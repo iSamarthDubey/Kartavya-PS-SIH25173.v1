@@ -1,0 +1,57 @@
+name: 📚 Documentation
+description: Access comprehensive project documentation
+about: Complete guides for setup, development, deployment, and troubleshooting
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # 📚 SIEM NLP Assistant Documentation
+        
+        **Welcome! Choose the documentation that best fits your needs:**
+
+  - type: checkboxes
+    id: documentation-type
+    attributes:
+      label: What type of documentation are you looking for?
+      description: Select all that apply
+      options:
+        - label: 🚀 **Quick Start** - Get running in 10 minutes
+          required: false
+        - label: 🏗️ **Architecture** - Understand system design
+          required: false  
+        - label: 📋 **API Reference** - Developer documentation
+          required: false
+        - label: 🔧 **Setup Guide** - Detailed installation
+          required: false
+        - label: 🔨 **Development** - Contributing guidelines
+          required: false
+        - label: 🚀 **Deployment** - Production setup
+          required: false
+        - label: 🛠️ **Troubleshooting** - Problem solving
+          required: false
+        - label: ❓ **FAQ** - Common questions
+          required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ## 📖 Documentation Links
+        
+        | Guide | Purpose | Link |
+        |-------|---------|------|
+        | 🚀 Quick Start | Get running in 10 minutes | **[docs/quick-start.md](./docs/quick-start.md)** |
+        | 🏗️ Architecture | System design & components | **[docs/architecture.md](./docs/architecture.md)** |
+        | 📋 API Reference | Complete API documentation | **[docs/api-reference.md](./docs/api-reference.md)** |
+        | 🔧 Setup Guide | Detailed installation | **[docs/setup-guide.md](./docs/setup-guide.md)** |
+        | 🔨 Development | Contributing guidelines | **[docs/development.md](./docs/development.md)** |
+        | 🚀 Deployment | Production deployment | **[docs/deployment.md](./docs/deployment.md)** |
+        | 🛠️ Troubleshooting | Common issues & solutions | **[docs/troubleshooting.md](./docs/troubleshooting.md)** |
+        | ❓ FAQ | Frequently asked questions | **[docs/faq.md](./docs/faq.md)** |
+        
+        ## 🎯 Quick Recommendations
+        
+        - **New to the project?** → Start with [Quick Start Guide](./docs/quick-start.md)
+        - **Developer?** → Check [API Reference](./docs/api-reference.md) & [Development Guide](./docs/development.md)
+        - **Deploying?** → Follow [Setup Guide](./docs/setup-guide.md) & [Deployment Guide](./docs/deployment.md)
+        - **Having issues?** → Check [Troubleshooting Guide](./docs/troubleshooting.md) & [FAQ](./docs/faq.md)

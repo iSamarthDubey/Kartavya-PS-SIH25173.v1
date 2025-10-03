@@ -1,0 +1,62 @@
+theme: minima
+title: "SIEM NLP Assistant Documentation"
+description: "Intelligent SIEM with Natural Language Processing - Complete Documentation"
+
+# Site settings
+url: "https://iSamarthDubey.github.io"
+baseurl: "/Kartavya-PS-SIH25173.v1"
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+
+# Navigation
+navigation:
+  - title: "🚀 Quick Start"
+    url: "/docs/quick-start"
+  - title: "🏗️ Architecture" 
+    url: "/docs/architecture"
+  - title: "📋 API Reference"
+    url: "/docs/api-reference"
+  - title: "🔧 Setup Guide"
+    url: "/docs/setup-guide"
+  - title: "🔨 Development"
+    url: "/docs/development"
+  - title: "🚀 Deployment"
+    url: "/docs/deployment"
+  - title: "🛠️ Troubleshooting"
+    url: "/docs/troubleshooting"
+  - title: "❓ FAQ"
+    url: "/docs/faq"
+
+# Collections
+collections:
+  docs:
+    output: true
+    permalink: /:collection/:name/
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+      type: "docs"
+    values:
+      layout: "default"
+      nav_order: 1
+
+# Plugins
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+  - jekyll-seo-tag
+
+# Exclude from processing
+exclude:
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor/
+  - .sass-cache/
+  - .jekyll-cache/
+  - gemfiles/
