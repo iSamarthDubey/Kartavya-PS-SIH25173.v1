@@ -124,7 +124,230 @@ class ContextManager:
         self.set_persistent_context("session", "session_data", self.session_data, ttl=86400)
         self.set_persistent_context("session", "user_preferences", self.user_preferences)
 
-    # New persistent context methods
+    # New persistent context methods (YOUR shared code integrated)
+    def set_context(self, namespace: str, key: str, value: Any, ttl: Optional[int] = None, metadata: Optional[Dict[str, Any]] = None) -> None:
+        """Insert or update a context entry.
+
+        ttl: seconds from now. If None => non-expiring.
+        metadata: arbitrary dict stored alongside the value.
+        """
+        with self._lock:
+            now = self._now()
+            meta_json = json.dumps(metadata or {})
+            val_json = json.dumps(value)
+
+            with self._conn() as conn:
+                cur = conn.cursor()
+                # try update first
+                cur.execute(
+                    "SELECT version FROM contexts WHERE namespace=? AND key=?",
+                    (namespace, key),
+                )
+                row = cur.fetchone()
+                if row:
+                    version = row["version"] + 1
+                    cur.execute(
+                        "UPDATE contexts SET value_json=?, metadata_json=?, version=?, updated_at=?, ttl=? WHERE namespace=? AND key=?",
+                        (val_json, meta_json, version, now, (now + ttl) if ttl else None, namespace, key),
+                    )
+                else:
+                    version = 1
+                    cur.execute(
+                        "INSERT INTO contexts(namespace, key, value_json, metadata_json, version, created_at, updated_at, ttl) VALUES (?,?,?,?,?,?,?,?)",
+                        (namespace, key, val_json, meta_json, version, now, now, (now + ttl) if ttl else None),
+                    )
+                conn.commit()
+
+            # update local cache
+            self._cache[(namespace, key)] = {
+                "value": value,
+                "metadata": metadata or {},
+                "version": version,
+                "updated_at": now,
+                "ttl": (now + ttl) if ttl else None,
+            }
+
+    def _is_expired_row(self, row: sqlite3.Row) -> bool:
+        ttl = row["ttl"]
+        if ttl is None:
+            return False
+        return self._now() > float(ttl)
+
+    def get_context(self, namespace: str, key: str, default: Any = None) -> Any:
+        """Get a stored context value. Returns default if not present or expired."""
+        with self._lock:
+            cache_key = (namespace, key)
+            # check cache first
+            cached = self._cache.get(cache_key)
+            if cached:
+                ttl = cached.get("ttl")
+                if ttl and self._now() > ttl:
+                    # expired -> delete and fall through
+                    try:
+                        self.delete_context(namespace, key)
+                    except Exception:
+                        pass
+                else:
+                    return cached["value"]
+
+            with self._conn() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT * FROM contexts WHERE namespace=? AND key=?", (namespace, key))
+                row = cur.fetchone()
+                if not row:
+                    return default
+                if self._is_expired_row(row):
+                    # remove expired
+                    cur.execute("DELETE FROM contexts WHERE namespace=? AND key=?", (namespace, key))
+                    conn.commit()
+                    self._cache.pop(cache_key, None)
+                    return default
+
+                value = json.loads(row["value_json"])
+                metadata = json.loads(row["metadata_json"] or "{}")
+                version = int(row["version"])
+                updated_at = float(row["updated_at"]) if row["updated_at"] else None
+                ttl = float(row["ttl"]) if row["ttl"] else None
+
+                # warm cache
+                self._cache[cache_key] = {
+                    "value": value,
+                    "metadata": metadata,
+                    "version": version,
+                    "updated_at": updated_at,
+                    "ttl": ttl,
+                }
+                return value
+
+    def delete_context(self, namespace: str, key: str) -> bool:
+        """Delete a context entry."""
+        with self._lock:
+            with self._conn() as conn:
+                cur = conn.cursor()
+                cur.execute("DELETE FROM contexts WHERE namespace=? AND key=?", (namespace, key))
+                conn.commit()
+            existed = self._cache.pop((namespace, key), None) is not None
+            return cur.rowcount > 0 or existed
+
+    def list_keys(self, namespace: str) -> List[str]:
+        """List all non-expired keys in a namespace."""
+        with self._lock:
+            with self._conn() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT key, ttl FROM contexts WHERE namespace=?", (namespace,))
+                rows = cur.fetchall()
+                res = []
+                for r in rows:
+                    if r["ttl"] and self._now() > float(r["ttl"]):
+                        # lazy cleanup
+                        conn.execute("DELETE FROM contexts WHERE namespace=? AND key=?", (namespace, r["key"]))
+                    else:
+                        res.append(r["key"])
+                conn.commit()
+                return res
+
+    def search(self, namespace: str, query: str, limit: int = 25) -> List[Dict[str, Any]]:
+        """A simple substring search across value_json and metadata_json.
+        Not a replacement for a true full-text search, but useful for quick lookups.
+        """
+        with self._lock:
+            q = f"%{query}%"
+            with self._conn() as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT key, value_json, metadata_json, version, ttl FROM contexts WHERE namespace=? AND (value_json LIKE ? OR metadata_json LIKE ?) LIMIT ?",
+                    (namespace, q, q, limit),
+                )
+                rows = cur.fetchall()
+                results = []
+                for r in rows:
+                    if r["ttl"] and self._now() > float(r["ttl"]):
+                        # skip expired
+                        continue
+                    results.append({
+                        "key": r["key"],
+                        "value": json.loads(r["value_json"]),
+                        "metadata": json.loads(r["metadata_json"] or "{}"),
+                        "version": r["version"],
+                    })
+                return results
+
+    def export_namespace(self, namespace: str, path: str) -> None:
+        """Export a namespace to a JSON file."""
+        with self._lock:
+            with self._conn() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT * FROM contexts WHERE namespace=?", (namespace,))
+                rows = cur.fetchall()
+                out = {}
+                for r in rows:
+                    if r["ttl"] and self._now() > float(r["ttl"]):
+                        continue
+                    out[r["key"]] = {
+                        "value": json.loads(r["value_json"]),
+                        "metadata": json.loads(r["metadata_json"] or "{}"),
+                        "version": r["version"],
+                        "updated_at": r["updated_at"],
+                        "ttl": r["ttl"],
+                    }
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(out, f, indent=2, ensure_ascii=False)
+
+    def import_namespace(self, namespace: str, path: str, overwrite: bool = False) -> None:
+        """Import a JSON exported by export_namespace into the given namespace.
+        If overwrite is False, existing keys will be skipped.
+        """
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        with self._lock:
+            with self._conn() as conn:
+                cur = conn.cursor()
+                for key, entry in data.items():
+                    cur.execute("SELECT 1 FROM contexts WHERE namespace=? AND key=?", (namespace, key))
+                    if cur.fetchone() and not overwrite:
+                        continue
+                    # compute ttl remaining if present
+                    ttl = None
+                    if entry.get("ttl"):
+                        ttl = float(entry["ttl"]) - self._now()
+                        if ttl <= 0:
+                            continue
+                    self.set_context(namespace, key, entry["value"], ttl=int(ttl) if ttl else None, metadata=entry.get("metadata"))
+
+    def build_elasticsearch_context_query(self, namespace: str, keys: List[str]) -> Dict[str, Any]:
+        """Create a simple Elasticsearch bool must query using stored context values.
+
+        Example: if key 'usernames' stores ['alice','bob'] and 'ips' stores ['1.2.3.4'],
+        create a bool -> should -> terms for common fields. This is opinionated and
+        intended to be adapted to your project's mapping.
+        """
+        parts = []
+        for key in keys:
+            val = self.get_context(namespace, key)
+            if val is None:
+                continue
+            # heuristics: lists -> terms, strings -> match, numbers -> term
+            if isinstance(val, list):
+                # try map key to typical fields
+                probable_fields = [key, f"{key}.keyword", f"{key}.raw"]
+                parts.append({
+                    "bool": {"should": [{"terms": {f: val}} for f in probable_fields], "minimum_should_match": 1}
+                })
+            elif isinstance(val, (int, float)):
+                parts.append({"term": {key: val}})
+            elif isinstance(val, str):
+                parts.append({"match_phrase": {key: val}})
+            else:
+                # fallback to match on stringified JSON
+                parts.append({"match": {key: json.dumps(val)}})
+
+        if not parts:
+            return {"match_none": {}}
+
+        return {"bool": {"must": parts}}
+
+    # Original set_persistent_context method (for backward compatibility)
     def set_persistent_context(self, namespace: str, key: str, value: Any, ttl: Optional[int] = None, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Store persistent context with optional TTL."""
         with self._lock:
@@ -301,7 +524,7 @@ class ContextManager:
         return self.get_persistent_context("query_cache", query_hash)
 
     # Enhanced Elasticsearch query generation
-    def build_elasticsearch_context_query(self, investigation_id: str) -> Dict[str, Any]:
+    def build_elasticsearch_investigation_query(self, investigation_id: str) -> Dict[str, Any]:
         """Build Elasticsearch query from investigation context."""
         investigation = self.get_investigation(investigation_id)
         if not investigation:
