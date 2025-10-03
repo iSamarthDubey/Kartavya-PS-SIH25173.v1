@@ -7,8 +7,8 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Docker-optimized requirements and install Python dependencies
-COPY ../requirements-docker.txt requirements.txt
+# Copy requirements file and install Python dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 

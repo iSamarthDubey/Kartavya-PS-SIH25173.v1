@@ -4,34 +4,6 @@
 
 Transform natural language queries into actionable security insights using advanced ML-powered query understanding, retrieval-augmented generation, and real-time SIEM integration.
 
----
-
-## 📚 **Documentation**
-
-**Complete project documentation is available in the [`docs/`](./docs/) directory:**
-
-| 📖 **Guide** | 🎯 **Purpose** | ⚡ **Quick Link** |
-|-------------|----------------|-------------------|
-| 🚀 **[Quick Start](./docs/quick-start.md)** | Get running in 10 minutes | **Start Here** |
-| 🏗️ **[Architecture](./docs/architecture.md)** | System design & components | Technical Overview |
-| 📋 **[API Reference](./docs/api-reference.md)** | Complete API documentation | For Developers |
-| 🔧 **[Setup Guide](./docs/setup-guide.md)** | Detailed installation | Production Setup |
-| 🔨 **[Development](./docs/development.md)** | Contributing guidelines | For Contributors |
-| 🚀 **[Deployment](./docs/deployment.md)** | Production deployment | DevOps Guide |
-| 🛠️ **[Troubleshooting](./docs/troubleshooting.md)** | Common issues & solutions | Need Help? |
-| ❓ **[FAQ](./docs/faq.md)** | Frequently asked questions | Quick Answers |
-
-### 🎯 **New to the project?** 
-→ Start with [Quick Start Guide](./docs/quick-start.md)
-
-### 👨‍💻 **Developer?** 
-→ Check [API Reference](./docs/api-reference.md) & [Development Guide](./docs/development.md)
-
-### 🚀 **Deploying?** 
-→ Follow [Setup Guide](./docs/setup-guide.md) & [Deployment Guide](./docs/deployment.md)
-
----
-
 ## 🚀 **Quick Start**
 
 ### 1. **Setup Environment**

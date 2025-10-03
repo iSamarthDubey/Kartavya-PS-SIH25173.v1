@@ -23,7 +23,7 @@ class ElasticClient:
         # Build connection configuration
         config = {
             'hosts': [{'host': host, 'port': port, 'scheme': 'http'}],
-            'timeout': 30,
+            'request_timeout': 30,
             'max_retries': 3,
             'retry_on_timeout': True
         }
