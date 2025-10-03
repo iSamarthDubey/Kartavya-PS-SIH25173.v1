@@ -29,12 +29,12 @@ class ElasticConnector:
         try:
             if self.username and self.password:
                 client = Elasticsearch(
-                    [{'host': self.host, 'port': self.port}],
+                    [f'http://{self.host}:{self.port}'],
                     basic_auth=(self.username, self.password),
                     verify_certs=False
                 )
             else:
-                client = Elasticsearch([{'host': self.host, 'port': self.port}])
+                client = Elasticsearch([f'http://{self.host}:{self.port}'])
             
             # Test connection
             if client.ping():
