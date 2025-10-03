@@ -11,8 +11,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import time
-import base64
-from io import BytesIO
 
 # Configure page
 st.set_page_config(
@@ -128,7 +126,7 @@ def display_sidebar():
                 st.json(health_data.get('components', {}))
         else:
             st.error("❌ Backend API: Offline")
-            st.info("💡 Start backend with: `cd backend && python test_and_run.py`")
+            st.info("💡 Start backend with: `cd backend && python main.py`")
         
         st.divider()
         
@@ -146,10 +144,10 @@ def display_sidebar():
             "Show firewall blocked connections"
         ]
         
-        for example in examples:
-            if st.button(f"💬 {example}", key=f"example_{hash(example)}", use_container_width=True):
-                st.session_state.query_input = example
-                st.rerun()
+        # Store clicked example in session state
+        for i, example in enumerate(examples):
+            if st.button(f"💬 {example}", key=f"example_{i}"):
+                st.session_state.selected_example = example
         
         st.divider()
         
@@ -170,10 +168,14 @@ def display_query_interface():
     st.header("🔍 Natural Language Query")
     
     # Initialize session state
-    if 'query_input' not in st.session_state:
-        st.session_state.query_input = ""
     if 'max_results' not in st.session_state:
         st.session_state.max_results = 50
+    
+    # Get default query from clicked example
+    default_query = ""
+    if 'selected_example' in st.session_state:
+        default_query = st.session_state.selected_example
+        del st.session_state.selected_example  # Clear after use
     
     # Query input
     col1, col2 = st.columns([4, 1])
@@ -181,14 +183,14 @@ def display_query_interface():
     with col1:
         query = st.text_input(
             "Enter your security question:",
-            value=st.session_state.query_input,
+            value=default_query,
             placeholder="e.g., Show failed login attempts from last hour",
             help="Ask questions in plain English about your security logs"
         )
     
     with col2:
         st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
-        search_clicked = st.button("🔍 Search", type="primary", use_container_width=True)
+        search_clicked = st.button("🔍 Search", type="primary")
     
     # Process query
     if search_clicked and query:
@@ -243,7 +245,7 @@ def display_results(query, result):
         
         if entities_df:
             df = pd.DataFrame(entities_df)
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df)
     
     # Results table
     if result.get('results'):
@@ -262,7 +264,7 @@ def display_results(query, result):
                         pass
             
             # Display table
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df)
             
             # Download option
             csv = df.to_csv(index=False)
@@ -287,12 +289,12 @@ def display_results(query, result):
                         chart_df['count'] = 1
                         
                         # Group by hour
-                        hourly = chart_df.set_index(ts_col).resample('H')['count'].sum().reset_index()
+                        hourly = chart_df.set_index(ts_col).resample('h')['count'].sum().reset_index()
                         
                         fig = px.line(hourly, x=ts_col, y='count', 
                                     title="Events Over Time",
                                     labels={ts_col: "Time", 'count': "Event Count"})
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig)
                     except Exception as e:
                         st.info(f"Could not generate time chart: {e}")
                 
@@ -311,7 +313,7 @@ def display_results(query, result):
                                    orientation='h',
                                    title=f"Top {chart_col} Values",
                                    labels={'x': 'Count', 'y': chart_col})
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig)
         
         except Exception as e:
             st.error(f"Error displaying results: {e}")
