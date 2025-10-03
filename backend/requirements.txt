@@ -1,28 +1,30 @@
-# Backend Service Dependencies
-# All packages use latest stable versions
+# SIEM Backend Service Dependencies
+# Use: pip install -r requirements.txt
 
 # FastAPI Framework
-fastapi
-uvicorn[standard]
-pydantic
-python-multipart
+fastapi>=0.118.0
+uvicorn[standard]>=0.37.0
+pydantic>=2.11.0
+python-multipart>=0.0.20
 
-# Elasticsearch and SIEM
-elasticsearch
-requests
+# SIEM & Search
+elasticsearch>=9.1.0
+requests>=2.32.0
 
-# NLP and ML
-spacy
-scikit-learn
-joblib
-dateparser
+# NLP & ML
+spacy>=3.8.0
+scikit-learn>=1.7.0
+joblib>=1.5.0
+dateparser>=1.2.0
 
-# Data processing
-pandas
-numpy
+# Data Processing
+pandas>=2.3.0
+numpy>=2.3.0
 
-# Logging and monitoring
-python-json-logger
+# Configuration & Logging
+python-dotenv>=1.1.0
+python-json-logger>=3.3.0
 
-# Environment management
-python-dotenv
+# Security
+cryptography>=43.0.0
+bcrypt>=4.3.0

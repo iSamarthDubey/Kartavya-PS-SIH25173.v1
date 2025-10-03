@@ -1,0 +1,138 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Logs
+*.log
+logs/
+
+# Models and data (optional - uncomment if you don't want to track large files)
+# models/*.pkl
+# models/*.h5
+# datasets/raw/
+# embeddings/faiss/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Elastic/Kibana data
+data/elasticsearch/
+data/kibana/
+
+# ========================================
+# TEMPORARY DOCUMENTATION FILES
+# Keep only main README.md, ignore all other doc files
+# ========================================
+
+# Analysis and structure documentation (temporary)
+STRUCTURE_ANALYSIS.md
+RESTRUCTURING_COMPLETE.md
+FINAL_CLEANUP_REPORT.md
+PROJECT_STATUS.md
+roadmap.md
+todo.md
+
+# Requirements documentation (temporary)
+REQUIREMENTS_FIX_REPORT.md
+REQUIREMENTS_DEPLOYMENT_READY.md
+REQUIREMENTS_SUMMARY.md
+DEPENDENCIES.md
+VERSION_STRATEGY_GUIDE.md
+
+# Installation and setup docs (temporary)
+install_dependencies.py
+
+# Any future temporary documentation files
+*_ANALYSIS.md
+*_REPORT.md
+*_STATUS.md
+*_SUMMARY.md
+*_GUIDE.md
+*_NOTES.md
+*_TEMP.md
+*_DRAFT.md
+
+# Keep main documentation only
+# README.md (keep this one!)
+# backend/README.md (keep this one!)
+
+# ========================================
+# END DOCUMENTATION EXCLUSIONS
+# ========================================

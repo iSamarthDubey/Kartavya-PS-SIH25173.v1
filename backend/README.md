@@ -43,7 +43,7 @@ Environment variables:
 
 ## 🏗️ Architecture
 
-```
+```0
 Backend Service
 ├── main.py              # FastAPI application and routes
 ├── elastic_client.py    # Elasticsearch wrapper

@@ -31,10 +31,10 @@
 
 ## 🎯 **RECOMMENDED HYBRID APPROACH:**
 
-### **Keep Our Strengths + Add ChatGPT's Improvements**
+### **Keep Our Strengths + Add Improvements**
 
 ```
-SIEM-NLP-Assistant/                 # 🆕 Rename from Kartavya-PS-SIH25173.v1
+root/               
 ├─ README.md                        # ✅ Keep ours (has project context)
 ├─ LICENSE                          # ✅ Keep
 ├─ .env                            # ✅ Keep
