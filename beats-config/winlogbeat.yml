@@ -1,0 +1,172 @@
+# Winlogbeat Configuration for Windows Event Logs
+# Collects Windows Event Logs and sends to Elasticsearch
+
+#======================= Winlogbeat specific options ==========================
+
+# Event logs to monitor
+winlogbeat.event_logs:
+  # Application logs
+  - name: Application
+    ignore_older: 72h
+    level: error, warning, information
+    
+  # System logs  
+  - name: System
+    ignore_older: 72h
+    level: error, warning, information
+    
+  # Security logs (requires admin privileges)
+  - name: Security
+    ignore_older: 72h
+    level: error, warning, information, success audit, failure audit
+    processors:
+      - script:
+          lang: javascript
+          id: security
+          source: >
+            function process(event) {
+                if (event.Get("winlog.event_id") === 4624) {
+                    event.Put("event.category", ["authentication"]);
+                    event.Put("event.type", ["start"]);
+                    event.Put("event.outcome", "success");
+                } else if (event.Get("winlog.event_id") === 4625) {
+                    event.Put("event.category", ["authentication"]);
+                    event.Put("event.type", ["start"]);
+                    event.Put("event.outcome", "failure");
+                }
+            }
+            
+  # Windows PowerShell logs
+  - name: Windows PowerShell
+    ignore_older: 72h
+    level: error, warning, information
+    
+  # Microsoft-Windows-PowerShell/Operational
+  - name: Microsoft-Windows-PowerShell/Operational
+    ignore_older: 72h
+    level: error, warning, information
+    
+  # Windows Defender logs
+  - name: Microsoft-Windows-Windows Defender/Operational
+    ignore_older: 72h
+    level: error, warning, information
+    
+  # DNS Server logs (if DNS server role is installed)
+  - name: DNS Server
+    ignore_older: 72h
+    level: error, warning, information
+    
+  # IIS logs (if IIS is installed)
+  - name: Microsoft-Windows-IIS-Logging/Logs
+    ignore_older: 72h
+    level: error, warning, information
+
+#================================ General =====================================
+
+# Name of the shipper
+name: "windows-logs-${HOSTNAME}"
+
+# Tags to include in each event
+tags: ["windows", "eventlogs", "security"]
+
+# Fields to add to each event
+fields:
+  environment: production
+  service: windows-security
+
+#================================ Outputs =====================================
+
+#-------------------------- Elasticsearch output ------------------------------
+output.elasticsearch:
+  hosts: ["localhost:9200"]
+  username: "elastic"
+  password: "changeme"
+  index: "winlogbeat-windows-%{+yyyy.MM.dd}"
+  template.name: "winlogbeat"
+  template.pattern: "winlogbeat-*"
+  template.settings:
+    index.number_of_shards: 1
+    index.number_of_replicas: 0
+
+#-------------------------- Logstash output --------------------------------
+# Uncomment to use Logstash instead of Elasticsearch
+#output.logstash:
+#  hosts: ["localhost:5044"]
+
+#================================ Processors =====================================
+processors:
+  # Add host metadata
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+      
+  # Add cloud metadata  
+  - add_cloud_metadata: ~
+  
+  # Parse Windows event data
+  - script:
+      lang: javascript
+      id: windows_events
+      source: >
+        function process(event) {
+            // Extract user information
+            var user_data = event.Get("winlog.user.name");
+            if (user_data) {
+                event.Put("user.name", user_data);
+            }
+            
+            // Extract source IP for authentication events
+            var source_ip = event.Get("winlog.event_data.IpAddress");
+            if (source_ip && source_ip !== "-") {
+                event.Put("source.ip", source_ip);
+            }
+            
+            // Extract process information
+            var process_name = event.Get("winlog.event_data.ProcessName");
+            if (process_name) {
+                event.Put("process.name", process_name);
+            }
+            
+            // Add event categorization
+            var event_id = event.Get("winlog.event_id");
+            if (event_id) {
+                switch(event_id) {
+                    case 4624:
+                        event.Put("event.action", "logon");
+                        event.Put("event.category", ["authentication"]);
+                        break;
+                    case 4625:
+                        event.Put("event.action", "logon_failed");
+                        event.Put("event.category", ["authentication"]);
+                        break;
+                    case 4648:
+                        event.Put("event.action", "explicit_logon");
+                        event.Put("event.category", ["authentication"]);
+                        break;
+                    case 4672:
+                        event.Put("event.action", "admin_logon");
+                        event.Put("event.category", ["authentication"]);
+                        break;
+                    case 4634:
+                        event.Put("event.action", "logoff");
+                        event.Put("event.category", ["authentication"]);
+                        break;
+                }
+            }
+        }
+
+#================================ Logging =====================================
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: C:\ProgramData\Winlogbeat\Logs
+  name: winlogbeat
+  keepfiles: 7
+  permissions: 0644
+
+#============================== X-Pack Monitoring ===============================
+monitoring.enabled: true
+
+#================================ HTTP Endpoint ==============================
+http.enabled: true
+http.host: "0.0.0.0"
+http.port: 5067

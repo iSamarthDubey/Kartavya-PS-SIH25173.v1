@@ -1,0 +1,86 @@
+Perfect timing ✅
+Let’s make a **clear split** between what we have **right now** vs. what’s **planned for future iterations** in this SIEM NLP Assistant project.
+
+---
+
+# 📌 Current (What we already have or are actively setting up)
+
+* **Infra**
+
+  * Docker setup for **Elasticsearch + Kibana** (working stack).
+  * **Metricbeat & Winlogbeat** running on Windows host (logs flowing in).
+  * Local environment config (`.env`, ports, credentials).
+* **Repo structure** skeleton (agreed & stable).
+* **Basic backend (FastAPI)** planned → `backend/` folder stub with `main.py`.
+* **Elastic connector module** (`siem_connector/elastic_connector.py`) for querying indices.
+* **Scripts** to ingest logs & test Beats (`scripts/ingest_logs.py`, `setup_beats.ps1`).
+* **Unit test stubs** (`tests/`).
+
+---
+
+# 🚀 Planned (Future roadmap we’ll add step by step)
+
+### 1️⃣ Core Assistant Features
+
+* **NLP Parser** (`nlp_parser/`)
+
+  * Extract intent/entities from user queries.
+  * Convert NL → Elastic DSL/KQL queries.
+* **Context Manager** (`context_manager/`)
+
+  * Store multi-turn conversations (in-memory first, Redis later).
+
+### 2️⃣ RAG + LLM Layer
+
+* **RAG Pipeline** (`rag_pipeline/`)
+
+  * Embedding logs & docs into FAISS or ES vector store.
+  * Retriever + prompt builder.
+  * Orchestrator to merge retrieved context into prompts.
+* **LLM Training** (`llm_training/`)
+
+  * Dataset of NL → KQL/DSL pairs (synthetic + real).
+  * Training & eval scripts (`train.py`, `evaluate.py`).
+* **Embeddings/Vector DB** (`embeddings/`)
+
+  * FAISS indices for offline retrieval.
+  * Optional: Elastic vector search.
+
+### 3️⃣ Enhanced Data + Datasets
+
+* Curated open-source **log datasets**:
+
+  * LogHub, CTU-13, Splunk attack samples, Wazuh samples.
+  * Processed into **synthetic NL → query pairs**.
+* **Synthetic dataset generator** (`scripts/generate_synthetic.py`).
+
+### 4️⃣ Results & Visualization
+
+* **Response Formatter** (`response_formatter/`)
+
+  * Text summaries (tables).
+  * Graphs (matplotlib/plotly).
+  * Dashboard export (to Kibana).
+
+### 5️⃣ UI & Demo Layer
+
+* **UI Dashboard** (`ui_dashboard/`)
+
+  * Streamlit app for querying assistant.
+  * Templates for formatted outputs.
+* **Optional: Slack/Telegram bot** integration for notifications.
+
+### 6️⃣ Deployment & Scaling
+
+* **Docker Compose** (`docker/`) for full infra setup.
+* Optional **VPS/Cloud deployment** guide.
+* CI/CD + tests pipeline.
+
+---
+
+# 📝 Summary:
+
+* **Current:** Elastic+Kibana Docker, Metricbeat+Winlogbeat (Windows), repo skeleton, backend stub, connectors, ingestion scripts.
+* **Future:** NLP parser → Context Manager → RAG pipeline → LLM fine-tuning → Advanced datasets → Formatter & dashboards → UI frontend → Cloud deployment.
+
+---

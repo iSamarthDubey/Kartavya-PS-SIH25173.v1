@@ -1,0 +1,28 @@
+# Backend Service Dependencies
+# All packages use latest stable versions
+
+# FastAPI Framework
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+
+# Elasticsearch and SIEM
+elasticsearch
+requests
+
+# NLP and ML
+spacy
+scikit-learn
+joblib
+dateparser
+
+# Data processing
+pandas
+numpy
+
+# Logging and monitoring
+python-json-logger
+
+# Environment management
+python-dotenv

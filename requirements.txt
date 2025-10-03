@@ -1,0 +1,48 @@
+# SIEM NLP Assistant - Main Dependencies
+# All packages use latest stable versions
+
+# Web Framework & API
+streamlit
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+
+# Machine Learning & NLP
+torch
+transformers
+sentence-transformers
+scikit-learn
+spacy
+joblib
+dateparser
+
+# Vector Database & Search
+faiss-cpu
+elasticsearch
+
+# Data Processing & Analysis
+pandas
+numpy
+requests
+python-dotenv
+pyyaml
+jsonlines
+
+# Visualization
+matplotlib
+plotly
+seaborn
+
+# Logging & Monitoring
+python-json-logger
+
+# Testing & Development
+pytest
+pytest-cov
+black
+flake8
+
+# Additional NLP dependencies
+nltk
+textstat
