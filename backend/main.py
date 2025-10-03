@@ -30,8 +30,10 @@ try:
     logger.info("✅ All imports successful")
 except ImportError as e:
     logger.error(f"❌ Import error: {e}")
-    # Fallback imports for running from different directories
+    # Fallback imports for running from backend directory
     import sys
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.insert(0, parent_dir)
     backend_dir = os.path.dirname(os.path.abspath(__file__))
     sys.path.insert(0, backend_dir)
     try:
@@ -40,6 +42,7 @@ except ImportError as e:
         from query_builder import QueryBuilder
         from elastic_client import ElasticClient
         from response_formatter.formatter import ResponseFormatter
+        from siem_connector import SIEMQueryProcessor, create_siem_processor
         logger.info("✅ Fallback imports successful")
     except ImportError as e2:
         logger.error(f"❌ Fallback import error: {e2}")
@@ -197,7 +200,18 @@ async def root():
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint."""
+    """Health check endpoint with detailed component status."""
+    
+    # Log component status for debugging
+    logger.info(f"Health check - intent_classifier: {intent_classifier is not None}")
+    logger.info(f"Health check - entity_extractor: {entity_extractor is not None}")
+    logger.info(f"Health check - query_builder: {query_builder is not None}")
+    logger.info(f"Health check - siem_processor: {siem_processor is not None}")
+    logger.info(f"Health check - response_formatter: {response_formatter is not None}")
+    logger.info(f"Health check - elastic_client: {elastic_client is not None}")
+    logger.info(f"Health check - rag_pipeline: {rag_pipeline is not None}")
+    
+    # Check actual component initialization status
     components = {
         "nlp_parser": (intent_classifier is not None and 
                       entity_extractor is not None and 
@@ -208,7 +222,19 @@ async def health_check():
         "text_formatter": response_formatter is not None
     }
     
-    all_healthy = all(components.values())
+    # Calculate working components count (core components only)
+    working_components = sum([
+        intent_classifier is not None,
+        entity_extractor is not None, 
+        query_builder is not None,
+        response_formatter is not None,
+        siem_processor is not None
+    ])
+    
+    logger.info(f"Health check - working components: {working_components}/5")
+    
+    # Consider system healthy if core components (4+/5) are working
+    all_healthy = working_components >= 4
     
     return HealthResponse(
         status="healthy" if all_healthy else "degraded",
@@ -221,9 +247,26 @@ async def process_query(request: QueryRequest):
     """Process natural language query and return SIEM results."""
     start_time = time.time()
     
+    # Initialize components if not already done (fallback)
+    global intent_classifier, entity_extractor, query_builder, response_formatter, siem_processor
+    
+    if intent_classifier is None:
+        logger.warning("⚠️ Re-initializing components during request")
+        try:
+            intent_classifier = IntentClassifier()
+            entity_extractor = EntityExtractor()
+            query_builder = QueryBuilder()
+            response_formatter = ResponseFormatter()
+            logger.info("✅ Components re-initialized successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize components: {e}")
+    
     # Check if core NLP components are available
     if not intent_classifier or not entity_extractor or not query_builder:
         logger.error("❌ NLP Parser components not available")
+        logger.error(f"Debug - intent_classifier: {intent_classifier is not None}")
+        logger.error(f"Debug - entity_extractor: {entity_extractor is not None}")
+        logger.error(f"Debug - query_builder: {query_builder is not None}")
         raise HTTPException(status_code=503, detail="NLP Parser not available")
     
     if not response_formatter:

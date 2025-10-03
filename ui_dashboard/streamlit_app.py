@@ -79,7 +79,6 @@ def query_backend(query, max_results=50):
     try:
         payload = {
             "query": query,
-            "parser_type": "enhanced",
             "max_results": max_results
         }
         
@@ -93,14 +92,20 @@ def query_backend(query, max_results=50):
         if response.status_code == 200:
             return True, response.json()
         else:
-            return False, f"API Error: {response.status_code} - {response.text}"
+            error_detail = "Unknown error"
+            try:
+                error_data = response.json()
+                error_detail = error_data.get('detail', response.text)
+            except:
+                error_detail = response.text
+            return False, f"API Error: {response.status_code} - {error_detail}"
     
     except requests.exceptions.Timeout:
-        return False, "Request timeout - backend may be slow"
+        return False, "⏱️ Request timeout - backend may be slow or unresponsive"
     except requests.exceptions.ConnectionError:
-        return False, "Cannot connect to backend - is it running?"
+        return False, "🔌 Cannot connect to backend - make sure it's running on http://localhost:8000"
     except Exception as e:
-        return False, f"Unexpected error: {str(e)}"
+        return False, f"❌ Unexpected error: {str(e)}"
 
 def display_header():
     """Display the main header."""
@@ -170,34 +175,47 @@ def display_query_interface():
     # Initialize session state
     if 'max_results' not in st.session_state:
         st.session_state.max_results = 50
+    if 'query_text' not in st.session_state:
+        st.session_state.query_text = ""
+    if 'process_query' not in st.session_state:
+        st.session_state.process_query = False
     
     # Get default query from clicked example
-    default_query = ""
     if 'selected_example' in st.session_state:
-        default_query = st.session_state.selected_example
+        st.session_state.query_text = st.session_state.selected_example
+        st.session_state.process_query = True
         del st.session_state.selected_example  # Clear after use
     
-    # Query input
-    col1, col2 = st.columns([4, 1])
+    # Query input with form for Enter key support
+    with st.form(key="query_form", clear_on_submit=False):
+        col1, col2 = st.columns([4, 1])
+        
+        with col1:
+            query = st.text_input(
+                "Enter your security question:",
+                value=st.session_state.query_text,
+                placeholder="e.g., Show failed login attempts from last hour",
+                help="Ask questions in plain English about your security logs",
+                key="query_input"
+            )
+        
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
+            search_clicked = st.form_submit_button("🔍 Search", type="primary")
     
-    with col1:
-        query = st.text_input(
-            "Enter your security question:",
-            value=default_query,
-            placeholder="e.g., Show failed login attempts from last hour",
-            help="Ask questions in plain English about your security logs"
-        )
+    # Update session state with current query
+    if query != st.session_state.query_text:
+        st.session_state.query_text = query
     
-    with col2:
-        st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
-        search_clicked = st.button("🔍 Search", type="primary")
-    
-    # Process query
-    if search_clicked and query:
-        success, result = query_backend(query, st.session_state.max_results)
+    # Process query when form submitted, button clicked, or example selected
+    if (search_clicked and query) or (st.session_state.process_query and st.session_state.query_text):
+        if st.session_state.process_query:
+            st.session_state.process_query = False  # Reset flag
+        
+        success, result = query_backend(st.session_state.query_text, st.session_state.max_results)
         
         if success:
-            display_results(query, result)
+            display_results(st.session_state.query_text, result)
         else:
             st.error(f"❌ Query failed: {result}")
     
