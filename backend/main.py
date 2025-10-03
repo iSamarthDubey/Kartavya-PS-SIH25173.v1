@@ -26,6 +26,7 @@ try:
     from query_builder import QueryBuilder
     from elastic_client import ElasticClient
     from response_formatter.formatter import ResponseFormatter
+    from siem_connector import SIEMQueryProcessor, create_siem_processor
     logger.info("✅ All imports successful")
 except ImportError as e:
     logger.error(f"❌ Import error: {e}")
