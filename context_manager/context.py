@@ -1,21 +1,55 @@
 """
-Context Manager for maintaining conversation state.
+Enhanced Context Manager for maintaining conversation state with persistence.
+Features: SQLite persistence, TTL support, thread safety, caching, search capabilities.
 """
 
-from typing import Dict, List, Any, Optional
-from datetime import datetime
+from typing import Dict, List, Any, Optional, Tuple
+from datetime import datetime, timedelta
 import json
 import logging
+import sqlite3
+import threading
+import time
+import os
+import hashlib
 
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_DB = "siem_contexts.db"
+
+CREATE_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS contexts (
+    namespace TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value_json TEXT NOT NULL,
+    metadata_json TEXT,
+    version INTEGER NOT NULL DEFAULT 1,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    ttl REAL,
+    PRIMARY KEY (namespace, key)
+);
+"""
+
+CREATE_INDEX_SQL = """
+CREATE INDEX IF NOT EXISTS idx_contexts_namespace ON contexts(namespace);
+CREATE INDEX IF NOT EXISTS idx_contexts_ttl ON contexts(ttl);
+CREATE INDEX IF NOT EXISTS idx_contexts_updated ON contexts(updated_at);
+"""
+
+
 class ContextManager:
-    """Manages conversation context and session state."""
+    """Enhanced context manager with persistence, TTL, and thread safety."""
     
-    def __init__(self, max_history: int = 50):
-        """Initialize context manager."""
+    def __init__(self, max_history: int = 50, db_path: str = DEFAULT_DB):
+        """Initialize enhanced context manager."""
         self.max_history = max_history
+        self.db_path = db_path
+        self._lock = threading.RLock()
+        self._cache: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        
+        # Legacy in-memory storage for backward compatibility
         self.conversation_history: List[Dict[str, Any]] = []
         self.session_data: Dict[str, Any] = {}
         self.user_preferences: Dict[str, Any] = {
@@ -23,10 +57,304 @@ class ContextManager:
             'max_results': 100,
             'preferred_format': 'table'
         }
+        
+        # Initialize database
+        self._ensure_db()
+        self._load_session_from_db()
+        self._start_cleanup_thread()
+
+    def _conn(self) -> sqlite3.Connection:
+        """Create database connection."""
+        conn = sqlite3.connect(self.db_path, timeout=30, check_same_thread=False)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def _ensure_db(self):
+        """Initialize database schema."""
+        with self._conn() as conn:
+            conn.executescript(CREATE_TABLE_SQL)
+            conn.executescript(CREATE_INDEX_SQL)
+            conn.commit()
+
+    def _now(self) -> float:
+        return time.time()
+
+    def _start_cleanup_thread(self):
+        """Start background cleanup thread."""
+        def cleanup_expired():
+            while True:
+                try:
+                    time.sleep(300)  # Clean every 5 minutes
+                    self._cleanup_expired()
+                except Exception as e:
+                    logger.error(f"Cleanup thread error: {e}")
+        
+        cleanup_thread = threading.Thread(target=cleanup_expired, daemon=True)
+        cleanup_thread.start()
+
+    def _cleanup_expired(self):
+        """Remove expired entries."""
+        with self._lock:
+            now = self._now()
+            with self._conn() as conn:
+                conn.execute("DELETE FROM contexts WHERE ttl IS NOT NULL AND ttl < ?", (now,))
+                conn.commit()
+
+    def _load_session_from_db(self):
+        """Load session data from database."""
+        # Load conversation history
+        history = self.get_persistent_context("session", "conversation_history", default=[])
+        if history:
+            self.conversation_history = history[-self.max_history:]
+        
+        # Load session data
+        session = self.get_persistent_context("session", "session_data", default={})
+        if session:
+            self.session_data = session
+        
+        # Load user preferences
+        prefs = self.get_persistent_context("session", "user_preferences", default={})
+        if prefs:
+            self.user_preferences.update(prefs)
+
+    def _save_session_to_db(self):
+        """Save session data to database."""
+        self.set_persistent_context("session", "conversation_history", self.conversation_history, ttl=86400)
+        self.set_persistent_context("session", "session_data", self.session_data, ttl=86400)
+        self.set_persistent_context("session", "user_preferences", self.user_preferences)
+
+    # New persistent context methods
+    def set_persistent_context(self, namespace: str, key: str, value: Any, ttl: Optional[int] = None, metadata: Optional[Dict[str, Any]] = None) -> None:
+        """Store persistent context with optional TTL."""
+        with self._lock:
+            now = self._now()
+            meta_json = json.dumps(metadata or {})
+            val_json = json.dumps(value)
+
+            with self._conn() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT version FROM contexts WHERE namespace=? AND key=?", (namespace, key))
+                row = cur.fetchone()
+                
+                if row:
+                    version = row["version"] + 1
+                    cur.execute(
+                        "UPDATE contexts SET value_json=?, metadata_json=?, version=?, updated_at=?, ttl=? WHERE namespace=? AND key=?",
+                        (val_json, meta_json, version, now, (now + ttl) if ttl else None, namespace, key),
+                    )
+                else:
+                    version = 1
+                    cur.execute(
+                        "INSERT INTO contexts(namespace, key, value_json, metadata_json, version, created_at, updated_at, ttl) VALUES (?,?,?,?,?,?,?,?)",
+                        (namespace, key, val_json, meta_json, version, now, now, (now + ttl) if ttl else None),
+                    )
+                conn.commit()
+
+            # Update cache
+            self._cache[(namespace, key)] = {
+                "value": value,
+                "metadata": metadata or {},
+                "version": version,
+                "updated_at": now,
+                "ttl": (now + ttl) if ttl else None,
+            }
+
+    def get_persistent_context(self, namespace: str, key: str, default: Any = None) -> Any:
+        """Get persistent context value."""
+        with self._lock:
+            cache_key = (namespace, key)
+            cached = self._cache.get(cache_key)
+            if cached:
+                ttl = cached.get("ttl")
+                if ttl and self._now() > ttl:
+                    self.delete_persistent_context(namespace, key)
+                    return default
+                return cached["value"]
+
+            with self._conn() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT * FROM contexts WHERE namespace=? AND key=?", (namespace, key))
+                row = cur.fetchone()
+                if not row:
+                    return default
+                    
+                if row["ttl"] and self._now() > float(row["ttl"]):
+                    cur.execute("DELETE FROM contexts WHERE namespace=? AND key=?", (namespace, key))
+                    conn.commit()
+                    return default
+
+                value = json.loads(row["value_json"])
+                self._cache[cache_key] = {
+                    "value": value,
+                    "metadata": json.loads(row["metadata_json"] or "{}"),
+                    "version": row["version"],
+                    "updated_at": row["updated_at"],
+                    "ttl": row["ttl"],
+                }
+                return value
+
+    def delete_persistent_context(self, namespace: str, key: str) -> bool:
+        """Delete persistent context."""
+        with self._lock:
+            with self._conn() as conn:
+                cur = conn.cursor()
+                cur.execute("DELETE FROM contexts WHERE namespace=? AND key=?", (namespace, key))
+                conn.commit()
+                deleted = cur.rowcount > 0
+            self._cache.pop((namespace, key), None)
+            return deleted
+
+    def search_context(self, namespace: str, query: str, limit: int = 25) -> List[Dict[str, Any]]:
+        """Search context entries."""
+        with self._lock:
+            q = f"%{query}%"
+            now = self._now()
+            with self._conn() as conn:
+                cur = conn.cursor()
+                cur.execute(
+                    """SELECT key, value_json, metadata_json, version 
+                       FROM contexts 
+                       WHERE namespace=? AND (ttl IS NULL OR ttl > ?) 
+                       AND (value_json LIKE ? OR metadata_json LIKE ?) 
+                       ORDER BY updated_at DESC LIMIT ?""",
+                    (namespace, now, q, q, limit),
+                )
+                results = []
+                for row in cur.fetchall():
+                    results.append({
+                        "key": row["key"],
+                        "value": json.loads(row["value_json"]),
+                        "metadata": json.loads(row["metadata_json"] or "{}"),
+                        "version": row["version"],
+                    })
+                return results
+
+    # Enhanced investigation methods
+    def start_investigation(self, investigation_name: str, initial_indicators: Dict[str, Any], user_id: str = "default") -> str:
+        """Start a new security investigation."""
+        investigation_id = f"inv_{int(self._now())}"
+        
+        investigation_data = {
+            "name": investigation_name,
+            "created_by": user_id,
+            "created_at": datetime.now().isoformat(),
+            "status": "active",
+            "indicators": initial_indicators,
+            "timeline": [],
+            "related_queries": []
+        }
+        
+        self.set_persistent_context("investigations", investigation_id, investigation_data, ttl=7*24*3600)
+        logger.info(f"Started investigation: {investigation_id}")
+        return investigation_id
+
+    def add_to_investigation(self, investigation_id: str, findings: Dict[str, Any]):
+        """Add findings to investigation."""
+        investigation = self.get_persistent_context("investigations", investigation_id)
+        if not investigation:
+            raise ValueError(f"Investigation {investigation_id} not found")
+        
+        investigation["timeline"].append({
+            "timestamp": datetime.now().isoformat(),
+            "findings": findings
+        })
+        
+        if "indicators" in findings:
+            for key, value in findings["indicators"].items():
+                if key in investigation["indicators"]:
+                    if isinstance(investigation["indicators"][key], list):
+                        investigation["indicators"][key].extend(value if isinstance(value, list) else [value])
+                    else:
+                        investigation["indicators"][key] = [investigation["indicators"][key]]
+                        investigation["indicators"][key].extend(value if isinstance(value, list) else [value])
+                else:
+                    investigation["indicators"][key] = value
+        
+        self.set_persistent_context("investigations", investigation_id, investigation, ttl=7*24*3600)
+
+    def get_investigation(self, investigation_id: str) -> Optional[Dict[str, Any]]:
+        """Get investigation data."""
+        return self.get_persistent_context("investigations", investigation_id)
+
+    def list_investigations(self, user_id: str = None) -> List[Dict[str, Any]]:
+        """List all investigations."""
+        results = self.search_context("investigations", "", limit=100)
+        if user_id:
+            results = [r for r in results if r["value"].get("created_by") == user_id]
+        return results
+
+    # Query caching methods
+    def cache_query_result(self, query: str, results: Dict[str, Any], user_id: str = "default", ttl: int = 1800):
+        """Cache query results."""
+        query_hash = hashlib.md5(f"{query}_{user_id}".encode()).hexdigest()
+        self.set_persistent_context("query_cache", query_hash, {
+            "query": query,
+            "results": results,
+            "user_id": user_id,
+            "cached_at": datetime.now().isoformat()
+        }, ttl=ttl)
+
+    def get_cached_query_result(self, query: str, user_id: str = "default") -> Optional[Dict[str, Any]]:
+        """Get cached query result."""
+        query_hash = hashlib.md5(f"{query}_{user_id}".encode()).hexdigest()
+        return self.get_persistent_context("query_cache", query_hash)
+
+    # Enhanced Elasticsearch query generation
+    def build_elasticsearch_context_query(self, investigation_id: str) -> Dict[str, Any]:
+        """Build Elasticsearch query from investigation context."""
+        investigation = self.get_investigation(investigation_id)
+        if not investigation:
+            return {"match_all": {}}
+        
+        must_clauses = []
+        should_clauses = []
+        
+        indicators = investigation.get("indicators", {})
+        for key, values in indicators.items():
+            if not values:
+                continue
+                
+            if isinstance(values, list):
+                if key in ['ip_addresses', 'source_ips', 'dest_ips']:
+                    should_clauses.extend([
+                        {"terms": {"source.ip": values}},
+                        {"terms": {"destination.ip": values}},
+                        {"terms": {"client.ip": values}}
+                    ])
+                elif key in ['usernames', 'users']:
+                    should_clauses.extend([
+                        {"terms": {"user.name": values}},
+                        {"terms": {"user.id": values}}
+                    ])
+                elif key in ['processes', 'process_names']:
+                    should_clauses.append({"terms": {"process.name": values}})
+                else:
+                    should_clauses.append({"terms": {key: values}})
+            elif isinstance(values, str):
+                if key in ['event_type', 'action']:
+                    must_clauses.append({"match": {"event.action": values}})
+                elif key in ['host', 'hostname']:
+                    must_clauses.append({"match": {"host.name": values}})
+                else:
+                    must_clauses.append({"match_phrase": {key: values}})
+            elif isinstance(values, dict) and key == 'time_range':
+                must_clauses.append({"range": {"@timestamp": values}})
+
+        query = {"bool": {}}
+        if must_clauses:
+            query["bool"]["must"] = must_clauses
+        if should_clauses:
+            query["bool"]["should"] = should_clauses
+            query["bool"]["minimum_should_match"] = 1
+
+        return query if query["bool"] else {"match_all": {}}
+
+    # Legacy methods (enhanced with persistence)
     
     def add_interaction(self, user_query: str, parsed_query: Dict[str, Any], 
                        siem_query: Dict[str, Any], results: List[Dict[str, Any]]):
-        """Add an interaction to the conversation history."""
+        """Add an interaction to the conversation history (now persistent)."""
         interaction = {
             'timestamp': datetime.now().isoformat(),
             'user_query': user_query,
@@ -41,16 +369,20 @@ class ContextManager:
         # Keep only recent interactions
         if len(self.conversation_history) > self.max_history:
             self.conversation_history = self.conversation_history[-self.max_history:]
+        
+        # Save to database
+        self._save_session_to_db()
     
     def get_conversation_context(self, num_interactions: int = 5) -> List[Dict[str, Any]]:
         """Get recent conversation context."""
         return self.conversation_history[-num_interactions:]
     
     def get_related_queries(self, current_query: str) -> List[Dict[str, Any]]:
-        """Find related queries from conversation history."""
+        """Find related queries from conversation history and database."""
         related = []
         current_words = set(current_query.lower().split())
         
+        # Search in-memory history
         for interaction in self.conversation_history:
             query_words = set(interaction['user_query'].lower().split())
             overlap = len(current_words.intersection(query_words))
@@ -59,31 +391,55 @@ class ContextManager:
                 related.append({
                     'query': interaction['user_query'],
                     'timestamp': interaction['timestamp'],
-                    'similarity_score': overlap / len(current_words.union(query_words))
+                    'similarity_score': overlap / len(current_words.union(query_words)),
+                    'source': 'current_session'
                 })
         
-        # Sort by similarity score
-        related.sort(key=lambda x: x['similarity_score'], reverse=True)
-        return related[:3]  # Return top 3 related queries
+        # Search in persistent storage
+        search_results = self.search_context("conversations", current_query, limit=10)
+        for result in search_results:
+            interaction = result["value"]
+            if interaction.get('user_query'):
+                query_words = set(interaction['user_query'].lower().split())
+                overlap = len(current_words.intersection(query_words))
+                if overlap > 1:
+                    related.append({
+                        'query': interaction['user_query'],
+                        'timestamp': interaction.get('timestamp', ''),
+                        'similarity_score': overlap / len(current_words.union(query_words)),
+                        'source': 'history'
+                    })
+        
+        # Sort by similarity score and remove duplicates
+        seen_queries = set()
+        unique_related = []
+        for item in sorted(related, key=lambda x: x['similarity_score'], reverse=True):
+            if item['query'] not in seen_queries:
+                seen_queries.add(item['query'])
+                unique_related.append(item)
+        
+        return unique_related[:5]  # Return top 5 related queries
     
     def update_session_data(self, key: str, value: Any):
-        """Update session data."""
+        """Update session data (now persistent)."""
         self.session_data[key] = value
+        self._save_session_to_db()
     
     def get_session_data(self, key: str, default: Any = None) -> Any:
         """Get session data."""
         return self.session_data.get(key, default)
     
     def set_user_preference(self, key: str, value: Any):
-        """Set user preference."""
+        """Set user preference (now persistent)."""
         self.user_preferences[key] = value
+        self._save_session_to_db()
     
     def get_user_preference(self, key: str, default: Any = None) -> Any:
         """Get user preference."""
         return self.user_preferences.get(key, default)
     
     def get_query_suggestions(self, partial_query: str = "") -> List[str]:
-        """Get query suggestions based on history and partial input."""
+        """Get query suggestions based on history and partial input (enhanced with search)."""
         suggestions = []
         
         # Add suggestions from recent queries
@@ -91,6 +447,14 @@ class ContextManager:
             query = interaction['user_query']
             if partial_query.lower() in query.lower():
                 suggestions.append(query)
+        
+        # Search persistent storage for suggestions
+        if partial_query:
+            search_results = self.search_context("conversations", partial_query, limit=5)
+            for result in search_results:
+                interaction = result["value"]
+                if interaction.get('user_query') and interaction['user_query'] not in suggestions:
+                    suggestions.append(interaction['user_query'])
         
         # Add common query patterns
         common_patterns = [
@@ -109,7 +473,7 @@ class ContextManager:
                 if pattern not in suggestions:
                     suggestions.append(pattern)
         
-        return suggestions[:5]
+        return suggestions[:8]  # Increased limit
     
     def _summarize_results(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Create a summary of query results."""
@@ -126,53 +490,112 @@ class ContextManager:
         return summary
     
     def clear_session(self):
-        """Clear current session data."""
+        """Clear current session data (enhanced with persistent cleanup)."""
         self.conversation_history = []
         self.session_data = {}
+        
+        # Clear from database
+        self.delete_persistent_context("session", "conversation_history")
+        self.delete_persistent_context("session", "session_data")
     
     def export_session(self) -> str:
-        """Export session data as JSON."""
+        """Export session data as JSON (enhanced with persistent data)."""
+        # Include both in-memory and persistent data
+        persistent_investigations = self.search_context("investigations", "", limit=100)
+        persistent_cache = self.search_context("query_cache", "", limit=50)
+        
         export_data = {
             'conversation_history': self.conversation_history,
             'session_data': self.session_data,
             'user_preferences': self.user_preferences,
+            'investigations': persistent_investigations,
+            'cached_queries': persistent_cache,
             'export_timestamp': datetime.now().isoformat()
         }
         
         return json.dumps(export_data, indent=2)
     
     def import_session(self, session_json: str):
-        """Import session data from JSON."""
+        """Import session data from JSON (enhanced with persistent storage)."""
         try:
             data = json.loads(session_json)
             self.conversation_history = data.get('conversation_history', [])
             self.session_data = data.get('session_data', {})
             self.user_preferences.update(data.get('user_preferences', {}))
-            logger.info("Session data imported successfully")
+            
+            # Import investigations
+            investigations = data.get('investigations', [])
+            for inv in investigations:
+                self.set_persistent_context("investigations", inv["key"], inv["value"], 
+                                          metadata=inv.get("metadata"))
+            
+            # Save to database
+            self._save_session_to_db()
+            logger.info("Enhanced session data imported successfully")
         except Exception as e:
             logger.error(f"Failed to import session data: {e}")
     
     def get_session_stats(self) -> Dict[str, Any]:
-        """Get session statistics."""
+        """Get comprehensive session statistics."""
         total_queries = len(self.conversation_history)
         
+        # Get database stats
+        with self._conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT namespace, COUNT(*) as count FROM contexts GROUP BY namespace")
+            db_stats = {row["namespace"]: row["count"] for row in cur.fetchall()}
+            
+            cur.execute("SELECT COUNT(*) as total FROM contexts")
+            total_contexts = cur.fetchone()["total"]
+        
         if total_queries == 0:
-            return {'total_queries': 0}
+            base_stats = {'total_queries': 0}
+        else:
+            # Calculate average results per query
+            total_results = sum(interaction['results_count'] for interaction in self.conversation_history)
+            avg_results = total_results / total_queries if total_queries > 0 else 0
+            
+            # Find most common query types
+            query_types = [interaction['parsed_query'].get('intent', 'unknown') 
+                          for interaction in self.conversation_history]
+            
+            base_stats = {
+                'total_queries': total_queries,
+                'average_results_per_query': round(avg_results, 2),
+                'session_duration': self._calculate_session_duration(),
+                'most_common_intents': self._get_most_common(query_types)
+            }
         
-        # Calculate average results per query
-        total_results = sum(interaction['results_count'] for interaction in self.conversation_history)
-        avg_results = total_results / total_queries if total_queries > 0 else 0
+        base_stats.update({
+            'persistent_contexts': total_contexts,
+            'contexts_by_namespace': db_stats,
+            'cache_size': len(self._cache),
+            'database_path': self.db_path
+        })
         
-        # Find most common query types
-        query_types = [interaction['parsed_query'].get('intent', 'unknown') 
-                      for interaction in self.conversation_history]
-        
+        return base_stats
+
+    # Utility methods for dashboard and monitoring
+    def get_dashboard_data(self, user_id: str = "default") -> Dict[str, Any]:
+        """Get comprehensive dashboard data."""
         return {
-            'total_queries': total_queries,
-            'average_results_per_query': round(avg_results, 2),
-            'session_duration': self._calculate_session_duration(),
-            'most_common_intents': self._get_most_common(query_types)
+            "user_session": {
+                "conversation_history": self.conversation_history[-10:],
+                "session_data": self.session_data,
+                "user_preferences": self.user_preferences
+            },
+            "active_investigations": self.list_investigations(user_id),
+            "recent_queries": [h['user_query'] for h in self.conversation_history[-5:]],
+            "system_stats": self.get_session_stats()
         }
+
+    def cleanup_old_data(self, days_old: int = 30):
+        """Cleanup data older than specified days."""
+        cutoff_time = self._now() - (days_old * 24 * 3600)
+        with self._conn() as conn:
+            conn.execute("DELETE FROM contexts WHERE created_at < ?", (cutoff_time,))
+            conn.commit()
+            logger.info(f"Cleaned up contexts older than {days_old} days")
     
     def _calculate_session_duration(self) -> str:
         """Calculate session duration."""
