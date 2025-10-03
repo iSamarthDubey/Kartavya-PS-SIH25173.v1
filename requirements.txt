@@ -1,48 +1,48 @@
 # SIEM NLP Assistant - Main Dependencies
-# All packages use latest stable versions
+# Use: pip install -r requirements.txt
 
 # Web Framework & API
-streamlit
-fastapi
-uvicorn[standard]
-pydantic
-python-multipart
+streamlit>=1.50.0
+fastapi>=0.118.0
+uvicorn[standard]>=0.37.0
+pydantic>=2.11.0
+python-multipart>=0.0.20
 
 # Machine Learning & NLP
-torch
-transformers
-sentence-transformers
-scikit-learn
-spacy
-joblib
-dateparser
+torch>=2.8.0
+transformers>=4.56.0
+sentence-transformers>=5.1.0
+scikit-learn>=1.7.0
+spacy>=3.8.0
+joblib>=1.5.0
+nltk>=3.9.0
+textstat>=0.7.10
+dateparser>=1.2.0
 
-# Vector Database & Search
-faiss-cpu
-elasticsearch
-
-# Data Processing & Analysis
-pandas
-numpy
-requests
-python-dotenv
-pyyaml
-jsonlines
+# Search & Data
+faiss-cpu>=1.12.0
+elasticsearch>=9.1.0
+pandas>=2.3.0
+numpy>=2.3.0
+requests>=2.32.0
 
 # Visualization
-matplotlib
-plotly
-seaborn
+matplotlib>=3.10.0
+plotly>=6.3.0
+seaborn>=0.13.0
 
-# Logging & Monitoring
-python-json-logger
+# Configuration & Utilities
+python-dotenv>=1.1.0
+pyyaml>=6.0.0
+jsonlines>=4.0.0
+python-json-logger>=3.3.0
 
-# Testing & Development
-pytest
-pytest-cov
-black
-flake8
+# Development & Testing
+pytest>=8.4.0
+pytest-cov>=7.0.0
+black>=25.9.0
+flake8>=7.3.0
 
-# Additional NLP dependencies
-nltk
-textstat
+# Security
+cryptography>=43.0.0
+bcrypt>=4.3.0

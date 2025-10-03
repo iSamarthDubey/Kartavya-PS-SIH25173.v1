@@ -143,7 +143,7 @@ netstat -ano | findstr :9200
 
 ## 📁 **Directory Structure**
 
-```
+```0
 docker/
 ├── docker-compose.yml     # Main compose file
 ├── notes.md              # This file
