@@ -102,11 +102,12 @@ query_builder = None
 elastic_client = None
 response_formatter = None
 rag_pipeline = None
+siem_processor = None
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize components on startup."""
-    global intent_classifier, entity_extractor, query_builder, elastic_client, response_formatter, rag_pipeline
+    global intent_classifier, entity_extractor, query_builder, elastic_client, response_formatter, rag_pipeline, siem_processor
     
     logger.info("🚀 Starting backend components initialization...")
     
@@ -142,6 +143,15 @@ async def startup_event():
         logger.error(f"❌ Elasticsearch client failed: {e}")
         elastic_client = None
         
+    # Initialize SIEM processor
+    try:
+        siem_platform = os.getenv('SIEM_PLATFORM', 'elasticsearch')
+        siem_processor = create_siem_processor(siem_platform)
+        logger.info(f"✅ SIEM processor initialized for {siem_platform}")
+    except Exception as e:
+        logger.error(f"❌ SIEM processor failed: {e}")
+        siem_processor = None
+        
     # Initialize response formatter
     try:
         response_formatter = ResponseFormatter()
@@ -166,13 +176,14 @@ async def startup_event():
         intent_classifier is not None,
         entity_extractor is not None, 
         query_builder is not None,
-        response_formatter is not None
+        response_formatter is not None,
+        siem_processor is not None
     ])
     
-    logger.info(f"🎯 Initialization complete: {working_components}/4 core components working")
+    logger.info(f"🎯 Initialization complete: {working_components}/5 core components working")
     
     if working_components < 4:
-        logger.warning("⚠️ Some components failed to initialize - NLP Parser may have limited functionality")
+        logger.warning("⚠️ Some components failed to initialize - API may have limited functionality")
 
 @app.get("/", response_model=Dict[str, str])
 async def root():
@@ -191,6 +202,7 @@ async def health_check():
         "nlp_parser": (intent_classifier is not None and 
                       entity_extractor is not None and 
                       query_builder is not None),
+        "siem_connector": siem_processor is not None,
         "rag_pipeline": rag_pipeline is not None,
         "elastic_connector": elastic_client is not None,
         "text_formatter": response_formatter is not None
@@ -232,34 +244,68 @@ async def process_query(request: QueryRequest):
         es_query = query_builder.build_query(request.query)
         logger.info("Elasticsearch query built")
         
-        # Step 4: Execute query
+        # Step 4: Execute query using enhanced SIEM connector
         results = []
         aggregations = None
         
-        if elastic_client and elastic_client.connected:
+        if siem_processor:
             try:
-                # Use the search method from our ElasticClient
-                index_pattern = "logs-*"  # Default index pattern
+                # Use the enhanced SIEM processor
+                logger.info("Using enhanced SIEM processor for query execution")
+                
+                response = siem_processor.process_query(
+                    es_query, 
+                    size=request.max_results,
+                    index="logs-*"
+                )
+                
+                # Extract results from normalized response
+                results = [hit.get('source', {}) for hit in response.get('hits', [])]
+                aggregations = response.get('aggregations', None)
+                
+                # Add metadata from SIEM processor
+                execution_metadata = response.get('metadata', {})
+                logger.info(f"SIEM query executed successfully: {execution_metadata.get('total_hits', 0)} hits in {execution_metadata.get('execution_time', 0):.2f}s")
+                
+            except Exception as e:
+                logger.warning(f"SIEM processor failed, falling back to direct Elasticsearch: {e}")
+                # Fallback to direct Elasticsearch
+                if elastic_client and elastic_client.connected:
+                    try:
+                        search_response = elastic_client.client.search(
+                            index="logs-*",
+                            body=es_query,
+                            size=request.max_results
+                        )
+                        hits = search_response.get('hits', {}).get('hits', [])
+                        results = [hit.get('_source', {}) for hit in hits]
+                        aggregations = search_response.get('aggregations', None)
+                        logger.info(f"Fallback query executed: {len(results)} results")
+                    except Exception as fallback_error:
+                        logger.warning(f"Fallback also failed: {fallback_error}")
+                        results = _generate_mock_results(intent, entity_summary)
+                else:
+                    results = _generate_mock_results(intent, entity_summary)
+                    
+        elif elastic_client and elastic_client.connected:
+            try:
+                # Direct Elasticsearch as fallback
+                logger.info("Using direct Elasticsearch client")
                 search_response = elastic_client.client.search(
-                    index=index_pattern,
+                    index="logs-*",
                     body=es_query,
                     size=request.max_results
                 )
-                
-                # Extract hits
                 hits = search_response.get('hits', {}).get('hits', [])
                 results = [hit.get('_source', {}) for hit in hits]
-                
-                # Extract aggregations if present
                 aggregations = search_response.get('aggregations', None)
-                
-                logger.info(f"Query executed successfully: {len(results)} results")
+                logger.info(f"Direct query executed: {len(results)} results")
                 
             except Exception as e:
-                logger.warning(f"Elasticsearch query failed: {e}")
+                logger.warning(f"Direct Elasticsearch query failed: {e}")
                 results = _generate_mock_results(intent, entity_summary)
         else:
-            logger.warning("Elasticsearch not connected, using mock results")
+            logger.warning("No SIEM connectors available, using mock results")
             results = _generate_mock_results(intent, entity_summary)
         
         # Step 5: Format response
@@ -334,6 +380,128 @@ async def get_query_suggestions(partial_query: str = ""):
         return {"suggestions": filtered_suggestions[:5]}
     
     return {"suggestions": suggestions[:8]}
+
+@app.get("/siem/health")
+async def get_siem_health():
+    """Get SIEM platform health status."""
+    if not siem_processor:
+        raise HTTPException(status_code=503, detail="SIEM processor not available")
+    
+    try:
+        health_status = siem_processor.get_health_status()
+        return health_status
+    except Exception as e:
+        logger.error(f"SIEM health check failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
+
+@app.get("/siem/indices")
+async def get_available_indices():
+    """Get list of available SIEM indices/data sources."""
+    if not siem_processor:
+        raise HTTPException(status_code=503, detail="SIEM processor not available")
+    
+    try:
+        indices = siem_processor.get_available_indices()
+        return {"indices": indices, "count": len(indices)}
+    except Exception as e:
+        logger.error(f"Failed to get indices: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get indices: {str(e)}")
+
+class AlertRequest(BaseModel):
+    severity: Optional[str] = None
+    time_range: str = "last_hour"
+    max_results: int = 100
+
+@app.post("/siem/alerts")
+async def fetch_alerts(request: AlertRequest):
+    """Fetch security alerts from SIEM platform."""
+    if not siem_processor:
+        raise HTTPException(status_code=503, detail="SIEM processor not available")
+    
+    try:
+        alerts_response = siem_processor.fetch_alerts(
+            severity=request.severity,
+            time_range=request.time_range,
+            size=request.max_results
+        )
+        
+        return {
+            "success": True,
+            "alerts": alerts_response.get('hits', []),
+            "total_alerts": alerts_response.get('metadata', {}).get('total_hits', 0),
+            "metadata": alerts_response.get('metadata', {})
+        }
+        
+    except Exception as e:
+        logger.error(f"Alert fetching failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Alert fetching failed: {str(e)}")
+
+class LogRequest(BaseModel):
+    log_type: Optional[str] = None
+    time_range: str = "last_hour"
+    source_ip: Optional[str] = None
+    max_results: int = 100
+
+@app.post("/siem/logs")
+async def fetch_logs(request: LogRequest):
+    """Fetch logs from SIEM platform with filters."""
+    if not siem_processor:
+        raise HTTPException(status_code=503, detail="SIEM processor not available")
+    
+    try:
+        logs_response = siem_processor.fetch_logs(
+            log_type=request.log_type,
+            time_range=request.time_range,
+            source_ip=request.source_ip,
+            size=request.max_results
+        )
+        
+        return {
+            "success": True,
+            "logs": logs_response.get('hits', []),
+            "total_logs": logs_response.get('metadata', {}).get('total_hits', 0),
+            "summary": logs_response.get('summary', {}),
+            "metadata": logs_response.get('metadata', {})
+        }
+        
+    except Exception as e:
+        logger.error(f"Log fetching failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Log fetching failed: {str(e)}")
+
+@app.get("/siem/info")
+async def get_siem_info():
+    """Get SIEM platform information and capabilities."""
+    if not siem_processor:
+        raise HTTPException(status_code=503, detail="SIEM processor not available")
+    
+    try:
+        health = siem_processor.get_health_status()
+        indices = siem_processor.get_available_indices()
+        
+        return {
+            "platform": siem_processor.platform,
+            "status": health.get('status', 'unknown'),
+            "available_indices": indices,
+            "capabilities": {
+                "query_execution": True,
+                "alert_fetching": True,
+                "log_fetching": True,
+                "health_monitoring": True,
+                "response_normalization": True
+            },
+            "supported_formats": ["elasticsearch_dsl", "kql"],
+            "version": "1.0.0"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get SIEM info: {e}")
+        return {
+            "platform": getattr(siem_processor, 'platform', 'unknown'),
+            "status": "error",
+            "error": str(e),
+            "capabilities": {},
+            "version": "1.0.0"
+        }
 
 def _generate_mock_results(intent: QueryIntent, entity_summary: Dict[str, List[str]]) -> List[Dict[str, Any]]:
     """Generate mock results for demonstration."""
