@@ -951,18 +951,21 @@ def main():
         
         if success:
             # Add assistant response to history
+            # Backend returns 'data' field, map it to 'results' for display
+            results_data = response.get('data', response.get('results', []))
+            
             assistant_message = {
                 'role': 'assistant',
-                'content': response.get('summary', 'Query processed successfully'),
-                'summary': response.get('summary', ''),
-                'results': response.get('results', []),
+                'content': response.get('answer', response.get('summary', 'Query processed successfully')),
+                'summary': response.get('answer', response.get('summary', '')),
+                'results': results_data,
                 'visualizations': response.get('visualizations', []),
-                'entities': response.get('entities', []),
+                'entities': response.get('entities', {}),
                 'metadata': {
                     'intent': response.get('intent', 'unknown'),
-                    'confidence_score': response.get('metadata', {}).get('confidence_score', 0),
-                    'results_count': len(response.get('results', [])),
-                    'processing_time_seconds': response.get('metadata', {}).get('processing_time_seconds', 0),
+                    'confidence_score': response.get('confidence', response.get('metadata', {}).get('confidence_score', 0)),
+                    'results_count': response.get('result_count', len(results_data)),
+                    'processing_time_seconds': response.get('execution_time', response.get('metadata', {}).get('processing_time_seconds', 0)),
                     'data_sources': response.get('metadata', {}).get('data_sources', [])
                 },
                 'timestamp': datetime.now().isoformat()
