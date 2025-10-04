@@ -1,4 +1,13 @@
-# Python cache files
+# ============================================
+# KARTAVYA SIEM NLP ASSISTANT - .gitignore
+# Smart India Hackathon 2025 - SIH25173
+# ============================================
+
+# ========================================
+# PYTHON
+# ========================================
+
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
@@ -18,6 +27,8 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -34,127 +45,471 @@ pip-delete-this-directory.txt
 # Unit test / coverage reports
 htmlcov/
 .tox/
+.nox/
 .coverage
 .coverage.*
 .cache
 nosetests.xml
 coverage.xml
 *.cover
+*.py,cover
 .hypothesis/
 .pytest_cache/
+pytestdebug.log
 
 # Jupyter Notebook
 .ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# IPython
+profile_default/
+ipython_config.py
 
 # pyenv
 .python-version
 
+# pipenv
+Pipfile.lock
+
+# Poetry
+poetry.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
 # Environments
 .env
+.env.local
+.env.*.local
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+pythonenv*
 
-# IDEs
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# ========================================
+# IDEs & EDITORS
+# ========================================
+
+# Visual Studio Code
 .vscode/
+*.code-workspace
+
+# PyCharm
 .idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
 *.swp
 *.swo
+*.swn
 *~
+.vim/
 
-# OS files
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# Eclipse
+.project
+.pydevproject
+.settings/
+
+# ========================================
+# OPERATING SYSTEMS
+# ========================================
+
+# macOS
 .DS_Store
 .DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
-ehthumbs.db
+.AppleDouble
+.LSOverride
+
+# Windows
 Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+.directory
+.Trash-*
+.nfs*
+
+# ========================================
+# DOCKER & CONTAINERS
+# ========================================
 
 # Docker
 .dockerignore
+docker-compose.override.yml
 
-# Logs
-*.log
-logs/
+# Container volumes
+volumes/
+docker-volumes/
 
-# Context Manager Database Files
-# Production databases that should be tracked for deployment
-!siem_contexts.db
-!siem_production.db
+# ========================================
+# DATABASES
+# ========================================
 
-# Test and development databases (ignore these)
+# SQLite databases (IMPORTANT: Be selective)
+# Test and development databases (IGNORE these)
 *test*.db
 *demo*.db
 *temp*.db
 *dev*.db
-test_*.db
-demo_*.db
-temp_*.db
+verification_test.db
+test_integration.db
 
-# SQLite temporary files
+# SQLite temporary files (ALWAYS ignore)
 *.db-shm
 *.db-wal
 *.db-journal
 
-# Models and data (optional - uncomment if you don't want to track large files)
-# models/*.pkl
-# models/*.h5
-# datasets/raw/
-# embeddings/faiss/
+# Production/Important databases (TRACK these - using ! to force include)
+!siem_contexts.db
+!ui_dashboard/siem_contexts.db
+
+# PostgreSQL
+*.pgsql
+*.sql
+*.dump
+
+# MySQL
+*.mysql
+
+# ========================================
+# ELASTICSEARCH & SIEM DATA
+# ========================================
+
+# Elasticsearch data
+data/elasticsearch/
+elasticsearch/data/
+
+# Kibana data
+data/kibana/
+kibana/data/
+
+# Logstash data
+data/logstash/
+
+# Beats data
+beats/data/
+
+# SIEM logs (large files)
+logs/*.log
+*.log
+
+# ========================================
+# MACHINE LEARNING & AI
+# ========================================
+
+# Model files (large)
+*.pkl
+*.h5
+*.hdf5
+*.pb
+*.pt
+*.pth
+*.onnx
+*.joblib
+
+# Training checkpoints
+checkpoints/
+*.ckpt
+
+# TensorBoard logs
+runs/
+tensorboard_logs/
+
+# Weights & Biases
+wandb/
+
+# MLflow
+mlruns/
+mlflow/
+
+# ========================================
+# DATASETS & EMBEDDINGS
+# ========================================
+
+# Large dataset files (optional - uncomment if needed)
+# datasets/raw/**/*.csv
+# datasets/raw/**/*.json
+# datasets/raw/**/*.txt
+# datasets/raw/**/*.pcap
+
+# Processed datasets (can be regenerated)
+datasets/processed/*.parquet
+datasets/processed/*.feather
+
+# Embeddings (can be regenerated)
+embeddings/faiss/*.index
+embeddings/elastic_vectors/*.npy
+
+# Synthetic data (can be regenerated)
+datasets/synthetic/*.json
+datasets/synthetic/*.csv
+
+# ========================================
+# LOGS & TEMPORARY FILES
+# ========================================
+
+# Application logs
+*.log
+logs/
+*.log.*
+log/
 
 # Temporary files
 tmp/
 temp/
 *.tmp
-
-# Enhanced Context Manager Files
-# Development and test files
-*context_test*
-*siem_test*
-*integration_test*
-
-# Backup files
+*.temp
 *.bak
 *.backup
 *_backup.*
+*_old.*
+*.orig
 
-# Elastic/Kibana data
-data/elasticsearch/
-data/kibana/
+# Python temporary
+*.pyc.bak
+*.pyo.bak
 
 # ========================================
-# DOCUMENTATION FILES POLICY
-# EXCLUDE: All .md files EXCEPT README.md in any directory
+# SECURITY & CREDENTIALS
 # ========================================
 
-# Ignore ALL markdown files
+# Environment files with secrets
+.env
+.env.local
+.env.production
+.env.staging
+.env.*.local
+*.env
+
+# Credentials
+credentials.json
+secrets.json
+*.key
+*.pem
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# API keys
+api_keys.txt
+config/secrets.yml
+
+# ========================================
+# BUILD & DEPENDENCIES
+# ========================================
+
+# Node.js (if using npm for frontend tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+
+# Compiled assets
+static/dist/
+static/build/
+
+# ========================================
+# DOCUMENTATION (SELECTIVE TRACKING)
+# ========================================
+
+# IGNORE all markdown files by default
 *.md
 
-# BUT keep these specific README files
+# TRACK only specific important documentation
 !README.md
-!*/README.md
-!**/README.md
-!docs/README.md
+!LICENSE
+!CONTRIBUTING.md
+!CODE_OF_CONDUCT.md
+!CHANGELOG.md
+!SECURITY.md
 
-# Explicitly ignore common doc files even if they match README pattern
-docs/*.md
+# TRACK docs folder documentation
+!docs/README.md
+!docs/PROJECT_STRUCTURE.md
+!docs/ARCHITECTURE_DIAGRAM.md
+!docs/QUICK_REFERENCE.md
+!docs/GETTING_STARTED.md
+!docs/API_REFERENCE.md
+!docs/NLP_PIPELINE.md
+!docs/SIEM_INTEGRATION.md
+!docs/DEPLOYMENT.md
+!docs/TESTING.md
+!docs/FAQ.md
+
+# IGNORE temporary/internal markdown files
+*_TEMP.md
+*_DRAFT.md
+*_WIP.md
 *_ANALYSIS.md
 *_REPORT.md
 *_STATUS.md
 *_SUMMARY.md
-*_GUIDE.md
 *_NOTES.md
 *_PLAN.md
 *_COMPLETE.md
-roadmap.md
+*_BACKUP.md
 todo.md
 TODO.md
+roadmap.md
 ROADMAP.md
+RESTRUCTURING_COMPLETE.md
+VERSION_STRATEGY_GUIDE.md
 
 # ========================================
-# END DOCUMENTATION EXCLUSIONS
+# PROJECT-SPECIFIC
+# ========================================
+
+# Script outputs
+scripts/output/
+scripts/logs/
+
+# Test outputs
+tests/output/
+tests/reports/
+
+# Backup streamlit apps (keep original only)
+ui_dashboard/*_backup.py
+ui_dashboard/*_old.py
+backend/*_backup.py
+backend/*_old.py
+
+# Generated configuration files
+config/generated/
+
+# Cache directories
+.cache/
+cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+coverage.xml
+
+# Profiling data
+*.prof
+*.lprof
+
+# ========================================
+# MISC
+# ========================================
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Media files (if not needed)
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.mp3
+*.wav
+
+# Large binary files
+*.bin
+*.dat
+
+# Compiled files
+*.class
+*.o
+*.obj
+
+# ========================================
+# KEEP THESE IMPORTANT FILES
+# (Force include even if matched above)
+# ========================================
+
+# Documentation
+!README.md
+!LICENSE
+!docs/*.md
+!docs/**/*.md
+
+# Configuration templates
+!config/*.template
+!config/*.example
+
+# Essential scripts
+!scripts/*.py
+!scripts/*.sh
+!scripts/*.ps1
+
+# Requirements files
+!requirements*.txt
+
+# Docker files
+!Dockerfile
+!docker-compose.yml
+!.dockerignore
+
+# CI/CD
+!.github/**/*
+!.gitlab-ci.yml
+!.travis.yml
+
+# Git
+!.gitignore
+!.gitattributes
+
+# ========================================
+# END OF .gitignore
 # ========================================
