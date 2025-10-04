@@ -1,81 +1,145 @@
-# 🛡️ SIEM NLP Assistant
+# Project Details
 
-**Intelligent Security Information and Event Management (SIEM) system with Natural Language Processing capabilities.**
+> _This project is being developed for the Smart India Hackathon (SIH) 2025, under the following problem statement:_
 
-Transform natural language queries into actionable security insights using advanced ML-powered query understanding, retrieval-augmented generation, and real-time SIEM integration.
+> _**Problem Statement Title:** Conversational SIEM Assistant for Investigation and Automated Threat Reporting using NLP  <br>
+> **PS Number:** SIH25173  <br>
+> **Organization:** Indian Space Research Organisation (ISRO)  <br>
+> **Department:** Department of Space (DoS)  <br>
+> **Theme:** Blockchain & Cybersecurity  <br>_
 
-## 🚀 **Quick Start**
+The goal is to provide a natural language interface for ELK-based SIEMs (Elastic SIEM, Wazuh), enabling conversational investigations and automated threat reporting without requiring users to know query syntax.
 
-### 1. **Setup Environment**
+---
+
+## Overview
+
+SIEM NLP Assistant bridges the gap between users and ELK-based SIEMs (Elastic SIEM, Wazuh) by enabling natural language investigations and automated threat reporting. Users can ask questions or request reports in plain English, and the assistant translates these into optimized SIEM queries—no query syntax required.
+
+**Key Capabilities:**
+
+- Multi-turn, context-aware conversational investigations
+- Automated report generation (text, tables, charts)
+- Works with both Elastic SIEM and Wazuh (via APIs)
+- No changes required to SIEM core
+
+---
+
+## Features
+
+- 🔍 **Conversational Investigations:**
+  - Multi-turn queries (e.g., “What suspicious login attempts occurred yesterday?” → “Filter only VPN-related attempts.”)
+  - Context preserved across follow-ups
+  - Translates natural language to Elasticsearch DSL/KQL
+
+- 📊 **Automated Report Generation:**
+  - Request summaries or charts in natural language
+  - Aggregates and presents results as narratives, tables, or visuals
+
+- 🧠 **NLP & Query Engine:**
+  - Advanced entity/intent extraction
+  - Handles ambiguous/relative terms (“last week”, “unusual activity”)
+  - Intelligent error handling and feedback
+
+- ⚡ **SIEM Integration:**
+  - Connects to Elastic SIEM and Wazuh via REST APIs
+  - Efficient, optimized query generation
+
+---
+
+## Architecture
+
+- **NLP Parser:** Understands natural language inputs
+- **Query Generator:** Maps parsed intent to Elasticsearch DSL/KQL
+- **SIEM Connector:** Interfaces with Elastic/Wazuh APIs
+- **Response Formatter:** Converts results to text, tables, or charts
+- **Context Manager:** Maintains dialogue history for iterative queries
+
+---
+
+## Quick Start
+
+### 1. Prerequisites
+
+- Python 3.10+
+- Docker & Docker Compose (recommended)
+- Elastic SIEM and/or Wazuh instance (local or remote)
+
+### 2. Automated Setup
+
+Run the following command in your project directory:
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+python setup.py
+```
 
-# Install spaCy model
+This script will:
+
+- Check/install all Python dependencies
+- Set up Docker containers (if you choose)
+- Prepare the environment for first use
+- Optionally launch the app for you
+
+**Note:** If you encounter any issues, see the README or run the manual steps below.
+
+### 3. Manual Steps (if needed)
+
+**Install dependencies:**
+
+```bash
+pip install -r requirements.txt
+```
+
+**Download spaCy model:**
+
+```bash
 python -m spacy download en_core_web_sm
 ```
 
-### 2. **Start SIEM Stack**
+**Start Docker services:**
 
 ```bash
-# Start Elasticsearch + Kibana
 cd docker
 docker-compose up -d
 ```
 
-### 3. **Run Applications**
+**Launch the app:**
 
 ```bash
-# Start FastAPI backend
-cd backend
-python main.py
-
-# Start Streamlit dashboard  
-streamlit run ui_dashboard/streamlit_app.py
+python app.py
 ```
 
-## 🤖 **Core Features**
+The default demo interface is Streamlit. (A dedicated dashboard is planned for production.)
 
-### **🧠 Enhanced NLP Parser**
+---
 
-- **Machine Learning**: TF-IDF + LogisticRegression for intent classification
-- **Confidence Scoring**: Reliability metrics for all predictions
-- **Advanced Entities**: IPs, domains, ports, time ranges, security events
-- **Smart Fallback**: Graceful degradation to pattern-based parsing
+## Deployment
 
-### **🔍 RAG Pipeline**
+- **Docker (Recommended):**
+  - Use the provided `docker-compose.yml` for easy setup of all services.
+- **Local Python:**
+  - Install dependencies and run as above for development or testing.
 
-- **Contextual Understanding**: Retrieval-augmented query generation
-- **Vector Search**: FAISS/Elasticsearch dense vector storage
-- **Multi-turn Context**: Conversation memory and state management
+---
 
-### **🔌 SIEM Integration**
+## Contributors & Contact
 
-- **Elasticsearch**: Native query DSL generation and execution
-- **Wazuh**: REST API connector for alert management
-- **Real-time Search**: Live log analysis and threat detection
+- Project Lead: [Samarth Dubey](https://github.com/iSamarthDubey)
+- For questions or contributions, open an issue or contact the maintainer.
 
-### **📊 Response Formatting**
+---
 
-- **Human-readable**: Natural language summaries of findings
-- **Visual Charts**: Plotly-based security dashboards
-- **Export Options**: JSON, CSV, and formatted reports
+## Disclaimer
 
-- All dependencies use the latest stable versions (no version pinning)
-- Use `scripts/update_dependencies.ps1` (Windows) or `scripts/update_dependencies.sh` (Linux/Mac) to update all dependencies
-- Check for outdated packages: `python -m pip list --outdated`
+This project here is only for research and demonstration purposes. Not production-hardened. Use at your own risk.
 
-## Architecture
-
-The project is organized into several key components:
-
-- **SIEM Connectors**: Interface with different SIEM platforms
-- **NLP Parser**: Process natural language queries
-- **RAG Pipeline**: Retrieve relevant context for query generation
-- **Response Formatter**: Format results for presentation
-- **Context Manager**: Maintain conversation state
+---
 
 ## License
 
-See LICENSE file for details.
+MIT License. See [LICENSE](LICENSE) file for details.
+
+---
+
+>
+> **From questions to insights - your SIEM, now truly conversational. Security made simple, powerful, and human-centric.** _"Project by **Team Kartavya**. Made with passion, for SIH 2025."_
