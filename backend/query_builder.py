@@ -86,28 +86,53 @@ class QueryBuilder:
             }
         }
     
-    def build_query(self, natural_query: str, index_pattern: str = "logs-*") -> Dict[str, Any]:
+    async def build_query(self, query_params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Convert natural language query to Elasticsearch DSL.
         
         Args:
-            natural_query: Natural language query string
-            index_pattern: Elasticsearch index pattern to search
+            query_params: Dictionary containing:
+                - raw_text: Natural language query string
+                - intent: Optional pre-classified intent
+                - entities: Optional pre-extracted entities
             
         Returns:
             Elasticsearch DSL query dictionary
         """
-        # Classify intent
-        intent, confidence = self.intent_classifier.classify_intent(natural_query)
+        # Extract params
+        natural_query = query_params.get('raw_text', '')
+        pre_intent = query_params.get('intent')
+        pre_entities = query_params.get('entities', [])
+        index_pattern = query_params.get('index_pattern', 'logs-*')
         
-        # Extract entities
-        entities = self.entity_extractor.extract_entities(natural_query)
+        # Use pre-classified intent or classify now
+        if pre_intent and isinstance(pre_intent, str):
+            intent_str = pre_intent
+            # Try to get enum value
+            try:
+                from backend.nlp.intent_classifier import QueryIntent
+                intent = QueryIntent(intent_str) if hasattr(QueryIntent, intent_str.upper()) else None
+            except:
+                intent = None
+            confidence = query_params.get('confidence', 0.5)
+        else:
+            intent, confidence = self.intent_classifier.classify_intent(natural_query)
+        
+        # Use pre-extracted entities or extract now
+        if pre_entities and isinstance(pre_entities, list):
+            entities = pre_entities
+        else:
+            entities = self.entity_extractor.extract_entities(natural_query)
+        
         entity_summary = self.entity_extractor.get_entity_summary(entities)
         
         # Extract time range
         time_range = self.entity_extractor.extract_time_range(natural_query)
         
-        logger.info(f"Building query for intent: {intent.value}, entities: {entity_summary}")
+        # Get intent string safely
+        intent_str = intent.value if (intent and hasattr(intent, 'value')) else (pre_intent or 'unknown')
+        
+        logger.info(f"Building query for intent: {intent_str}, entities: {entity_summary}")
         
         # Build base query structure
         query = {
