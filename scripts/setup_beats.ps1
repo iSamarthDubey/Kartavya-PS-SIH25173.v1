@@ -60,7 +60,7 @@ function Install-Beat {
         return $true
     }
     catch {
-        Write-Error "Failed to install $BeatName: $($_.Exception.Message)"
+  Write-Error "Failed to install ${BeatName}: $($_.Exception.Message)"
         return $false
     }
 }
@@ -97,7 +97,7 @@ filebeat.inputs:
       level: error
 
 output.elasticsearch:
-  hosts: ["$($ElasticHost):$($ElasticPort)"]
+  hosts: ["${ElasticHost}:${ElasticPort}"]
   index: "security-logs-%{+yyyy.MM.dd}"
 
 setup.template.name: "security-logs"
@@ -148,7 +148,7 @@ metricbeat.modules:
   period: 10s
 
 output.elasticsearch:
-  hosts: ["$($ElasticHost):$($ElasticPort)"]
+  hosts: ["${ElasticHost}:${ElasticPort}"]
   index: "metrics-%{+yyyy.MM.dd}"
 
 setup.template.name: "metrics"
@@ -202,13 +202,14 @@ $StopScriptPath = Join-Path $InstallPath "stop_beats.bat"
 $StopScriptContent | Out-File -FilePath $StopScriptPath -Encoding ASCII
 
 Write-Host "`nInstallation Summary:" -ForegroundColor Cyan
+
 Write-Host "- Installation Path: $InstallPath" -ForegroundColor White
-Write-Host "- Elasticsearch Host: $ElasticHost:$ElasticPort" -ForegroundColor White
+Write-Host "- Elasticsearch Host: ${ElasticHost}:${ElasticPort}" -ForegroundColor White
 Write-Host "- Start Beats: $StartScriptPath" -ForegroundColor White
 Write-Host "- Stop Beats: $StopScriptPath" -ForegroundColor White
 
 Write-Host "`nNext Steps:" -ForegroundColor Cyan
-Write-Host "1. Ensure Elasticsearch is running on $ElasticHost:$ElasticPort" -ForegroundColor Yellow
+Write-Host "1. Ensure Elasticsearch is running on ${ElasticHost}:${ElasticPort}" -ForegroundColor Yellow
 Write-Host "2. Run $StartScriptPath to start log collection" -ForegroundColor Yellow
 Write-Host "3. Check logs in Elasticsearch using Kibana or the SIEM Assistant" -ForegroundColor Yellow
 

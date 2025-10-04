@@ -72,7 +72,7 @@ class QueryResponse(BaseModel):
     intent: str
     entities: List[Dict[str, Any]]
     query_type: str
-    siem_query: str
+    siem_query: Dict[str, Any]  # Changed from str to Dict - Elasticsearch DSL query
     results: List[Dict[str, Any]]
     visualizations: List[Dict[str, Any]]
     summary: str

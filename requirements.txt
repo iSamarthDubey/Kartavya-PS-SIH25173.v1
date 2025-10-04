@@ -36,6 +36,7 @@ python-dotenv>=1.1.0
 pyyaml>=6.0.0
 jsonlines>=4.0.0
 python-json-logger>=3.3.0
+watchdog>=4.0.0  # File watcher for auto-reload
 
 # Development & Testing
 pytest>=8.4.0
