@@ -138,6 +138,7 @@ data/kibana/
 !README.md
 !*/README.md
 !**/README.md
+!docs/README.md
 
 # Explicitly ignore common doc files even if they match README pattern
 docs/*.md
