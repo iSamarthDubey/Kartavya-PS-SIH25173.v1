@@ -21,11 +21,12 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from .nlp_parser.parser import NLPParser
+from backend.nlp.intent_classifier import IntentClassifier
+from backend.nlp.entity_extractor import EntityExtractor
 from backend.query_builder import QueryBuilder
 from siem_connector.elastic_connector import ElasticConnector
 from siem_connector.wazuh_connector import WazuhConnector
-from response_formatter.formatter import ResponseFormatter
+from backend.response_formatter.formatter import ResponseFormatter
 from context_manager.context import ContextManager
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,8 @@ class ConversationalPipeline:
         self.config = config or {}
         
         # Initialize core components
-        self.nlp_parser = None
+        self.intent_classifier = None
+        self.entity_extractor = None
         self.query_builder = None
         self.elastic_connector = None
         self.wazuh_connector = None
@@ -62,11 +64,17 @@ class ConversationalPipeline:
         try:
             logger.info("Initializing ConversationalPipeline components...")
             
-            # 1. Initialize NLP Parser
-            self.nlp_parser = NLPParser()
+            # 1. Initialize NLP Components
+            self.intent_classifier = IntentClassifier()
             await self._safe_component_init(
-                lambda: self.nlp_parser.initialize(),
-                "NLP Parser"
+                lambda: None,  # IntentClassifier doesn't need async init
+                "Intent Classifier"
+            )
+            
+            self.entity_extractor = EntityExtractor()
+            await self._safe_component_init(
+                lambda: None,  # EntityExtractor doesn't need async init
+                "Entity Extractor"
             )
             
             # 2. Initialize Query Builder
@@ -206,21 +214,33 @@ class ConversationalPipeline:
     async def _process_nlp(self, user_input: str, conversation_id: str) -> Dict[str, Any]:
         """Step 1: Process natural language input for intent and entities."""
         try:
-            if self.nlp_parser:
-                result = await self.nlp_parser.parse(user_input)
-                logger.info(f"NLP Analysis - Intent: {result.get('intent')}, Entities: {len(result.get('entities', []))}")
-                return result
+            if self.intent_classifier and self.entity_extractor:
+                # Classify intent
+                intent, confidence = self.intent_classifier.classify_intent(user_input)
+                intent_str = intent.value if hasattr(intent, 'value') else str(intent)
+                
+                # Extract entities
+                entities = self.entity_extractor.extract_entities(user_input)
+                
+                logger.info(f"NLP Analysis - Intent: {intent_str}, Entities: {len(entities)}, Confidence: {confidence:.2f}")
+                
+                return {
+                    'intent': intent_str,
+                    'entities': entities,
+                    'confidence': confidence,
+                    'raw_intent': intent
+                }
             else:
-                # Fallback if NLP parser not available
+                # Fallback if NLP components not available
                 return {
                     'intent': 'search_logs',
-                    'entities': [],
+                    'entities': {},
                     'confidence': 0.5,
                     'fallback': True
                 }
         except Exception as e:
             logger.warning(f"NLP processing failed: {e}")
-            return {'intent': 'search_logs', 'entities': [], 'confidence': 0.0}
+            return {'intent': 'search_logs', 'entities': {}, 'confidence': 0.0}
     
     async def _generate_query(self, nlp_result: Dict, user_input: str) -> Dict[str, Any]:
         """Step 2: Generate SIEM query from NLP analysis."""
@@ -343,7 +363,8 @@ class ConversationalPipeline:
     def get_health_status(self) -> Dict[str, Any]:
         """Get health status of all pipeline components."""
         components = {
-            'nlp_parser': self.nlp_parser is not None,
+            'intent_classifier': self.intent_classifier is not None,
+            'entity_extractor': self.entity_extractor is not None,
             'query_builder': self.query_builder is not None,
             'elastic_connector': self.elastic_connector is not None,
             'wazuh_connector': self.wazuh_connector is not None,

@@ -4,6 +4,7 @@ Comprehensive testing for the assistant pipeline and API endpoints.
 """
 
 import pytest
+import pytest_asyncio
 import asyncio
 import json
 from unittest.mock import Mock, patch, AsyncMock
@@ -20,7 +21,7 @@ from assistant.main import app
 class TestConversationalPipeline:
     """Test the core conversational pipeline functionality."""
     
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def pipeline(self):
         """Create a test pipeline instance."""
         pipeline = ConversationalPipeline()
@@ -71,8 +72,9 @@ class TestConversationalPipeline:
         
         # Check that components dict has expected keys
         expected_components = [
-            'nlp_parser', 'query_builder', 'elastic_connector',
-            'wazuh_connector', 'response_formatter', 'context_manager'
+            'intent_classifier', 'entity_extractor', 'query_builder', 
+            'elastic_connector', 'wazuh_connector', 'response_formatter', 
+            'context_manager'
         ]
         for component in expected_components:
             assert component in status['components']

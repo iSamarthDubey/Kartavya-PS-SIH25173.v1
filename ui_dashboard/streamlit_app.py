@@ -21,7 +21,7 @@ st.set_page_config(
 )
 
 # Constants
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = "http://localhost:8001"
 API_TIMEOUT = 10
 
 # Custom CSS
@@ -79,16 +79,14 @@ def query_backend(query, max_results=50):
     try:
         payload = {
             "query": query,
-            "max_results": max_results
+            "conversation_id": "frontend_session"
         }
-        
         with st.spinner("🔍 Processing your query..."):
             response = requests.post(
-                f"{BACKEND_URL}/query", 
-                json=payload, 
+                f"{BACKEND_URL}/ask",
+                json=payload,
                 timeout=API_TIMEOUT
             )
-        
         if response.status_code == 200:
             return True, response.json()
         else:
@@ -99,11 +97,10 @@ def query_backend(query, max_results=50):
             except:
                 error_detail = response.text
             return False, f"API Error: {response.status_code} - {error_detail}"
-    
     except requests.exceptions.Timeout:
         return False, "⏱️ Request timeout - backend may be slow or unresponsive"
     except requests.exceptions.ConnectionError:
-        return False, "🔌 Cannot connect to backend - make sure it's running on http://localhost:8000"
+        return False, f"🔌 Cannot connect to backend - make sure it's running on {BACKEND_URL}"
     except Exception as e:
         return False, f"❌ Unexpected error: {str(e)}"
 
