@@ -127,50 +127,32 @@ data/elasticsearch/
 data/kibana/
 
 # ========================================
-# TEMPORARY DOCUMENTATION FILES
-# Keep only main README.md, ignore all other doc files
+# DOCUMENTATION FILES POLICY
+# EXCLUDE: All .md files EXCEPT README.md in any directory
 # ========================================
 
-# Analysis and structure documentation (temporary)
-STRUCTURE_ANALYSIS.md
-RESTRUCTURING_COMPLETE.md
-FINAL_CLEANUP_REPORT.md
-PROJECT_STATUS.md
-roadmap.md
-todo.md
+# Ignore ALL markdown files
+*.md
 
-# Requirements documentation (temporary)
-REQUIREMENTS_FIX_REPORT.md
-REQUIREMENTS_DEPLOYMENT_READY.md
-REQUIREMENTS_SUMMARY.md
-DEPENDENCIES.md
-VERSION_STRATEGY_GUIDE.md
-GITIGNORE_STRATEGY.md
-RESTRUCTURING_COMPLETE.md
-PROJECT_STATUS.md
-ROADMAP.md
-TODO.md
+# BUT keep these specific README files
+!README.md
+!*/README.md
+!**/README.md
 
-
-# Installation and setup docs (temporary)
-
-# Any future temporary documentation files
+# Explicitly ignore common doc files even if they match README pattern
+docs/*.md
 *_ANALYSIS.md
 *_REPORT.md
 *_STATUS.md
 *_SUMMARY.md
 *_GUIDE.md
 *_NOTES.md
-*_TEMP.md
-*_DRAFT.md
-*_INTEGRATION*.md
-*_CONTEXT*.md
-*_ENHANCED*.md
-*_TEST*.md
-
-# Keep main documentation only
-# README.md (keep this one!)
-# backend/README.md (keep this one!)
+*_PLAN.md
+*_COMPLETE.md
+roadmap.md
+todo.md
+TODO.md
+ROADMAP.md
 
 # ========================================
 # END DOCUMENTATION EXCLUSIONS
