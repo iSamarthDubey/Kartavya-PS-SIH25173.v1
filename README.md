@@ -141,5 +141,6 @@ MIT License. See [LICENSE](LICENSE) file for details.
 
 ---
 
->
-> **From questions to insights - your SIEM, now truly conversational. Security made simple, powerful, and human-centric.** _"Project by **Team Kartavya**. Made with passion, for SIH 2025."_
+> **From questions to insights - your SIEM, now truly conversational. Security made simple, powerful, and human-centric.**
+
+> _"Project by **Team Kartavya**. Made with passion, for (SIH) 2025"._
