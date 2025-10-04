@@ -1,4 +1,5 @@
 # 📁 KARTAVYA - SIEM NLP ASSISTANT
+
 # Repository Structure & Component Documentation
 
 ================================================================================
@@ -35,9 +36,10 @@ Kartavya-PS-SIH25173.v1/
 ├── LICENSE                     # ⚖️ License Information
 └── REPOSITORY_STRUCTURE.txt    # 📋 This File
 
-
 ================================================================================
+
 ## 📦 MODULE DETAILS
+
 ================================================================================
 
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -80,7 +82,6 @@ DEPENDENCIES:
 RUN COMMAND:
     python assistant/main.py
 
-
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ 2. BACKEND MODULE (backend/)                                             │
 │    🧠 Core Processing & Intelligence                                     │
@@ -114,7 +115,7 @@ SUBMODULE: backend/nlp/
         • Intents: SEARCH_LOGS, AUTHENTICATION, NETWORK_SECURITY,
                   MALWARE_DETECTION, DATA_EXFILTRATION, etc.
         • Returns: (QueryIntent enum, confidence score)
-    
+
     ENTITY EXTRACTOR:
         • Extracts 12+ entity types from queries
         • Entity Types: ip_address, username, domain, port, file_path,
@@ -140,7 +141,6 @@ USAGE:
     from backend.query_builder import QueryBuilder
     from backend.response_formatter import ResponseFormatter
 
-
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ 3. SIEM CONNECTOR MODULE (siem_connector/)                               │
 │    🔌 SIEM Platform Integration Layer                                    │
@@ -162,7 +162,7 @@ ELASTICSEARCH CONNECTOR (elastic_connector.py):
     • Health checks and monitoring
     • Error handling and retry logic
     • Index management
-    
+
     Configuration:
         ELASTICSEARCH_HOST=localhost
         ELASTICSEARCH_PORT=9200
@@ -174,7 +174,7 @@ WAZUH CONNECTOR (wazuh_connector.py):
     • Alert retrieval and analysis
     • Agent management
     • Rule querying
-    
+
     Configuration:
         WAZUH_HOST=localhost
         WAZUH_PORT=55000
@@ -189,10 +189,9 @@ UTILITIES (utils.py):
 
 USAGE:
     from siem_connector import ElasticConnector, WazuhConnector
-    
+
     connector = ElasticConnector()
     results = await connector.search(query="...", limit=100)
-
 
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ 4. RAG PIPELINE MODULE (rag_pipeline/)                                   │
@@ -202,7 +201,7 @@ USAGE:
 PURPOSE:
     RAG (Retrieval-Augmented Generation) pipeline for intelligent
     document retrieval and LLM-powered response generation.
-    ** CURRENTLY STUB - READY FOR IMPLEMENTATION **
+    __CURRENTLY STUB - READY FOR IMPLEMENTATION__
 
 STRUCTURE:
     ├── pipeline.py             # Main RAG orchestrator
@@ -220,10 +219,9 @@ PLANNED FEATURES:
 
 FUTURE USAGE:
     from rag_pipeline import RAGPipeline
-    
+
     rag = RAGPipeline()
     enhanced_response = await rag.enhance_response(query, results)
-
 
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ 5. UI DASHBOARD MODULE (ui_dashboard/)                                   │
@@ -261,8 +259,7 @@ RUN COMMAND:
     streamlit run ui_dashboard/streamlit_app.py
 
 ACCESS URL:
-    http://localhost:8502
-
+    <http://localhost:8502>
 
 ┌──────────────────────────────────────────────────────────┐
 │ 6. TESTS MODULE (tests/)                                 │
@@ -303,7 +300,6 @@ RUN COMMANDS:
     pytest tests/integration/               # Integration tests
     python tests/e2e/test_complete_integration.py  # E2E tests
 
-
 ┌──────────────────────────────────────────────────────────────────────┐
 │ 7. DOCS MODULE (docs/)                                               │
 │    Project Documentation                                             │
@@ -324,7 +320,6 @@ FILES:
 NOTE:
     These files are excluded from Git (only README.md is tracked).
     They are maintained locally for development reference.
-
 
 ┌───────────────────────────────────────────────────────────────────────┐
 │ 8. SCRIPTS MODULE (scripts/)                                          │
@@ -350,7 +345,6 @@ USAGE:
     # Update dependencies
     .\scripts\update_dependencies.ps1
 
-
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ 9. DATASETS MODULE (datasets/)                                           │
 │    📊 Training & Sample Data                                             │
@@ -374,7 +368,6 @@ DATASETS:
     • LogHub: Various system log formats
     • Splunk Attack Data: Security event samples
     • Wazuh Samples: SIEM alert examples
-
 
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ 10. DOCKER MODULE (docker/)                                              │
@@ -401,7 +394,6 @@ SERVICES:
 RUN COMMAND:
     docker-compose -f docker/docker-compose.yml up -d
 
-
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ 11. BEATS CONFIG MODULE (beats-config/)                                  │
 │     ⚙️ Elastic Beats Configuration Files                                 │
@@ -418,7 +410,6 @@ USAGE:
     Configure these files with your Elasticsearch endpoint,
     then deploy using Elastic Beats agents.
 
-
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ 12. EMBEDDINGS MODULE (embeddings/)                                      │
 │     🔢 Vector Embeddings Storage                                         │
@@ -434,7 +425,6 @@ STRUCTURE:
 
 NOTE:
     Currently prepared for future RAG implementation.
-
 
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ 13. LLM TRAINING MODULE (llm_training/)                                  │
@@ -453,16 +443,17 @@ FILES:
 USAGE:
     python llm_training/train.py --dataset nl_to_query_pairs.json
 
-
 ================================================================================
+
 ## 🔄 DATA FLOW
+
 ================================================================================
 
 USER QUERY → WORKFLOW:
 
 1. USER INPUT
    └─→ Streamlit UI (ui_dashboard/streamlit_app.py)
-       └─→ HTTP POST to http://localhost:8001/assistant/ask
+       └─→ HTTP POST to <http://localhost:8001/assistant/ask>
 
 2. API GATEWAY
    └─→ FastAPI Router (assistant/router.py)
@@ -504,9 +495,10 @@ USER QUERY → WORKFLOW:
    └─→ FastAPI Response → Streamlit UI
        └─→ Display results to user
 
-
 ================================================================================
+
 ## 🚀 QUICK START COMMANDS
+
 ================================================================================
 
 1. SETUP ENVIRONMENT:
@@ -516,11 +508,13 @@ USER QUERY → WORKFLOW:
 
 2. START BACKEND:
    python assistant/main.py
-   # Runs on http://localhost:8001
+
+   # Runs on <http://localhost:8001>
 
 3. START FRONTEND:
    streamlit run ui_dashboard/streamlit_app.py
-   # Opens browser at http://localhost:8502
+
+   # Opens browser at <http://localhost:8502>
 
 4. RUN TESTS:
    pytest tests/
@@ -529,9 +523,10 @@ USER QUERY → WORKFLOW:
 5. DOCKER DEPLOYMENT:
    docker-compose -f docker/docker-compose.yml up -d
 
-
 ================================================================================
+
 ## 📝 CONFIGURATION FILES
+
 ================================================================================
 
 .env                            # Environment variables
@@ -551,9 +546,10 @@ requirements-docker.txt         # Docker image dependencies
     • Excludes __pycache__, *.pyc, .env
     • Excludes test databases, logs
 
-
 ================================================================================
+
 ## 🎯 COMPONENT STATUS
+
 ================================================================================
 
 ✅ PRODUCTION READY:
@@ -573,9 +569,10 @@ requirements-docker.txt         # Docker image dependencies
     • Elasticsearch (port 9200) - For SIEM data storage
     • Wazuh (port 55000) - Optional additional SIEM
 
-
 ================================================================================
+
 ## 📊 STATISTICS
+
 ================================================================================
 
 Total Python Files:     50+
@@ -586,9 +583,10 @@ NLP Intent Types:       10+
 Entity Types:           12+
 Supported SIEMs:        Elasticsearch, Wazuh
 
-
 ================================================================================
+
 ## 👥 TEAM & SUPPORT
+
 ================================================================================
 
 Project:        Kartavya - SIEM NLP Assistant
@@ -597,13 +595,13 @@ Repository:     github.com/iSamarthDubey/Kartavya-PS-SIH25173.v1
 Documentation:  See README.md for detailed setup
 Issues:         Use GitHub Issues for bug reports
 
-
 ================================================================================
+
 ## 📄 LICENSE
+
 ================================================================================
 
 See LICENSE file for licensing information.
-
 
 ================================================================================
 END OF REPOSITORY STRUCTURE DOCUMENTATION
