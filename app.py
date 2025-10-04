@@ -37,7 +37,7 @@ import webbrowser
 # --- Configurable Ports ---
 BACKEND_PORT = int(os.environ.get("SIEM_BACKEND_PORT", 8001))
 FRONTEND_PORT = int(os.environ.get("SIEM_FRONTEND_PORT", 8501))
-BACKEND_HEALTH_PATH = "/assistant/docs"  # docs path is a good health check for this project
+BACKEND_HEALTH_PATH = "/health"  # Use the actual health endpoint
 STARTUP_TIMEOUT = 30
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
@@ -163,6 +163,9 @@ def http_get(url, timeout=3):
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
             return "ALIVE"
+    except (ConnectionRefusedError, urllib.error.URLError):
+        # Connection refused means server not ready yet
+        return None
         return None
     except Exception:
         return None
@@ -204,10 +207,10 @@ def is_frontend_running():
 
 
 def start_backend():
-    cinfo(f"[BACKEND] Starting uvicorn with --reload on port {BACKEND_PORT}")
+    cinfo(f"[BACKEND] Starting uvicorn on port {BACKEND_PORT}")
     cmd = [
         sys.executable, "-m", "uvicorn",
-        "backend.main:app",
+        "backend.main:app",  # Use backend.main - it has working health and API endpoints
         "--host", "0.0.0.0",
         "--port", str(BACKEND_PORT),
         "--reload",
@@ -220,7 +223,7 @@ def start_backend():
     start = time.time()
     while time.time() - start < STARTUP_TIMEOUT:
         if get_pid_on_port(BACKEND_PORT):
-            body = http_get(f'http://localhost:{BACKEND_PORT}{BACKEND_HEALTH_PATH}', timeout=2)
+            body = http_get(f'http://localhost:{BACKEND_PORT}{BACKEND_HEALTH_PATH}', timeout=10)  # Increased from 2 to 10 seconds
             if body:
                 cgood("  [BACKEND] Started and responding")
                 return p

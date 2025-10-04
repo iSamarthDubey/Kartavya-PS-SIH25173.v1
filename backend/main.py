@@ -284,7 +284,12 @@ async def process_query(request: QueryRequest):
         logger.info(f"Entities extracted: {entity_summary}")
         
         # Step 3: Build Elasticsearch query
-        es_query = query_builder.build_query(request.query)
+        query_params = {
+            "raw_text": request.query,
+            "intent": intent.value,
+            "entities": entities
+        }
+        es_query = await query_builder.build_query(query_params)
         logger.info("Elasticsearch query built")
         
         # Step 4: Execute query using enhanced SIEM connector
@@ -299,7 +304,7 @@ async def process_query(request: QueryRequest):
                 response = siem_processor.process_query(
                     es_query, 
                     size=request.max_results,
-                    index="logs-*"
+                    index="security-logs-demo,logs-*"  # Check demo index first
                 )
                 
                 # Extract results from normalized response
@@ -316,7 +321,7 @@ async def process_query(request: QueryRequest):
                 if elastic_client and elastic_client.connected:
                     try:
                         search_response = elastic_client.client.search(
-                            index="logs-*",
+                            index="security-logs-demo,logs-*",  # Check demo index first
                             body=es_query,
                             size=request.max_results
                         )
@@ -335,7 +340,7 @@ async def process_query(request: QueryRequest):
                 # Direct Elasticsearch as fallback
                 logger.info("Using direct Elasticsearch client")
                 search_response = elastic_client.client.search(
-                    index="logs-*",
+                    index="security-logs-demo,logs-*",  # Check demo index first
                     body=es_query,
                     size=request.max_results
                 )
@@ -381,6 +386,55 @@ async def process_query(request: QueryRequest):
     except Exception as e:
         logger.error(f"Query processing failed: {e}")
         raise HTTPException(status_code=500, detail=f"Query processing failed: {str(e)}")
+
+
+@app.post("/assistant/ask")
+async def ask_assistant(request: dict):
+    """
+    Frontend-compatible endpoint that wraps /query.
+    Accepts: {"query": "user question", "conversation_id": "123", "filters": {...}}
+    Returns: formatted response for Streamlit UI
+    """
+    try:
+        # Extract query from request
+        user_query = request.get("query", "")
+        conversation_id = request.get("conversation_id", "")
+        filters = request.get("filters", {})
+        
+        logger.info(f"📝 Ask endpoint called: '{user_query}' (conv: {conversation_id})")
+        
+        if not user_query:
+            raise HTTPException(status_code=400, detail="Query is required")
+        
+        # Build query request
+        query_req = QueryRequest(
+            query=user_query,
+            parser_type="enhanced",
+            max_results=100
+        )
+        
+        # Process through existing pipeline
+        response = await process_query(query_req)
+        
+        # Return in frontend-expected format
+        return {
+            "success": True,
+            "answer": response.formatted_response,
+            "data": response.results[:20],  # Limit to 20 for UI
+            "intent": response.intent,
+            "confidence": response.confidence,
+            "query": user_query,
+            "siem_query": response.siem_query,
+            "execution_time": response.execution_time,
+            "result_count": len(response.results)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ask endpoint failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/parser/info")
 async def get_parser_info():

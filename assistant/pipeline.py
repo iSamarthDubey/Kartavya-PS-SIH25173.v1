@@ -80,34 +80,34 @@ class ConversationalPipeline:
             # 2. Initialize Query Builder
             self.query_builder = QueryBuilder()
             await self._safe_component_init(
-                lambda: self.query_builder.initialize(),
+                lambda: None,  # QueryBuilder doesn't have initialize() method
                 "Query Builder"
             )
             
             # 3. Initialize SIEM Connectors
             self.elastic_connector = ElasticConnector()
             await self._safe_component_init(
-                lambda: self.elastic_connector.initialize(),
+                lambda: None,  # ElasticConnector doesn't have initialize() method
                 "Elastic Connector"
             )
             
             self.wazuh_connector = WazuhConnector()
             await self._safe_component_init(
-                lambda: self.wazuh_connector.initialize(),
+                lambda: None,  # WazuhConnector doesn't have initialize() method
                 "Wazuh Connector"
             )
             
             # 4. Initialize Response Formatter
             self.response_formatter = ResponseFormatter()
             await self._safe_component_init(
-                lambda: self.response_formatter.initialize(),
+                lambda: None,  # ResponseFormatter doesn't have initialize() method
                 "Response Formatter"
             )
             
             # 5. Initialize Context Manager
             self.context_manager = ContextManager()
             await self._safe_component_init(
-                lambda: self.context_manager.initialize(),
+                lambda: None,  # ContextManager doesn't have initialize() method
                 "Context Manager"
             )
             

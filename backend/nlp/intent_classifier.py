@@ -157,21 +157,20 @@ class IntentClassifier:
     
     def _calculate_pattern_score(self, query: str, patterns: List[str]) -> float:
         """Calculate matching score for patterns."""
-        total_score = 0.0
-        matches = 0
+        scores = []
         
         for pattern in patterns:
             if re.search(pattern, query, re.IGNORECASE):
-                matches += 1
                 # Boost score for exact matches
                 if re.search(r'\b' + re.escape(pattern.replace(r'\b', '')) + r'\b', query, re.IGNORECASE):
-                    total_score += 1.0
+                    scores.append(1.0)
                 else:
-                    total_score += 0.7
+                    scores.append(0.7)
         
-        # Normalize by number of patterns
-        if len(patterns) > 0:
-            return min(total_score / len(patterns), 1.0)
+        # Return the MAXIMUM score - if ANY pattern matches strongly, intent is confident
+        # This fixes the bug where having many patterns diluted the score
+        if scores:
+            return max(scores)
         
         return 0.0
     
