@@ -177,12 +177,30 @@ class ConversationalPipeline:
             # Calculate processing time
             processing_time = (datetime.now() - start_time).total_seconds()
             
+            # Convert Entity objects to dictionaries for API response
+            entities = nlp_result.get('entities', [])
+            entities_dict = []
+            if entities:
+                for entity in entities:
+                    if hasattr(entity, '__dict__'):
+                        # Convert dataclass/object to dict
+                        entities_dict.append({
+                            'type': entity.type,
+                            'value': entity.value,
+                            'confidence': entity.confidence,
+                            'start_pos': entity.start_pos,
+                            'end_pos': entity.end_pos
+                        })
+                    elif isinstance(entity, dict):
+                        # Already a dict
+                        entities_dict.append(entity)
+            
             # Build final response
             final_response = {
                 'conversation_id': conversation_id,
                 'user_query': user_input,
                 'intent': nlp_result.get('intent', 'unknown'),
-                'entities': nlp_result.get('entities', []),
+                'entities': entities_dict,
                 'query_type': query_result.get('query_type', 'search'),
                 'siem_query': query_result.get('query', ''),
                 'results': formatted_response.get('data', []),

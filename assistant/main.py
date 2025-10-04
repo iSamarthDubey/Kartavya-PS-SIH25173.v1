@@ -10,9 +10,19 @@ from typing import Dict, List, Any, Optional
 import logging
 import asyncio
 from datetime import datetime
+import sys
+from pathlib import Path
 
-from .pipeline import ConversationalPipeline
-from .router import assistant_router
+# Add parent directory to path for imports when running standalone
+if __name__ == "__main__":
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+
+try:
+    from .pipeline import ConversationalPipeline
+    from .router import assistant_router
+except ImportError:
+    from assistant.pipeline import ConversationalPipeline
+    from assistant.router import assistant_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -225,9 +235,9 @@ app.include_router(assistant_router, prefix="/assistant")
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "assistant.main:app",
+        app,  # Pass app directly instead of string
         host="0.0.0.0",
         port=8001,  # Different port from main backend
-        reload=True,
+        reload=False,  # Disable reload for stability
         log_level="info"
     )
