@@ -9,8 +9,9 @@ from pathlib import Path
 import json
 from datetime import datetime
 
-# Add paths
-sys.path.insert(0, str(Path(__file__).parent))
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 from assistant.pipeline import ConversationalPipeline
 from backend.nlp.intent_classifier import IntentClassifier

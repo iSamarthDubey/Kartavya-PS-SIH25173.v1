@@ -27,7 +27,7 @@ from backend.query_builder import QueryBuilder
 from siem_connector.elastic_connector import ElasticConnector
 from siem_connector.wazuh_connector import WazuhConnector
 from backend.response_formatter.formatter import ResponseFormatter
-from context_manager.context import ContextManager
+from assistant.context_manager import ContextManager
 
 logger = logging.getLogger(__name__)
 

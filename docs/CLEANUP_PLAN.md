@@ -9,6 +9,7 @@
 ## 📋 Current Issues Found
 
 ### 1. **Duplicate/Redundant Files**
+
 - ❌ `app.py` (root) - Old file, not in use
 - ❌ `nlp_parser/` - Duplicate of `backend/nlp/`
 - ❌ `response_formatter/` (root) - Duplicate of `backend/response_formatter/`
@@ -18,23 +19,27 @@
 - ❌ `verification_test.db` - Old test file
 
 ### 2. **Import Path Inconsistencies**
+
 ```python
 # INCONSISTENT: Mix of relative and absolute imports
 backend/query_builder.py: from nlp.intent_classifier import ...
 assistant/pipeline.py: from backend.nlp.intent_classifier import ...
 ```
 
-### 3. **Missing __init__.py Files**
+### 3. **Missing **init**.py Files**
+
 - ❌ `backend/nlp/__init__.py` - Missing
 - ❌ `backend/response_formatter/__init__.py` - Incomplete
 - ❌ `siem_connector/__init__.py` - Missing
 
 ### 4. **Scattered Test Files**
+
 - `test_complete_integration.py` (root)
 - `test_entity_fix.py` (root)
 - `tests/` folder (separate location)
 
 ### 5. **Documentation Clutter**
+
 - Multiple status reports (need consolidation)
 - Outdated TODO/roadmap files
 
@@ -43,6 +48,7 @@ assistant/pipeline.py: from backend.nlp.intent_classifier import ...
 ## 🎯 Cleanup Actions
 
 ### Phase 1: Remove Redundant Files ✅
+
 ```bash
 # Delete old/duplicate files
 rm app.py
@@ -55,7 +61,9 @@ rm verification_test.db
 ```
 
 ### Phase 2: Standardize Import Paths ✅
+
 **New Standard**: All imports from project root
+
 ```python
 # ✅ CORRECT (from root)
 from backend.nlp.intent_classifier import IntentClassifier
@@ -65,8 +73,10 @@ from siem_connector.elastic_connector import ElasticsearchConnector
 from assistant.pipeline import ConversationalPipeline
 ```
 
-### Phase 3: Add Missing __init__.py Files ✅
+### Phase 3: Add Missing **init**.py Files ✅
+
 Create proper module initialization:
+
 - `backend/__init__.py`
 - `backend/nlp/__init__.py`
 - `backend/response_formatter/__init__.py`
@@ -74,7 +84,9 @@ Create proper module initialization:
 - `rag_pipeline/__init__.py`
 
 ### Phase 4: Reorganize Tests ✅
+
 Move all tests to `tests/` folder:
+
 ```
 tests/
 ├── unit/
@@ -89,6 +101,7 @@ tests/
 ```
 
 ### Phase 5: Consolidate Documentation ✅
+
 ```
 docs/
 ├── ARCHITECTURE.md          # System design
@@ -98,6 +111,7 @@ docs/
 ```
 
 ### Phase 6: Update Configuration Files ✅
+
 - Fix `requirements.txt` (remove duplicates)
 - Update `.gitignore`
 - Create proper `setup.py` or `pyproject.toml`
@@ -195,6 +209,7 @@ Kartavya-PS-SIH25173.v1/
 ## 🔄 Import Routing Map
 
 ### Core Module Paths
+
 ```python
 # Assistant Module
 from assistant.pipeline import ConversationalPipeline
@@ -228,20 +243,23 @@ from rag_pipeline.vector_store import VectorStore
 ## ✅ Validation Checklist
 
 ### Pre-Cleanup
+
 - [x] Backup current state (Git commit)
 - [x] Document current import paths
 - [x] Identify redundant files
 - [x] List all dependencies
 
 ### During Cleanup
+
 - [ ] Remove redundant files
-- [ ] Add missing __init__.py files
+- [ ] Add missing **init**.py files
 - [ ] Fix all import statements
 - [ ] Reorganize tests
 - [ ] Update documentation
 - [ ] Fix requirements.txt
 
 ### Post-Cleanup
+
 - [ ] Run all tests (pytest)
 - [ ] Verify backend starts (port 8001)
 - [ ] Verify frontend starts (port 8502)
@@ -255,12 +273,14 @@ from rag_pipeline.vector_store import VectorStore
 ## 🚀 Execution Order
 
 1. **Git Commit Current State** ✅
+
    ```bash
    git add -A
    git commit -m "Pre-cleanup checkpoint"
    ```
 
 2. **Create Backup Branch** ✅
+
    ```bash
    git checkout -b backup/pre-cleanup
    git checkout main
@@ -268,7 +288,7 @@ from rag_pipeline.vector_store import VectorStore
 
 3. **Execute Cleanup** 🚧
    - Delete redundant files
-   - Add __init__.py files
+   - Add **init**.py files
    - Fix imports
    - Reorganize structure
 
@@ -279,6 +299,7 @@ from rag_pipeline.vector_store import VectorStore
    - Test integration
 
 5. **Final Commit** ⏳
+
    ```bash
    git add -A
    git commit -m "feat: Clean up and restructure codebase"
@@ -290,6 +311,7 @@ from rag_pipeline.vector_store import VectorStore
 ## 📊 Expected Results
 
 ### Before Cleanup
+
 - 📁 50+ files in root
 - ⚠️  Import path inconsistencies
 - ❌ Duplicate modules
@@ -297,6 +319,7 @@ from rag_pipeline.vector_store import VectorStore
 - 📚 Documentation clutter
 
 ### After Cleanup
+
 - ✅ Clean organized structure
 - ✅ Consistent import paths
 - ✅ No duplicates
