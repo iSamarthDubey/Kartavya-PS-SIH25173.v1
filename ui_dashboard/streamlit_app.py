@@ -17,14 +17,14 @@ import re
 
 # Configure page
 st.set_page_config(
-    page_title="SIEM NLP Assistant",
-    page_icon="🛡️",
+    page_title="Conversational SIEM Assistant",
+    page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # Constants
-BACKEND_URL = "http://localhost:8001/assistant"
+BACKEND_URL = "http://localhost:8001"  # Base URL - specific endpoints will add /assistant/ask
 API_TIMEOUT = 30
 
 # Custom CSS for modern chat interface
@@ -183,7 +183,7 @@ def query_assistant(user_query, filters=None):
             st.session_state.query_history.append(user_query)
         
         response = requests.post(
-            f"{BACKEND_URL}/ask",
+            f"{BACKEND_URL}/assistant/ask",  # Full path to assistant endpoint
             json=payload,
             timeout=API_TIMEOUT
         )
@@ -251,7 +251,8 @@ def display_header():
     """Display the main header."""
     st.markdown("""
     <div class="main-header">
-        <h1>🛡️ SIEM NLP Assistant</h1>
+        <h1>🤖 Conversational SIEM Assistant</h1>
+        <p>→ for Investigation and Automated Threat Reporting using NLP</p>
         <p>Ask questions in natural language about your security data</p>
         <small>Powered by advanced NLP and multi-SIEM integration</small>
     </div>
