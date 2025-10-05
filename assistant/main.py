@@ -16,12 +16,17 @@ import os
 import sys
 from pathlib import Path
 
+if __name__ == "__main__":
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+ASSISTANT_HOST = os.environ.get("ASSISTANT_HOST", "0.0.0.0")
+try:
+    ASSISTANT_PORT = int(os.environ.get("ASSISTANT_PORT", "8001"))
+except ValueError:
+    ASSISTANT_PORT = 8001
+
 import assistant.security as security_module
 from src.security.session_manager import Session
-
-# Add parent directory to path for imports when running standalone
-if __name__ == "__main__":
-    sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
     from .pipeline import ConversationalPipeline
@@ -108,6 +113,10 @@ class QueryRequest(BaseModel):
     query: str = Field(..., description="Natural language query", min_length=1)
     conversation_id: Optional[str] = Field(None, description="Conversation ID for context")
     user_context: Optional[Dict[str, Any]] = Field(None, description="Additional user context")
+    filters: Optional[Dict[str, Any]] = Field(None, description="Optional UI filters (e.g., time_range, severity)")
+    limit: Optional[int] = Field(None, description="Max results to return (capped server-side)")
+    offset: Optional[int] = Field(None, description="Pagination offset")
+    force_intent: Optional[str] = Field(None, description="Override detected intent (advanced)")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -115,6 +124,10 @@ class QueryRequest(BaseModel):
                 "query": "Show me failed login attempts in the last hour",
                 "conversation_id": "conv_12345",
                 "user_context": {"user_role": "security_analyst"},
+                "filters": {"time_range": "Last 24 hours", "severity": "High"},
+                "limit": 100,
+                "offset": 0,
+                "force_intent": "show_failed_logins"
             }
         }
     )
@@ -190,6 +203,30 @@ async def get_pipeline() -> ConversationalPipeline:
         pipeline = ConversationalPipeline()
         await pipeline.initialize()
     return pipeline
+
+
+@app.get("/health")
+async def public_health_check() -> Dict[str, Any]:
+    """Unauthenticated health check used by local tooling and the UI."""
+
+    global pipeline
+
+    is_ready = bool(pipeline and getattr(pipeline, "is_initialized", False))
+    health_payload: Dict[str, Any] = {
+        "status": "ok" if is_ready else "initializing",
+        "is_initialized": is_ready,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+    if pipeline and hasattr(pipeline, "get_health_status"):
+        try:
+            detailed = pipeline.get_health_status()
+            health_payload["components"] = detailed.get("components", {})
+            health_payload["pipeline_status"] = detailed.get("status")
+        except Exception as exc:  # pragma: no cover - best effort detail
+            logger.debug("Detailed health status unavailable: %s", exc)
+
+    return health_payload
 
 
 @app.post("/assistant/auth/login", response_model=LoginResponse)
@@ -317,6 +354,15 @@ async def ask_question(
         merged_context = {"actor": session.username, "role": session.role}
         if request.user_context:
             merged_context.update(request.user_context)
+        # Include filters and pagination/control hints
+        if request.filters:
+            merged_context.update({"filters": request.filters})
+        if request.limit is not None:
+            merged_context["limit"] = int(request.limit)
+        if request.offset is not None:
+            merged_context["offset"] = int(request.offset)
+        if request.force_intent:
+            merged_context["force_intent"] = request.force_intent
 
         result = await pipeline.process_query(
             user_input=sanitized_query,
@@ -407,6 +453,16 @@ async def clear_conversation(
         )
         raise HTTPException(status_code=500, detail=f"Failed to clear conversation: {str(e)}")
 
+@app.get("/assistant/ping")
+async def ping():
+    """Unauthenticated liveness endpoint for orchestration and health checks."""
+    return {
+        "service": "SIEM NLP Conversational Assistant",
+        "status": "ok",
+        "version": "1.0.0"
+    }
+
+
 @app.get("/assistant/")
 async def root():
     """Root endpoint for the conversational assistant."""
@@ -414,6 +470,7 @@ async def root():
         "message": "SIEM NLP Conversational Assistant API",
         "version": "1.0.0",
         "endpoints": {
+            "ping": "/assistant/ping",
             "health": "/assistant/health",
             "ask": "/assistant/ask",
             "history": "/assistant/conversation/{conversation_id}/history",
@@ -430,10 +487,17 @@ app.include_router(
 
 if __name__ == "__main__":
     import uvicorn
+
+    logger.info(
+        "Launching assistant API on %s:%s (override with ASSISTANT_HOST / ASSISTANT_PORT)",
+        ASSISTANT_HOST,
+        ASSISTANT_PORT,
+    )
+
     uvicorn.run(
         app,  # Pass app directly instead of string
-        host="0.0.0.0",
-        port=8001,  # Different port from main backend
+        host=ASSISTANT_HOST,
+        port=ASSISTANT_PORT,
         reload=False,  # Disable reload for stability
         log_level="info"
     )

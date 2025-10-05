@@ -32,6 +32,11 @@ from assistant.mock_data import generate_mock_logs
 
 logger = logging.getLogger(__name__)
 
+# Clarification thresholds and caps
+_DEFAULT_INTENT_CONFIDENCE_THRESHOLD = 0.3
+_MAX_RESULTS_CAP = int(os.environ.get("ASSISTANT_MAX_RESULTS", "200"))
+_DEFAULT_TIME_WINDOW = os.environ.get("ASSISTANT_DEFAULT_TIME_WINDOW", "now-1d")
+
 class ConversationalPipeline:
     """
     Core orchestrator for the conversational SIEM assistant.
@@ -55,7 +60,7 @@ class ConversationalPipeline:
         self.is_initialized = False
         self.conversation_id = None
         
-        logger.info("ConversationalPipeline initialized")
+        logger.info("Conversational Pipeline initialized")
     
     async def initialize(self) -> bool:
         """
@@ -164,8 +169,17 @@ class ConversationalPipeline:
             nlp_result = await self._process_nlp(user_input, conversation_id)
             
             # Step 2: Query Generation
-            query_result = await self._generate_query(nlp_result, user_input)
-            
+            query_result = await self._generate_query(nlp_result, user_input, user_context)
+
+            # Enforce safer defaults and caps
+            # Cap results
+            try:
+                if isinstance(query_result, dict):
+                    limit = int(query_result.get('limit', 100))
+                    query_result['limit'] = min(limit, _MAX_RESULTS_CAP)
+            except Exception:
+                query_result['limit'] = min(100, _MAX_RESULTS_CAP)
+
             # Step 3: SIEM Query Execution
             siem_result = await self._execute_siem_query(query_result)
             
@@ -215,6 +229,8 @@ class ConversationalPipeline:
                     'results_count': len(formatted_response.get('data', [])),
                     'data_sources': data_sources,
                     'confidence_score': nlp_result.get('confidence', 0.0),
+                    'needs_clarification': nlp_result.get('needs_clarification', False),
+                    'suggestions': nlp_result.get('suggestions', []),
                     'mock_data': 'mock-data' in data_sources,
                 },
                 'status': 'success'
@@ -243,6 +259,23 @@ class ConversationalPipeline:
                 
                 # Extract entities
                 entities = self.entity_extractor.extract_entities(user_input)
+
+                # Clarification: propose alternatives when low confidence or sparse entities
+                needs_clarification = False
+                suggestions = []
+                if confidence < _DEFAULT_INTENT_CONFIDENCE_THRESHOLD or len(entities) == 0:
+                    try:
+                        raw_suggestions = self.intent_classifier.get_intent_suggestions(user_input)
+                        # top-3 intent strings with scores
+                        suggestions = [
+                            {
+                                'intent': s[0].value if hasattr(s[0], 'value') else str(s[0]),
+                                'score': float(s[1])
+                            } for s in raw_suggestions[:3]
+                        ]
+                        needs_clarification = len(suggestions) > 0
+                    except Exception:
+                        pass
                 
                 logger.info(f"NLP Analysis - Intent: {intent_str}, Entities: {len(entities)}, Confidence: {confidence:.2f}")
                 
@@ -250,7 +283,9 @@ class ConversationalPipeline:
                     'intent': intent_str,
                     'entities': entities,
                     'confidence': confidence,
-                    'raw_intent': intent
+                    'raw_intent': intent,
+                    'needs_clarification': needs_clarification,
+                    'suggestions': suggestions
                 }
             else:
                 # Fallback if NLP components not available
@@ -264,15 +299,27 @@ class ConversationalPipeline:
             logger.warning(f"NLP processing failed: {e}")
             return {'intent': 'search_logs', 'entities': {}, 'confidence': 0.0}
     
-    async def _generate_query(self, nlp_result: Dict, user_input: str) -> Dict[str, Any]:
+    async def _generate_query(self, nlp_result: Dict, user_input: str, user_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Step 2: Generate SIEM query from NLP analysis."""
         try:
             if self.query_builder:
+                # Allow overrides from user_context
+                force_intent = None
+                limit = None
+                offset = None
+                if user_context and isinstance(user_context, dict):
+                    force_intent = user_context.get('force_intent')
+                    limit = user_context.get('limit')
+                    offset = user_context.get('offset')
                 query_params = {
-                    'intent': nlp_result.get('intent'),
+                    'intent': force_intent or nlp_result.get('intent'),
                     'entities': nlp_result.get('entities', []),
-                    'raw_text': user_input
+                    'raw_text': user_input,
                 }
+                if limit is not None:
+                    query_params['limit'] = limit
+                if offset is not None:
+                    query_params['offset'] = offset
                 result = await self.query_builder.build_query(query_params)
                 result.setdefault('intent', query_params['intent'])
                 result.setdefault('entities', query_params['entities'])
