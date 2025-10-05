@@ -317,6 +317,7 @@ temp/
 *_backup.*
 *_old.*
 *.orig
+tmp_test_*.json
 
 # Python temporary
 *.pyc.bak
