@@ -510,6 +510,8 @@ coverage.xml
 !.gitignore
 !.gitattributes
 
+!status0.txt
+
 # ========================================
 # END OF .gitignore
 # ========================================
