@@ -37,7 +37,7 @@ import webbrowser
 # --- Configurable Ports ---
 BACKEND_PORT = int(os.environ.get("SIEM_BACKEND_PORT", 8001))
 FRONTEND_PORT = int(os.environ.get("SIEM_FRONTEND_PORT", 8501))
-BACKEND_HEALTH_PATH = "/health"  # Use the actual health endpoint
+BACKEND_HEALTH_PATH = "/assistant/ping"  # Assistant liveness endpoint (unauthenticated)
 STARTUP_TIMEOUT = 30
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
@@ -190,7 +190,8 @@ def is_our_backend_running():
         return False, None
     url = f'http://localhost:{BACKEND_PORT}{BACKEND_HEALTH_PATH}'
     body = http_get(url, timeout=2)
-    if body and ("SIEM NLP Conversational Assistant" in body or "OpenAPI" in body or "swagger" in body.lower()):
+    # Recognize our assistant via ping response or generic OpenAPI strings
+    if body and ("SIEM NLP Conversational Assistant" in body or "\"service\": \"SIEM NLP Conversational Assistant\"" in body or "OpenAPI" in body or "swagger" in (body.lower() if isinstance(body, str) else "")):
         return True, pid
     return False, pid
 
@@ -210,12 +211,13 @@ def start_backend():
     cinfo(f"[BACKEND] Starting uvicorn on port {BACKEND_PORT}")
     cmd = [
         sys.executable, "-m", "uvicorn",
-        "backend.main:app",  # Use backend.main - it has working health and API endpoints
+        "assistant.main:app",  # Start the Assistant API as the canonical public service
         "--host", "0.0.0.0",
         "--port", str(BACKEND_PORT),
         "--reload",
-        "--reload-dir", "backend",
+        "--reload-dir", "assistant",
         "--reload-dir", "siem_connector",
+        "--reload-dir", "backend",
     ]
     log_file = LOG_DIR / "backend.log"
     p = subprocess.Popen(cmd, stdout=open(log_file, "w"), stderr=subprocess.STDOUT, start_new_session=True)
