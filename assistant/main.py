@@ -12,15 +12,11 @@ from typing import Dict, List, Any, Optional
 import logging
 import asyncio
 from datetime import datetime
+import os
 import sys
 from pathlib import Path
 
-from assistant.security import (
-    require_permission,
-    require_rate_limited_permission,
-    require_session,
-    security_context,
-)
+import assistant.security as security_module
 from src.security.session_manager import Session
 
 # Add parent directory to path for imports when running standalone
@@ -40,6 +36,32 @@ logger = logging.getLogger(__name__)
 
 # Global pipeline instance
 pipeline: Optional[ConversationalPipeline] = None
+
+
+def _refresh_security_context_if_env_changed() -> security_module.SecurityContext:
+    """Rebuild the security context when environment-backed paths change."""
+
+    target_store = Path(os.environ.get("ASSISTANT_USER_STORE", "config/security_users.json"))
+    current_store = security_module.security_context.auth_manager.user_store_path
+
+    def _normalize(path: Path) -> Path:
+        try:
+            return path.resolve(strict=False)
+        except Exception:
+            return path
+
+    current_path = current_store if current_store else Path("config/security_users.json")
+
+    if _normalize(current_path) != _normalize(target_store):
+        security_module.security_context = security_module.SecurityContext.build_from_env()
+
+    return security_module.security_context
+
+
+security_context = _refresh_security_context_if_env_changed()
+require_session = security_module.require_session
+require_permission = security_module.require_permission
+require_rate_limited_permission = security_module.require_rate_limited_permission
 
 
 @asynccontextmanager
