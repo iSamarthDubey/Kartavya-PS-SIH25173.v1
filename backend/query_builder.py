@@ -6,6 +6,9 @@ Converts natural language queries to Elasticsearch DSL/KQL queries.
 from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 import logging
+import os
+from pathlib import Path
+import yaml
 
 # Import NLP components with error handling
 try:
@@ -29,6 +32,10 @@ class QueryBuilder:
         """Initialize the query builder."""
         self.intent_classifier = IntentClassifier()
         self.entity_extractor = EntityExtractor()
+
+        # Optional index class hint and external field mappings
+        self.index_class = os.getenv('INDEX_CLASS', '').strip().lower()
+        self.external_mappings = self._load_index_mappings()
         
         # Event ID mappings for common security events
         self.event_id_mappings = {
@@ -156,9 +163,30 @@ class QueryBuilder:
         # Add entity-based filters
         self._add_entity_filters(query, entities, entity_summary)
         
-        # Add time range filter
+        # Add time range filter (with fallback default)
         if time_range and time_range.get('start_time'):
             self._add_time_filter(query, time_range)
+        else:
+            # Fallback default window (e.g., now-1d)
+            default_window = os.getenv('ASSISTANT_DEFAULT_TIME_WINDOW', 'now-1d')
+            query['query']['bool'].setdefault('filter', []).append({
+                'range': {
+                    '@timestamp': {
+                        'gte': default_window
+                    }
+                }
+            })
+        
+        # Apply pagination/size caps
+        max_size = int(os.getenv('ASSISTANT_MAX_RESULTS', '200'))
+        requested_size = int(query_params.get('limit', query.get('size', 100)))
+        query['size'] = min(requested_size, max_size)
+        if 'offset' in query_params:
+            try:
+                offset = max(0, int(query_params.get('offset', 0)))
+                query['from'] = offset
+            except Exception:
+                pass
         
         # Add aggregations for relevant intents
         self._add_aggregations(query, intent, entities)
@@ -241,37 +269,48 @@ class QueryBuilder:
         """Add filters based on extracted entities."""
         bool_query = query["query"]["bool"]
         
+        # Helper: return preferred fields from external mappings (if provided) or sensible defaults
+        def preferred(kind: str, defaults: List[str]) -> List[str]:
+            # kind examples: 'username', 'source_ip', 'dest_ip', 'event_id', 'process', 'file.path'
+            results = []
+            if self.external_mappings and self.index_class:
+                cls = self.external_mappings.get(self.index_class, {})
+                if kind in cls:
+                    results.extend([f for f in cls.get(kind, []) if isinstance(f, str)])
+            # Append defaults ensuring uniqueness
+            for f in defaults:
+                if f not in results:
+                    results.append(f)
+            return results
+
         # IP Address filters
         if 'ip_address' in entity_summary:
             ip_filters = []
+            # gather candidate ip fields
+            ip_fields = (
+                preferred('source_ip', ['source.ip', 'client.ip', 'host.ip'])
+                + preferred('destination_ip', ['destination.ip', 'server.ip'])
+            )
             for ip in entity_summary['ip_address']:
-                ip_filters.extend([
-                    {"term": {"source.ip": ip}},
-                    {"term": {"destination.ip": ip}},
-                    {"term": {"client.ip": ip}},
-                    {"term": {"server.ip": ip}},
-                    {"term": {"host.ip": ip}}
-                ])
-            
+                for f in ip_fields:
+                    ip_filters.append({"term": {f: ip}})
             if ip_filters:
-                bool_query["should"].extend(ip_filters)
+                bool_query.setdefault("should", []).extend(ip_filters)
                 if not bool_query.get("minimum_should_match"):
                     bool_query["minimum_should_match"] = 1
         
         # Username filters
         if 'username' in entity_summary:
             username_filters = []
+            user_fields = preferred('username', ['user.name', 'winlog.event_data.TargetUserName', 'system.auth.user'])
             for username in entity_summary['username']:
-                username_filters.extend([
-                    {"term": {"user.name.keyword": username}},
-                    {"term": {"winlog.event_data.TargetUserName.keyword": username}},
-                    {"term": {"system.auth.user.keyword": username}},
-                    {"wildcard": {"user.name": f"*{username}*"}},
-                    {"match": {"message": username}}
-                ])
-            
+                for f in user_fields:
+                    # exact via .keyword if applicable, else wildcard
+                    username_filters.append({"term": {f + (".keyword" if not f.endswith('.keyword') else ""): username}})
+                    username_filters.append({"wildcard": {f: f"*{username}*"}})
+                username_filters.append({"match": {"message": username}})
             if username_filters:
-                bool_query["should"].extend(username_filters)
+                bool_query.setdefault("should", []).extend(username_filters)
                 if not bool_query.get("minimum_should_match"):
                     bool_query["minimum_should_match"] = 1
         
@@ -308,41 +347,38 @@ class QueryBuilder:
         # Domain filters
         if 'domain' in entity_summary:
             domain_filters = []
+            domain_fields = preferred('domain', ['url.domain', 'dns.question.name'])
             for domain in entity_summary['domain']:
-                domain_filters.extend([
-                    {"match": {"url.domain": domain}},
-                    {"match": {"dns.question.name": domain}},
-                    {"match": {"message": domain}}
-                ])
+                for f in domain_fields:
+                    domain_filters.append({"match": {f: domain}})
+                domain_filters.append({"match": {"message": domain}})
             
             if domain_filters:
-                bool_query["should"].extend(domain_filters)
+                bool_query.setdefault("should", []).extend(domain_filters)
         
         # Process name filters
         if 'process_name' in entity_summary:
             process_filters = []
+            process_fields = preferred('process', ['process.name', 'winlog.event_data.ProcessName', 'process.executable'])
             for process in entity_summary['process_name']:
-                process_filters.extend([
-                    {"match": {"process.name": process}},
-                    {"match": {"winlog.event_data.ProcessName": process}},
-                    {"wildcard": {"process.executable": f"*{process}*"}}
-                ])
+                for f in process_fields:
+                    matcher = {"wildcard": {f: f"*{process}*"}} if f.endswith('executable') else {"match": {f: process}}
+                    process_filters.append(matcher)
             
             if process_filters:
-                bool_query["should"].extend(process_filters)
+                bool_query.setdefault("should", []).extend(process_filters)
         
         # File path filters
         if 'file_path' in entity_summary:
             file_filters = []
+            file_fields = preferred('file.path', ['file.path', 'winlog.event_data.ObjectName'])
             for file_path in entity_summary['file_path']:
-                file_filters.extend([
-                    {"match": {"file.path": file_path}},
-                    {"match": {"winlog.event_data.ObjectName": file_path}},
-                    {"wildcard": {"file.path.keyword": f"*{file_path}*"}}
-                ])
+                for f in file_fields:
+                    file_filters.append({"match": {f: file_path}})
+                file_filters.append({"wildcard": {"file.path.keyword": f"*{file_path}*"}})
             
             if file_filters:
-                bool_query["should"].extend(file_filters)
+                bool_query.setdefault("should", []).extend(file_filters)
         
         # Severity filters
         if 'severity' in entity_summary:
@@ -461,6 +497,17 @@ class QueryBuilder:
         if aggs:
             query["aggs"] = aggs
     
+    def _load_index_mappings(self) -> Dict[str, Any]:
+        """Load optional external index mappings YAML (config/index_mappings.yaml)."""
+        try:
+            cfg_path = Path(__file__).resolve().parents[1] / 'config' / 'index_mappings.yaml'
+            if cfg_path.exists():
+                with cfg_path.open('r', encoding='utf-8') as fh:
+                    return yaml.safe_load(fh) or {}
+        except Exception as e:
+            logger.warning(f"Index mappings load failed: {e}")
+        return {}
+
     def _cleanup_bool_query(self, query: Dict[str, Any]):
         """Remove empty bool clauses."""
         bool_query = query["query"]["bool"]

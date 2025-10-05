@@ -8,6 +8,15 @@ from typing import Dict, List, Any, Optional, Union
 from datetime import datetime, timedelta
 import logging
 from dataclasses import dataclass
+import os
+
+# Optional spaCy support (flag-gated)
+_USE_SPACY = os.environ.get('ASSISTANT_USE_SPACY', 'false').lower() in ('1', 'true', 'yes')
+try:
+    import spacy  # noqa: F401
+    _SPACY_AVAILABLE = True
+except Exception:
+    _SPACY_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +139,23 @@ class EntityExtractor:
             List of extracted entities
         """
         entities = []
+
+        # Optional spaCy enrichment first (adds hints, regex remains source of truth)
+        if _USE_SPACY and _SPACY_AVAILABLE:
+            try:
+                nlp = spacy.load('en_core_web_sm')
+                doc = nlp(query)
+                # Heuristic: PERSON → username candidate; ORG/GPE often noisy, skip
+                for ent in doc.ents:
+                    if ent.label_ == 'PERSON':
+                        val = ent.text.strip()
+                        if val and 2 <= len(val) <= 32:
+                            entities.append(Entity(type='username', value=val, confidence=0.6, start_pos=ent.start_char, end_pos=ent.end_char))
+                    # DATE entities contribute to time phrase; leave regex to parse semantics
+                    if ent.label_ == 'DATE':
+                        entities.append(Entity(type='time_phrase', value=ent.text.strip(), confidence=0.5, start_pos=ent.start_char, end_pos=ent.end_char))
+            except Exception:
+                pass
         
         for entity_type, patterns in self.patterns.items():
             for pattern in patterns:
