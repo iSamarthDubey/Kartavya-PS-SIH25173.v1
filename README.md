@@ -44,6 +44,10 @@ SIEM NLP Assistant bridges the gap between users and ELK-based SIEMs (Elastic SI
 - ⚡ **SIEM Integration:**
   - Connects to Elastic SIEM and Wazuh via REST APIs
   - Efficient, optimized query generation
+- 🔐 **Security-First API Surface:**
+  - Token-based authentication with role-based access control
+  - Per-route rate limiting and audit logging for sensitive actions
+  - Query sanitization guards against injection-style payloads
 
 ---
 
@@ -110,6 +114,18 @@ python app.py
 ```
 
 The default demo interface is Streamlit. (A dedicated dashboard is planned for production.)
+
+---
+
+## Security & Authentication
+
+- **Bootstrap Admin:** The service auto-creates an `admin` user on first launch.
+  - Username: `admin`
+  - Password: `Admin!2025` (override via `ASSISTANT_ADMIN_PASSWORD` env var)
+- **Session Tokens:** Call `/assistant/auth/login` to retrieve a bearer token, then send it via the `Authorization: Bearer <token>` header on every request.
+- **RBAC:** Core endpoints enforce permissions such as `queries:run`, `users:create`, and `audit:view`.
+- **Rate Limits:** Built-in throttles protect login and query actions; customize via `ASSISTANT_QUERY_RATE`, `ASSISTANT_QUERY_WINDOW`, `ASSISTANT_LOGIN_RATE`, and `ASSISTANT_LOGIN_WINDOW`.
+- **Audit Trail:** All authentication, authorization, and query events are appended to `logs/audit.log`.
 
 ---
 
