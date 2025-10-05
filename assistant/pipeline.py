@@ -28,6 +28,7 @@ from siem_connector.elastic_connector import ElasticConnector
 from siem_connector.wazuh_connector import WazuhConnector
 from backend.response_formatter.formatter import ResponseFormatter
 from assistant.context_manager import ContextManager
+from assistant.mock_data import generate_mock_logs
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +197,8 @@ class ConversationalPipeline:
                         entities_dict.append(entity)
             
             # Build final response
+            data_sources = siem_result.get('sources', [])
+
             final_response = {
                 'conversation_id': conversation_id,
                 'user_query': user_input,
@@ -210,8 +213,9 @@ class ConversationalPipeline:
                     'processing_time_seconds': processing_time,
                     'timestamp': start_time.isoformat(),
                     'results_count': len(formatted_response.get('data', [])),
-                    'data_sources': siem_result.get('sources', []),
-                    'confidence_score': nlp_result.get('confidence', 0.0)
+                    'data_sources': data_sources,
+                    'confidence_score': nlp_result.get('confidence', 0.0),
+                    'mock_data': 'mock-data' in data_sources,
                 },
                 'status': 'success'
             }
@@ -270,6 +274,9 @@ class ConversationalPipeline:
                     'raw_text': user_input
                 }
                 result = await self.query_builder.build_query(query_params)
+                result.setdefault('intent', query_params['intent'])
+                result.setdefault('entities', query_params['entities'])
+                result.setdefault('limit', query_params.get('limit', 100))
                 logger.info(f"Query Generated - Type: {result.get('query_type')}")
                 return result
             else:
@@ -278,11 +285,19 @@ class ConversationalPipeline:
                     'query_type': 'search',
                     'query': f'message:"{user_input}"',
                     'timeframe': '24h',
-                    'limit': 100
+                    'limit': 100,
+                    'intent': nlp_result.get('intent'),
+                    'entities': nlp_result.get('entities', {}),
                 }
         except Exception as e:
             logger.warning(f"Query generation failed: {e}")
-            return {'query_type': 'search', 'query': '*', 'limit': 10}
+            return {
+                'query_type': 'search',
+                'query': '*',
+                'limit': 10,
+                'intent': nlp_result.get('intent'),
+                'entities': nlp_result.get('entities', {}),
+            }
     
     async def _execute_siem_query(self, query_result: Dict) -> Dict[str, Any]:
         """Step 3: Execute query against available SIEM platforms."""
@@ -318,6 +333,18 @@ class ConversationalPipeline:
                 except Exception as e:
                     logger.warning(f"Wazuh query failed: {e}")
             
+            if not results:
+                entity_map = self._normalize_entities_for_mock(query_result.get('entities'))
+                mock_records = generate_mock_logs(
+                    query_result.get('intent', 'search_events'),
+                    entity_map,
+                    limit=query_result.get('limit', 10),
+                )
+                if mock_records:
+                    results.extend(mock_records)
+                    sources.append('mock-data')
+                    logger.info(f"Mock data generator produced {len(mock_records)} records")
+
             return {
                 'hits': results,
                 'total': len(results),
@@ -366,6 +393,57 @@ class ConversationalPipeline:
                 logger.info(f"Context updated for conversation: {conversation_id}")
         except Exception as e:
             logger.warning(f"Context update failed: {e}")
+
+    def _normalize_entities_for_mock(self, entities: Any) -> Dict[str, List[str]]:
+        """Convert mixed entity formats into the structure expected by the mock generator."""
+        if not entities:
+            return {}
+
+        normalized: Dict[str, List[str]] = {}
+
+        # Helper to add a value under a canonical key
+        def _add_value(key: str, value: Any) -> None:
+            if not key or value in (None, ""):
+                return
+
+            canonical_map = {
+                'username': 'user',
+                'user.name': 'user',
+                'user_id': 'user',
+                'account': 'user',
+                'ip': 'ip_address',
+                'src_ip': 'ip_address',
+                'source_ip': 'ip_address',
+                'destination_ip': 'ip_address',
+            }
+
+            canonical_key = canonical_map.get(key.lower(), key)
+
+            normalized.setdefault(canonical_key, []).append(str(value))
+
+        if isinstance(entities, dict):
+            for key, value in entities.items():
+                if isinstance(value, (list, tuple, set)):
+                    for item in value:
+                        _add_value(str(key), item)
+                else:
+                    _add_value(str(key), value)
+            return normalized
+
+        for entity in entities:
+            if not entity:
+                continue
+
+            if isinstance(entity, dict):
+                entity_type = entity.get('type') or entity.get('entity_type') or entity.get('label')
+                entity_value = entity.get('value') or entity.get('text') or entity.get('content')
+            else:
+                entity_type = getattr(entity, 'type', None) or getattr(entity, 'entity_type', None) or getattr(entity, 'label', None)
+                entity_value = getattr(entity, 'value', None) or getattr(entity, 'text', None) or getattr(entity, 'content', None)
+
+            _add_value(str(entity_type) if entity_type else '', entity_value)
+
+        return normalized
     
     async def get_conversation_history(self, conversation_id: str) -> List[Dict]:
         """Retrieve conversation history for a given conversation ID."""
