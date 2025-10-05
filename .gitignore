@@ -398,6 +398,9 @@ static/build/
 *_DRAFT.md
 *_WIP.md
 *_ANALYSIS.md
+
+# Project status snapshots
+status0.txt
 *_REPORT.md
 *_STATUS.md
 *_SUMMARY.md
@@ -509,8 +512,6 @@ coverage.xml
 # Git
 !.gitignore
 !.gitattributes
-
-!status0.txt
 
 # ========================================
 # END OF .gitignore
