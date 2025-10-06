@@ -3,11 +3,13 @@ Wazuh SIEM Connector
 Handles connections and queries to Wazuh SIEM platforms.
 """
 
-import os
-import requests
-from typing import Dict, List, Any, Optional
-import logging
+import asyncio
 import base64
+import logging
+import os
+from typing import Dict, List, Any, Optional
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,25 @@ class WazuhConnector:
         
         self.session = requests.Session()
         self.token = self._authenticate()
+
+    def is_available(self) -> bool:
+        """Return True when authentication succeeded."""
+        return self.token is not None
+
+    async def search(self, query: str, limit: int = 50) -> Dict[str, Any]:
+        """Return recent alerts matching the provided query parameters."""
+        if not self.is_available():
+            return {"hits": [], "total": 0}
+
+        try:
+            return await asyncio.to_thread(self._search_alerts, limit)
+        except Exception as exc:
+            logger.warning("Wazuh search failed: %s", exc)
+            return {"hits": [], "total": 0}
+
+    def _search_alerts(self, limit: int) -> Dict[str, Any]:
+        alerts = self.get_alerts(limit=limit)
+        return {"hits": alerts, "total": len(alerts)}
     
     def _authenticate(self) -> str:
         """Authenticate with Wazuh API."""

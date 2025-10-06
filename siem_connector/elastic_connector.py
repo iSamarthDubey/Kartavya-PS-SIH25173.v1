@@ -3,10 +3,12 @@ Elasticsearch SIEM Connector
 Handles connections and queries to Elasticsearch SIEM platforms.
 """
 
-import os
-from elasticsearch import Elasticsearch
-from typing import Dict, List, Any, Optional
+import asyncio
 import logging
+import os
+from typing import Dict, List, Any, Optional
+
+from elasticsearch import Elasticsearch
 
 logger = logging.getLogger(__name__)
 
@@ -21,21 +23,29 @@ class ElasticConnector:
         self.username = os.getenv('ELASTICSEARCH_USERNAME')
         self.password = os.getenv('ELASTICSEARCH_PASSWORD')
         self.index = os.getenv('ELASTICSEARCH_INDEX', 'security-logs')
-        
+
         self.client = self._connect()
+        self._available = self.client is not None
     
     def _connect(self) -> Elasticsearch:
         """Establish connection to Elasticsearch."""
         try:
+            hosts = [f'http://{self.host}:{self.port}']
             if self.username and self.password:
                 client = Elasticsearch(
-                    [f'http://{self.host}:{self.port}'],
+                    hosts,
                     basic_auth=(self.username, self.password),
                     verify_certs=False
                 )
             else:
-                client = Elasticsearch([f'http://{self.host}:{self.port}'])
-            
+                client = Elasticsearch(hosts)
+
+            client = client.options(
+                request_timeout=2,
+                max_retries=0,
+                retry_on_timeout=False,
+            )
+
             # Test connection
             if client.ping():
                 logger.info(f"Connected to Elasticsearch at {self.host}:{self.port}")
@@ -56,10 +66,50 @@ class ElasticConnector:
                 e,
             )
             return None
+
+    def is_available(self) -> bool:
+        """Return True if a live Elasticsearch client is available."""
+        return self.client is not None
+
+    async def search(self, query: str, limit: int = 100) -> Dict[str, Any]:
+        """Execute a keyword search and return normalized hits."""
+        if not self.is_available():
+            return {"hits": [], "total": 0, "aggregations": {}}
+
+        try:
+            return await asyncio.to_thread(self._search_sync, query or "*", limit)
+        except Exception as exc:
+            logger.warning(f"Elasticsearch search failed: {exc}")
+            return {"hits": [], "total": 0, "aggregations": {}}
+
+    def _search_sync(self, query: Any, limit: int) -> Dict[str, Any]:
+        if isinstance(query, dict):
+            query_dsl = query
+        else:
+            query_dsl = {
+                "query": {
+                    "query_string": {
+                        "query": query or "*",
+                        "default_operator": "AND",
+                    }
+                }
+            }
+
+        normalized = self.send_query_to_elastic(query_dsl, size=limit)
+        hits = normalized.get("hits", [])
+        metadata = normalized.get("metadata", {})
+        return {
+            "hits": hits,
+            "total": metadata.get("total_hits", len(hits)),
+            "aggregations": normalized.get("aggregations", {}),
+        }
     
     def execute_query(self, query: Dict[str, Any], size: int = 100) -> Dict[str, Any]:
         """Execute a query against Elasticsearch."""
         try:
+            if not self.client:
+                logger.info("Elasticsearch client unavailable; execute_query returning empty result")
+                return {'hits': [], 'aggregations': {}, 'metadata': {'total_hits': 0}}
             response = self.client.search(
                 index=self.index,
                 body=query,
@@ -85,6 +135,9 @@ class ElasticConnector:
     def get_indices(self) -> List[str]:
         """Get list of available indices."""
         try:
+            if not self.client:
+                logger.info("Elasticsearch client unavailable; no indices to list")
+                return []
             indices = self.client.indices.get_alias(index="*")
             return list(indices.keys())
         except Exception as e:
@@ -95,6 +148,9 @@ class ElasticConnector:
         """Get field mappings for an index."""
         target_index = index or self.index
         try:
+            if not self.client:
+                logger.info("Elasticsearch client unavailable; no field mappings available")
+                return {}
             mappings = self.client.indices.get_mapping(index=target_index)
             return mappings
         except Exception as e:
@@ -116,6 +172,16 @@ class ElasticConnector:
         """
         try:
             target_index = index or self.index
+            if not self.client:
+                logger.info("Elasticsearch client unavailable; returning empty query response")
+                return {
+                    'hits': [],
+                    'aggregations': {},
+                    'metadata': {
+                        'total_hits': 0,
+                        'error': 'client_unavailable'
+                    }
+                }
             
             logger.info(f"Executing query on index '{target_index}' with size {size}")
             
@@ -359,6 +425,9 @@ class ElasticConnector:
         """Count documents matching the query."""
         try:
             target_index = index or self.index
+            if not self.client:
+                logger.info("Elasticsearch client unavailable; count_documents returning 0")
+                return 0
             
             count_response = self.client.count(
                 index=target_index,
@@ -374,6 +443,9 @@ class ElasticConnector:
     def get_cluster_health(self) -> Dict[str, Any]:
         """Get Elasticsearch cluster health information."""
         try:
+            if not self.client:
+                logger.info("Elasticsearch client unavailable; cluster health unknown")
+                return {'status': 'unknown', 'error': 'client_unavailable'}
             health = self.client.cluster.health()
             return {
                 'status': health.get('status'),
