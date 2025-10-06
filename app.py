@@ -33,6 +33,11 @@ import urllib.error
 import os
 from pathlib import Path
 import webbrowser
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
 
 # --- Configurable Ports ---
 BACKEND_PORT = int(os.environ.get("SIEM_BACKEND_PORT", 8001))
