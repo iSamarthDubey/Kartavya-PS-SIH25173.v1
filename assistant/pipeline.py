@@ -315,6 +315,7 @@ class ConversationalPipeline:
                     'intent': force_intent or nlp_result.get('intent'),
                     'entities': nlp_result.get('entities', []),
                     'raw_text': user_input,
+                    'filters': (user_context.get('filters') if user_context and isinstance(user_context.get('filters'), dict) else None),
                 }
                 if limit is not None:
                     query_params['limit'] = limit
