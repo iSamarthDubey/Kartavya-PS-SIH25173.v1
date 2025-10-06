@@ -161,7 +161,9 @@ def get_pids_on_port(port):
                 if parts:
                     pid = parts[-1]
                     if pid.isdigit():
-                        pids.add(int(pid))
+                        value = int(pid)
+                        if value > 0:
+                            pids.add(value)
             return sorted(pids)
         else:
             res = run_cmd(f'lsof -ti:{port}')
@@ -272,6 +274,31 @@ def start_backend():
     return None
 
 
+def boot_backend(max_attempts: int = 3) -> bool:
+    """Attempt to start the backend, falling back to alternate ports if needed."""
+    attempts = max(1, max_attempts)
+    for attempt in range(attempts):
+        progress_bar("Starting backend", 2)
+        process = start_backend()
+        if process:
+            return True
+
+        # Try to clean up any lingering listeners on the current port
+        lingering = get_pids_on_port(BACKEND_PORT)
+        for pid in lingering:
+            kill_pid(pid)
+
+        fallback_port = find_available_port(BACKEND_PORT + 1)
+        if not fallback_port or fallback_port == BACKEND_PORT:
+            break
+        cwarn(
+            f"  Backend failed to start on port {BACKEND_PORT}; retrying on port {fallback_port}"
+        )
+        set_backend_port(fallback_port)
+
+    return False
+
+
 def start_frontend():
     cinfo(f"[FRONTEND] Starting Streamlit on port {FRONTEND_PORT}")
     frontend_script = Path(__file__).parent / "ui_dashboard" / "streamlit_app.py"
@@ -340,9 +367,7 @@ def main():
                 if fallback_port and fallback_port != BACKEND_PORT:
                     cwarn(f"  Switching backend to available port {fallback_port}")
                     set_backend_port(fallback_port)
-                    progress_bar("Starting backend", 2)
-                    p = start_backend()
-                    if not p:
+                    if not boot_backend():
                         checklist("Backend failed to start", 'fail')
                     else:
                         checklist(f"Backend started on port {BACKEND_PORT}", 'ok')
@@ -350,19 +375,15 @@ def main():
                     cerr("  No alternate port available. Please free the port and retry.")
             else:
                 checklist("Killed conflicting backend process(es)", 'ok')
-                progress_bar("Starting backend", 2)
-                p = start_backend()
-                if not p:
-                    checklist("Backend failed to start", 'fail')
+                if boot_backend():
+                    checklist(f"Backend started on port {BACKEND_PORT}", 'ok')
                 else:
-                    checklist("Backend started", 'ok')
+                    checklist("Backend failed to start", 'fail')
         else:
-            progress_bar("Starting backend", 2)
-            p = start_backend()
-            if not p:
-                checklist("Backend failed to start", 'fail')
+            if boot_backend():
+                checklist(f"Backend started on port {BACKEND_PORT}", 'ok')
             else:
-                checklist("Backend started", 'ok')
+                checklist("Backend failed to start", 'fail')
     print()
 
     # Frontend check
