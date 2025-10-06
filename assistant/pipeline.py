@@ -96,12 +96,16 @@ class ConversationalPipeline:
                 lambda: None,  # ElasticConnector doesn't have initialize() method
                 "Elastic Connector"
             )
+            if hasattr(self.elastic_connector, "is_available") and not self.elastic_connector.is_available():
+                logger.warning("Elastic connector unavailable - operating in mock-data mode")
             
             self.wazuh_connector = WazuhConnector()
             await self._safe_component_init(
                 lambda: None,  # WazuhConnector doesn't have initialize() method
                 "Wazuh Connector"
             )
+            if hasattr(self.wazuh_connector, "is_available") and not self.wazuh_connector.is_available():
+                logger.warning("Wazuh connector unavailable - skipping Wazuh-backed searches")
             
             # 4. Initialize Response Formatter
             self.response_formatter = ResponseFormatter()
@@ -354,7 +358,7 @@ class ConversationalPipeline:
             sources = []
             
             # Try Elasticsearch first
-            if self.elastic_connector:
+            if self.elastic_connector and getattr(self.elastic_connector, "is_available", lambda: True)():
                 try:
                     elastic_results = await self.elastic_connector.search(
                         query=query_result.get('query', '*'),
@@ -366,9 +370,15 @@ class ConversationalPipeline:
                         logger.info(f"Elasticsearch: {len(elastic_results['hits'])} results")
                 except Exception as e:
                     logger.warning(f"Elasticsearch query failed: {e}")
+            elif self.elastic_connector:
+                logger.info("Elasticsearch connector unavailable - skipping live search")
             
             # Try Wazuh as backup/supplement
-            if self.wazuh_connector and len(results) < 50:  # Only if we need more data
+            if (
+                self.wazuh_connector
+                and len(results) < 50
+                and getattr(self.wazuh_connector, "is_available", lambda: True)()
+            ):  # Only if we need more data
                 try:
                     wazuh_results = await self.wazuh_connector.search(
                         query=query_result.get('query', '*'),
@@ -380,6 +390,8 @@ class ConversationalPipeline:
                         logger.info(f"Wazuh: {len(wazuh_results['hits'])} results")
                 except Exception as e:
                     logger.warning(f"Wazuh query failed: {e}")
+            elif self.wazuh_connector:
+                logger.info("Wazuh connector unavailable - skipping live search")
             
             if not results:
                 entity_map = self._normalize_entities_for_mock(query_result.get('entities'))
