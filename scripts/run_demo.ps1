@@ -3,6 +3,9 @@ param(
     [string]$BackendHost = "0.0.0.0",
     [string]$FrontendHost = "localhost",
     [int]$FrontendPort = 8501,
+    [string]$DemoUsername,
+    [string]$DemoPassword,
+    [string]$AdminPassword,
     [switch]$SkipTests,
     [switch]$NoFrontend
 )
@@ -13,6 +16,28 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Resolve-Path (Join-Path $scriptDir "..")
 
 Push-Location $repoRoot
+
+if (-not $DemoUsername) {
+    $DemoUsername = $env:ASSISTANT_DEMO_USERNAME
+}
+if (-not $DemoUsername) {
+    $DemoUsername = "admin"
+}
+
+if (-not $DemoPassword) {
+    $DemoPassword = $env:ASSISTANT_DEMO_PASSWORD
+}
+if (-not $DemoPassword) {
+    $DemoPassword = "Admin!2025"
+}
+
+if ($AdminPassword) {
+    $env:ASSISTANT_ADMIN_PASSWORD = $AdminPassword
+}
+
+$env:ASSISTANT_DEMO_USER = $DemoUsername
+$env:ASSISTANT_DEMO_USERNAME = $DemoUsername
+$env:ASSISTANT_DEMO_PASSWORD = $DemoPassword
 
 $backendProcess = $null
 $frontendProcess = $null
@@ -28,7 +53,12 @@ try {
 
     $env:ASSISTANT_HOST = $BackendHost
     $env:ASSISTANT_PORT = $BackendPort.ToString()
-    $env:ASSISTANT_BACKEND_URL = "http://$FrontendHost:$BackendPort"
+
+    $backendUrlHost = $FrontendHost
+    if (-not $backendUrlHost -or $backendUrlHost -eq "0.0.0.0") {
+        $backendUrlHost = "localhost"
+    }
+    $env:ASSISTANT_BACKEND_URL = "http://$backendUrlHost:$BackendPort"
 
     Write-Host "Starting backend with uvicorn on $BackendHost:$BackendPort..." -ForegroundColor Cyan
     $backendArgs = @(
@@ -70,15 +100,16 @@ try {
             $frontendArgs += @("--server.address", $FrontendHost)
         }
 
-    $frontendProcess = Start-Process -FilePath "python" -ArgumentList $frontendArgs -PassThru -NoNewWindow -WorkingDirectory $repoRoot
+        $frontendProcess = Start-Process -FilePath "python" -ArgumentList $frontendArgs -PassThru -NoNewWindow -WorkingDirectory $repoRoot
     }
 
     Write-Host "" # Blank line
     Write-Host "Demo environment is running:" -ForegroundColor Green
-    Write-Host ("  Backend API   : http://{0}:{1}/assistant/ask" -f $FrontendHost, $BackendPort)
+    Write-Host ("  Backend API   : http://{0}:{1}/assistant/ask" -f $backendUrlHost, $BackendPort)
     if (-not $NoFrontend) {
         Write-Host ("  Streamlit UI : http://{0}:{1}" -f $FrontendHost, $FrontendPort)
     }
+    Write-Host ("  Demo user      : {0}" -f $DemoUsername)
     Write-Host "Press Enter to stop both services..."
     [void][System.Console]::ReadLine()
 }

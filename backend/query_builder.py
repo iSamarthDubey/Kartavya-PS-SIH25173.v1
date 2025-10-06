@@ -111,6 +111,13 @@ class QueryBuilder:
         pre_intent = query_params.get('intent')
         pre_entities = query_params.get('entities', [])
         index_pattern = query_params.get('index_pattern', 'logs-*')
+        filters = query_params.get('filters') or {}
+        request_index_class = None
+        try:
+            if isinstance(filters, dict) and filters.get('index_class'):
+                request_index_class = str(filters.get('index_class')).strip().lower()
+        except Exception:
+            request_index_class = None
         
         # Use pre-classified intent or classify now
         if pre_intent and isinstance(pre_intent, str):
@@ -161,10 +168,24 @@ class QueryBuilder:
         self._add_intent_filters(query, intent, entities, entity_summary)
         
         # Add entity-based filters
-        self._add_entity_filters(query, entities, entity_summary)
+        self._add_entity_filters(query, entities, entity_summary, index_class_override=request_index_class)
         
-        # Add time range filter (with fallback default)
-        if time_range and time_range.get('start_time'):
+        # Add time range filter (with fallback default and UI override)
+        # UI override: filters.time_window_gte
+        if isinstance(filters, dict) and filters.get('time_window_gte'):
+            try:
+                gte = str(filters.get('time_window_gte'))
+                query['query']['bool'].setdefault('filter', []).append({
+                    'range': {
+                        '@timestamp': {
+                            'gte': gte
+                        }
+                    }
+                })
+            except Exception:
+                # fallback to parsed or default
+                pass
+        elif time_range and time_range.get('start_time'):
             self._add_time_filter(query, time_range)
         else:
             # Fallback default window (e.g., now-1d)
@@ -176,6 +197,25 @@ class QueryBuilder:
                     }
                 }
             })
+
+        # Severity override from UI filters (Critical/High/Medium/Low)
+        if isinstance(filters, dict) and filters.get('severity') and str(filters.get('severity')).lower() != 'all':
+            sev = str(filters.get('severity')).lower()
+            sev_map_min = {
+                'critical': 10,
+                'high': 8,
+                'medium': 5,
+                'low': 3,
+                'info': 1
+            }
+            if sev in sev_map_min:
+                query['query']['bool'].setdefault('filter', []).append({
+                    'range': {
+                        'event.severity': {
+                            'gte': sev_map_min[sev]
+                        }
+                    }
+                })
         
         # Apply pagination/size caps
         max_size = int(os.getenv('ASSISTANT_MAX_RESULTS', '200'))
@@ -265,7 +305,7 @@ class QueryBuilder:
             bool_query["minimum_should_match"] = 1
     
     def _add_entity_filters(self, query: Dict[str, Any], entities: List[Entity], 
-                           entity_summary: Dict[str, List[str]]):
+                           entity_summary: Dict[str, List[str]], index_class_override: Optional[str] = None):
         """Add filters based on extracted entities."""
         bool_query = query["query"]["bool"]
         
@@ -273,8 +313,9 @@ class QueryBuilder:
         def preferred(kind: str, defaults: List[str]) -> List[str]:
             # kind examples: 'username', 'source_ip', 'dest_ip', 'event_id', 'process', 'file.path'
             results = []
-            if self.external_mappings and self.index_class:
-                cls = self.external_mappings.get(self.index_class, {})
+            selected_class = (index_class_override or self.index_class)
+            if self.external_mappings and selected_class:
+                cls = self.external_mappings.get(selected_class, {})
                 if kind in cls:
                     results.extend([f for f in cls.get(kind, []) if isinstance(f, str)])
             # Append defaults ensuring uniqueness
