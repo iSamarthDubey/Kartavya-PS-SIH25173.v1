@@ -41,11 +41,21 @@ class ElasticConnector:
                 logger.info(f"Connected to Elasticsearch at {self.host}:{self.port}")
                 return client
             else:
-                raise ConnectionError("Failed to ping Elasticsearch")
+                logger.warning(
+                    "Elasticsearch ping failed for %s:%s. Proceeding without a live cluster.",
+                    self.host,
+                    self.port,
+                )
+                return None
                 
         except Exception as e:
-            logger.error(f"Failed to connect to Elasticsearch: {e}")
-            raise
+            logger.warning(
+                "Failed to connect to Elasticsearch at %s:%s (%s). Running in mock-data mode.",
+                self.host,
+                self.port,
+                e,
+            )
+            return None
     
     def execute_query(self, query: Dict[str, Any], size: int = 100) -> Dict[str, Any]:
         """Execute a query against Elasticsearch."""

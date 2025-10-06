@@ -29,6 +29,9 @@ class WazuhConnector:
     def _authenticate(self) -> str:
         """Authenticate with Wazuh API."""
         try:
+            if not self.username or not self.password:
+                raise ValueError("Wazuh credentials not provided")
+
             credentials = base64.b64encode(
                 f"{self.username}:{self.password}".encode()
             ).decode()
@@ -53,12 +56,19 @@ class WazuhConnector:
                 raise Exception(f"Authentication failed: {response.text}")
                 
         except Exception as e:
-            logger.error(f"Wazuh authentication failed: {e}")
-            raise
+            logger.warning(
+                "Wazuh authentication failed for %s:%s (%s). Proceeding without Wazuh integration.",
+                self.host,
+                self.port,
+                e,
+            )
+            return None
     
     def get_agents(self) -> List[Dict[str, Any]]:
         """Get list of Wazuh agents."""
         try:
+            if not self.token:
+                return []
             response = self.session.get(
                 f"{self.base_url}/agents",
                 verify=False
@@ -76,6 +86,8 @@ class WazuhConnector:
     def get_alerts(self, **filters) -> List[Dict[str, Any]]:
         """Get alerts with optional filters."""
         try:
+            if not self.token:
+                return []
             params = {}
             if 'limit' in filters:
                 params['limit'] = filters['limit']
@@ -102,6 +114,8 @@ class WazuhConnector:
     def get_rules(self, **filters) -> List[Dict[str, Any]]:
         """Get Wazuh rules."""
         try:
+            if not self.token:
+                return []
             params = {}
             if 'limit' in filters:
                 params['limit'] = filters['limit']
