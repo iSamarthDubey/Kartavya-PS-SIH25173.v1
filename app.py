@@ -32,6 +32,7 @@ import urllib.request
 import urllib.error
 import os
 from pathlib import Path
+from typing import Optional
 import webbrowser
 try:
     from dotenv import load_dotenv
@@ -44,10 +45,23 @@ BACKEND_PORT = int(os.environ.get("SIEM_BACKEND_PORT", 8001))
 FRONTEND_PORT = int(os.environ.get("SIEM_FRONTEND_PORT", 8501))
 BACKEND_HEALTH_PATH = "/assistant/ping"  # Assistant liveness endpoint (unauthenticated)
 STARTUP_TIMEOUT = 30
+BACKEND_RELOAD = os.environ.get("SIEM_BACKEND_RELOAD", "false").lower() in {"1", "true", "yes", "on"}
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 
 started_processes = []
+
+
+def set_backend_port(port: int) -> None:
+    """Update the global backend port and align dependent environment variables."""
+    global BACKEND_PORT
+    BACKEND_PORT = port
+    os.environ["SIEM_BACKEND_PORT"] = str(port)
+    os.environ["ASSISTANT_PORT"] = str(port)
+    os.environ["ASSISTANT_API_PORT"] = str(port)
+
+
+set_backend_port(BACKEND_PORT)
 
 
 
@@ -132,33 +146,47 @@ def run_cmd(cmd):
     return subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
 
-def get_pid_on_port(port):
-    """Return PID using the port or None.
-    Uses `netstat -ano` on Windows and `lsof -ti:port` on Unix.
-    """
+def get_pids_on_port(port):
+    """Return a sorted list of PIDs listening on the specified port."""
     try:
         if sys.platform.startswith("win"):
             cmd = f'netstat -ano | findstr :{port}'
             res = run_cmd(cmd)
             out = res.stdout.strip()
             if not out:
-                return None
+                return []
+            pids = set()
             for line in out.splitlines():
                 parts = line.split()
                 if parts:
                     pid = parts[-1]
                     if pid.isdigit():
-                        return int(pid)
-            return None
+                        pids.add(int(pid))
+            return sorted(pids)
         else:
             res = run_cmd(f'lsof -ti:{port}')
             out = res.stdout.strip()
             if not out:
-                return None
-            pid = int(out.splitlines()[0])
-            return pid
+                return []
+            return sorted({int(pid) for pid in out.splitlines() if pid.strip().isdigit()})
     except Exception:
-        return None
+        return []
+
+
+def get_pid_on_port(port):
+    """Backward compatible helper returning the first PID on a port or None."""
+    pids = get_pids_on_port(port)
+    return pids[0] if pids else None
+
+
+def find_available_port(start_port: int, attempts: int = 20) -> Optional[int]:
+    """Return the first available port at or above the starting port."""
+    port = start_port
+    for _ in range(max(1, attempts)):
+        if not get_pids_on_port(port):
+            return port
+        port += 1
+    return None
 
 # --- HTTP GET Helper ---
 def http_get(url, timeout=3):
@@ -219,11 +247,16 @@ def start_backend():
         "assistant.main:app",  # Start the Assistant API as the canonical public service
         "--host", "0.0.0.0",
         "--port", str(BACKEND_PORT),
-        "--reload",
-        "--reload-dir", "assistant",
-        "--reload-dir", "siem_connector",
-        "--reload-dir", "backend",
     ]
+    if BACKEND_RELOAD:
+        cmd.extend([
+            "--reload",
+            "--reload-dir", "assistant",
+            "--reload-dir", "siem_connector",
+            "--reload-dir", "backend",
+        ])
+    else:
+        cinfo("  [BACKEND] Reload disabled (set SIEM_BACKEND_RELOAD=1 to enable hot reload)")
     log_file = LOG_DIR / "backend.log"
     p = subprocess.Popen(cmd, stdout=open(log_file, "w"), stderr=subprocess.STDOUT, start_new_session=True)
     started_processes.append(p)
@@ -289,15 +322,34 @@ def main():
     if our_running:
         checklist(f"Backend already running (PID {pid})", 'ok')
     else:
-        if pid:
-            checklist(f"Port {BACKEND_PORT} occupied by PID {pid} (not our backend)", 'fail')
-            cwarn(f"  Killing PID {pid}...")
-            killed = kill_pid(pid)
+        occupied_pids = get_pids_on_port(BACKEND_PORT)
+        if occupied_pids:
+            checklist(
+                f"Port {BACKEND_PORT} occupied by PID(s) {', '.join(str(p) for p in occupied_pids)} (not our backend)",
+                'fail'
+            )
+            all_killed = True
+            for other_pid in occupied_pids:
+                cwarn(f"  Killing PID {other_pid}...")
+                killed = kill_pid(other_pid)
+                all_killed = all_killed and killed
             time.sleep(0.5)
-            if not killed:
-                checklist("Could not kill conflicting backend process", 'fail')
+            if not all_killed and get_pids_on_port(BACKEND_PORT):
+                checklist("Could not kill all conflicting backend processes", 'fail')
+                fallback_port = find_available_port(BACKEND_PORT + 1)
+                if fallback_port and fallback_port != BACKEND_PORT:
+                    cwarn(f"  Switching backend to available port {fallback_port}")
+                    set_backend_port(fallback_port)
+                    progress_bar("Starting backend", 2)
+                    p = start_backend()
+                    if not p:
+                        checklist("Backend failed to start", 'fail')
+                    else:
+                        checklist(f"Backend started on port {BACKEND_PORT}", 'ok')
+                else:
+                    cerr("  No alternate port available. Please free the port and retry.")
             else:
-                checklist("Killed conflicting backend process", 'ok')
+                checklist("Killed conflicting backend process(es)", 'ok')
                 progress_bar("Starting backend", 2)
                 p = start_backend()
                 if not p:
