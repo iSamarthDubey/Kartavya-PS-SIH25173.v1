@@ -1,0 +1,20 @@
+/frontend
+ ├─ src/
+ │   ├─ assets/
+ │   ├─ components/
+ │   │   ├─ ChatWindow.tsx
+ │   │   ├─ Sidebar.tsx
+ │   │   ├─ ReportCard.tsx
+ │   │   └─ ChartCard.tsx
+ │   ├─ pages/
+ │   │   ├─ Dashboard.tsx
+ │   │   ├─ Reports.tsx
+ │   │   ├─ Chat.tsx
+ │   │   └─ Settings.tsx
+ │   ├─ store/useChatStore.ts
+ │   ├─ utils/api.ts
+ │   ├─ App.tsx
+ │   └─ main.tsx
+ │
+ ├─ public/
+ └─ vite.config.ts

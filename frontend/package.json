@@ -1,7 +1,7 @@
 {
   "name": "kartavya-frontend",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,15 +9,26 @@
     "preview": "vite preview --port 5173"
   },
   "dependencies": {
+    "axios": "^1.7.7",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.3.29",
     "jszip": "^3.10.1",
+    "lucide-react": "^0.453.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.2"
+    "react-router-dom": "^6.26.2",
+    "recharts": "^2.12.7",
+    "tailwind-merge": "^2.6.0",
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
+    "@types/node": "^22.5.4",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^5.0.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.44",
+    "tailwindcss": "^3.4.13",
     "typescript": "^5.5.4",
     "vite": "^5.4.2"
   }
