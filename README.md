@@ -48,10 +48,6 @@ SIEM NLP Assistant bridges the gap between users and ELK-based SIEMs (Elastic SI
 - ⚡ **SIEM Integration:**
   - Connects to Elastic SIEM and Wazuh via REST APIs
   - Efficient, optimized query generation
-- 🔐 **Security-First API Surface:**
-  - Token-based authentication with role-based access control
-  - Per-route rate limiting and audit logging for sensitive actions
-  - Query sanitization guards against injection-style payloads
 
 ---
 
@@ -65,109 +61,59 @@ SIEM NLP Assistant bridges the gap between users and ELK-based SIEMs (Elastic SI
 
 ---
 
-docker-compose up -d
-## Getting Started
+## Quick Start
 
-### Prerequisites
+### 1. Prerequisites
 
-- Python 3.10 or newer (3.11 recommended)
-- pip with the build tools required for Python packages
-- (Optional) Docker & Docker Compose if you plan to bring up Elastic/Wazuh locally
+- Python 3.10+
+- Docker & Docker Compose (recommended)
+- Elastic SIEM and/or Wazuh instance (local or remote)
 
-Work inside a virtual environment if you can (`python -m venv .venv; .venv\\Scripts\\Activate.ps1` on Windows).
+### 2. Automated Setup
 
-### Option A – One-command demo for Windows (recommended)
+Run the following command in your project directory:
 
-The repository ships with `scripts/run_demo.ps1`, a PowerShell helper that installs nothing but bootstraps the backend and Streamlit UI for you. From the project root:
-
-```powershell
-.\scripts
-un_demo.ps1
+```bash
+python setup.py
 ```
 
-What the script does:
+This script will:
 
-- Runs `tests/run_complete_tests.py` unless you pass `-SkipTests`
-- Starts the FastAPI backend with `uvicorn` (default host `0.0.0.0`, port `8100`)
-- Sets `ASSISTANT_BACKEND_URL` so Streamlit talks to the correct port
-- Launches the Streamlit UI on `http://localhost:8501`
-- Stops both processes when you hit **Enter** in the terminal
+- Check/install all Python dependencies
+- Set up Docker containers (if you choose)
+- Prepare the environment for first use
+- Optionally launch the app for you
 
-Useful switches:
+**Note:** If you encounter any issues, see the README or run the manual steps below.
 
-- `-SkipTests` &mdash; skip the pre-flight test suite
-- `-NoFrontend` &mdash; run the API only (for Postman/cURL)
-- `-BackendPort 8001` or `-FrontendPort 8600` &mdash; override default ports
+### 3. Manual Steps (if needed)
 
-### Option B – Manual start (any platform)
+**Install dependencies:**
 
-1. **Install dependencies** (root + backend):
+```bash
+pip install -r requirements.txt
+```
 
-  ```bash
-  pip install -r requirements.txt
-  pip install -r backend/requirements.txt
-  ```
+**Download spaCy model:**
 
-2. **(Optional) Enable spaCy enrichment** for better entity hints:
+```bash
+python -m spacy download en_core_web_sm
+```
 
-  ```bash
-  pip install -U spacy
-  python -m spacy download en_core_web_sm
-  ```
+**Start Docker services:**
 
-  Set `ASSISTANT_USE_SPACY=true` before launching if you want it active.
+```bash
+cd docker
+docker-compose up -d
+```
 
-3. **Start the FastAPI backend** (choose a port; defaults to `8001` if unset):
+**Launch the app:**
 
-  ```bash
-  ASSISTANT_HOST=0.0.0.0 ASSISTANT_PORT=8001 \ 
-  python -m uvicorn assistant.main:app --host 0.0.0.0 --port 8001
-  ```
+```bash
+python app.py
+```
 
-4. **Start the Streamlit UI** in a second shell (pointing it at the backend):
-
-  ```bash
-  ASSISTANT_BACKEND_URL=http://localhost:8001 \ 
-  python -m streamlit run ui_dashboard/streamlit_app.py --server.port 8501 --server.headless true
-  ```
-
-  On Windows PowerShell, use `$env:ASSISTANT_BACKEND_URL="http://localhost:8001"` before running the command.
-
-Once both processes are up, open `http://localhost:8501` in your browser to chat with the assistant.
-
-### Health checks & smoke tests
-
-- Verify the public readiness probe: `http://localhost:8001/health`
-- Authenticated health telemetry: `http://localhost:8001/assistant/health` (requires bearer token)
-- Quick ask call (replace `<token>`): `curl -H "Authorization: Bearer <token>" -X POST http://localhost:8001/assistant/ask -d '{"query": "Show failed logins last 24h"}' -H "Content-Type: application/json"`
-
-### Core environment variables
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `ASSISTANT_HOST` | `0.0.0.0` | Bind address for the FastAPI service |
-| `ASSISTANT_PORT` | `8001` | API port (overridden to `8100` by `run_demo.ps1`) |
-| `ASSISTANT_BACKEND_URL` | derived | Base URL Streamlit uses to talk to the API |
-| `ASSISTANT_ADMIN_PASSWORD` | `Admin!2025` | Bootstrap admin password (set this yourself!) |
-| `ASSISTANT_DEMO_USERNAME` | `admin` | Preferred username the Streamlit UI auto-fills |
-| `ASSISTANT_DEMO_PASSWORD` | `Admin!2025` | Preferred password the Streamlit UI auto-fills |
-| `ASSISTANT_QUERY_RATE` / `ASSISTANT_QUERY_WINDOW` | `30 / 60` | Query rate limit (hits per seconds window) |
-| `ASSISTANT_LOGIN_RATE` / `ASSISTANT_LOGIN_WINDOW` | `5 / 300` | Login rate limit |
-| `ASSISTANT_USE_SPACY` | unset | Enable spaCy enrichment when set to `true` |
-
-Set or export these before launching the backend. The Streamlit UI reads the same values at startup.
-
----
-
-## Security & Authentication
-
-- **Bootstrap admin:** The backend guarantees an `admin` user exists. If you do not set `ASSISTANT_ADMIN_PASSWORD` before the first run it will use the public default `Admin!2025` and log a warning. Override it immediately for anything beyond a throwaway demo.
-- **Session tokens:** Obtain a bearer token from `/assistant/auth/login` using JSON payload `{"username": "...", "password": "..."}`. Include `Authorization: Bearer <token>` on every protected request.
-- **UI auto-login:** The Streamlit sidebar auto-logins using `ASSISTANT_DEMO_USERNAME`/`ASSISTANT_DEMO_PASSWORD` (or `admin`/`Admin!2025` if you keep the defaults). You can override the credentials in the sidebar or by changing the environment variables.
-- **RBAC enforcement:** Endpoint permissions such as `queries:run`, `users:create`, and `audit:view` are enforced by the security layer.
-- **Rate limiting:** Customise query/login throttles with `ASSISTANT_QUERY_RATE`, `ASSISTANT_QUERY_WINDOW`, `ASSISTANT_LOGIN_RATE`, and `ASSISTANT_LOGIN_WINDOW`.
-- **Audit trail:** Authentication, authorization, and query outcomes are appended to `logs/audit.log` for review.
-- **Health probes:** `/health` is unauthenticated for load balancers; `/assistant/health` requires a valid token and returns richer diagnostics.
+The default demo interface is Streamlit. (A dedicated dashboard is planned for production.)
 
 ---
 
