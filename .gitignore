@@ -519,3 +519,5 @@ coverage.xml
 # ========================================
 scripts/restructure_repo.py
 about.txt
+docs/CLEANUP-PLAN.md
+docs/UPGRADE-ROADMAP.md
