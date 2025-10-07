@@ -517,3 +517,5 @@ coverage.xml
 # ========================================
 # END OF .gitignore
 # ========================================
+scripts/restructure_repo.py
+about.txt
