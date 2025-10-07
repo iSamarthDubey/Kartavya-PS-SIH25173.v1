@@ -1,37 +1,28 @@
-# SIEM Backend Service Dependencies
-# Use: pip install -r requirements.txt
+# Kartavya SIEM Assistant - Backend Dependencies
 
-# FastAPI Framework
-fastapi>=0.118.0
-uvicorn[standard]>=0.37.0
-pydantic>=2.11.0
-python-multipart>=0.0.20
+# Core
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+python-dotenv==1.0.0
 
-# SIEM & Search
-elasticsearch>=9.1.0
-requests>=2.32.0
+# SIEM Connectors
+elasticsearch==8.11.0
+aiohttp==3.9.1
 
 # NLP & ML
-spacy>=3.8.0
-scikit-learn>=1.7.0
-joblib>=1.5.0
-dateparser>=1.2.0
-
-# Data Processing & Visualization
-pandas>=2.2.0
-numpy>=1.26.0
-matplotlib>=3.8.0
-seaborn>=0.13.0
-
-# Development & Logging
-python-dotenv>=1.0.0
-pandas>=2.3.0
-numpy>=2.3.0
-
-# Configuration & Logging
-python-dotenv>=1.1.0
-python-json-logger>=3.3.0
+spacy==3.7.2
+dateparser==1.2.0
+pandas==2.1.4
+numpy==1.26.2
 
 # Security
-cryptography>=43.0.0
-bcrypt>=4.3.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+pydantic==2.5.2
+
+# Utils
+redis==5.0.1
+httpx==0.25.2
+pytest==7.4.3
+pytest-asyncio==0.21.1

@@ -1,150 +1,104 @@
-# Project Details
+# Kartavya SIEM Assistant 🛡️
 
-> _This project is being developed for the Smart India Hackathon (SIH) 2025, under the following problem statement:_
+**NLP-powered Conversational SIEM Assistant for ISRO**
 
-> _**Problem Statement Title:** Conversational SIEM Assistant for Investigation and Automated Threat Reporting using NLP  <br>
-> **PS Number:** SIH25173  <br>
-> **Organization:** Indian Space Research Organisation (ISRO)  <br>
-> **Department:** Department of Space (DoS)  <br>
-> **Theme:** Blockchain & Cybersecurity  <br>_
+## 🎯 Overview
 
-The goal is to provide a natural language interface for ELK-based SIEMs (Elastic SIEM, Wazuh), enabling conversational investigations and automated threat reporting without requiring users to know query syntax.
+Kartavya is an advanced Natural Language Processing (NLP) powered assistant that provides a conversational interface for SIEM (Security Information and Event Management) systems, specifically designed for Elastic SIEM and Wazuh platforms.
 
----
+## ✨ Features
 
-## Overview
+- **Natural Language Queries**: Convert plain English to Elasticsearch DSL/KQL
+- **Multi-turn Conversations**: Maintain context across multiple queries
+- **Automated Report Generation**: Generate security reports with charts and narratives
+- **Real-time Threat Investigation**: Investigate security incidents conversationally
+- **Schema-aware Query Generation**: Intelligent mapping to SIEM schema
+- **Security-first Design**: Built for government/enterprise environments
 
-SIEM NLP Assistant bridges the gap between users and ELK-based SIEMs (Elastic SIEM, Wazuh) by enabling natural language investigations and automated threat reporting. Users can ask questions or request reports in plain English, and the assistant translates these into optimized SIEM queries—no query syntax required.
+## 🏗️ Architecture
 
-**Key Capabilities:**
-
-- Multi-turn, context-aware conversational investigations
-- Automated report generation (text, tables, charts)
-- Works with both Elastic SIEM and Wazuh (via APIs)
-- No changes required to SIEM core
-
----
-
-## Features
-
-- Clarification flow on ambiguous queries (top-3 intents) with one-click refine in the UI
-- DSL transparency: UI can show the generated Elasticsearch DSL
-- Export Pack: one-click ZIP export containing summary, results.json, siem_query.json, entities.json, and metadata.json
-
-- 🔍 **Conversational Investigations:**
-  - Multi-turn queries (e.g., “What suspicious login attempts occurred yesterday?” → “Filter only VPN-related attempts.”)
-  - Context preserved across follow-ups
-  - Translates natural language to Elasticsearch DSL/KQL
-
-- 📊 **Automated Report Generation:**
-  - Request summaries or charts in natural language
-  - Aggregates and presents results as narratives, tables, or visuals
-
-- 🧠 **NLP & Query Engine:**
-  - Advanced entity/intent extraction
-  - Handles ambiguous/relative terms (“last week”, “unusual activity”)
-  - Intelligent error handling and feedback
-
-- ⚡ **SIEM Integration:**
-  - Connects to Elastic SIEM and Wazuh via REST APIs
-  - Efficient, optimized query generation
-
----
-
-## Architecture
-
-- **NLP Parser:** Understands natural language inputs
-- **Query Generator:** Maps parsed intent to Elasticsearch DSL/KQL
-- **SIEM Connector:** Interfaces with Elastic/Wazuh APIs
-- **Response Formatter:** Converts results to text, tables, or charts
-- **Context Manager:** Maintains dialogue history for iterative queries
-
----
-
-## Quick Start
-
-### 1. Prerequisites
-
-- Python 3.10+
-- Docker & Docker Compose (recommended)
-- Elastic SIEM and/or Wazuh instance (local or remote)
-
-### 2. Automated Setup
-
-Run the following command in your project directory:
-
-```bash
-python setup.py
+```
+kartavya-siem/
+├── backend/          # FastAPI backend (Port 8001)
+├── frontend/         # React frontend (Port 3000)  
+├── deployment/       # Docker & Kubernetes configs
+├── docs/            # Documentation
+├── scripts/         # Utility scripts
+└── tests/           # Test suites
 ```
 
-This script will:
+## 🚀 Quick Start
 
-- Check/install all Python dependencies
-- Set up Docker containers (if you choose)
-- Prepare the environment for first use
-- Optionally launch the app for you
+### Prerequisites
+- Python 3.11+
+- Node.js 18+
+- Docker & Docker Compose
+- Elasticsearch 8.x or Wazuh 4.x
 
-**Note:** If you encounter any issues, see the README or run the manual steps below.
+### Installation
 
-### 3. Manual Steps (if needed)
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/isro/kartavya-siem
+   cd kartavya-siem
+   ```
 
-**Install dependencies:**
+2. **Set up environment**
+   ```bash
+   cp deployment/.env.example deployment/.env
+   # Edit deployment/.env with your configurations
+   ```
+
+3. **Start with Docker Compose**
+   ```bash
+   cd deployment
+   docker-compose up -d
+   ```
+
+4. **Access the application**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8001
+   - API Docs: http://localhost:8001/docs
+
+## 📖 Documentation
+
+- [Architecture Guide](docs/ARCHITECTURE.md)
+- [API Documentation](docs/API.md)
+- [Deployment Guide](docs/DEPLOYMENT.md)
+- [Development Guide](docs/DEVELOPMENT.md)
+
+## 🧪 Testing
 
 ```bash
-pip install -r requirements.txt
+# Run all tests
+pytest
+
+# Run specific test suites
+pytest tests/backend/unit/
+pytest tests/backend/integration/
+pytest tests/e2e/
 ```
 
-**Download spaCy model:**
+## 🔒 Security
 
-```bash
-python -m spacy download en_core_web_sm
-```
+This application is designed for government/enterprise environments with:
+- Role-based access control (RBAC)
+- API authentication & authorization
+- Audit logging
+- Data encryption
+- Query validation & sanitization
 
-**Start Docker services:**
+## 📝 License
 
-```bash
-cd docker
-docker-compose up -d
-```
+MIT License - See [LICENSE](LICENSE) file
 
-**Launch the app:**
+## 🤝 Contributing
 
-```bash
-python app.py
-```
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
-The default demo interface is Streamlit. (A dedicated dashboard is planned for production.)
+## 📞 Support
 
----
-
-## Deployment
-
-- **Docker (Recommended):**
-  - Use the provided `docker-compose.yml` for easy setup of all services.
-- **Local Python:**
-  - Install dependencies and run as above for development or testing.
+For issues and questions, please use the GitHub issue tracker.
 
 ---
-
-## Contributors & Contact
-
-- Project Lead: [Samarth Dubey](https://github.com/iSamarthDubey)
-- For questions or contributions, open an issue or contact the maintainer.
-
----
-
-## Disclaimer
-
-This project here is only for research and demonstration purposes. Not production-hardened. Use at your own risk.
-
----
-
-## License
-
-MIT License. See [LICENSE](LICENSE) file for details.
-
----
-
-> **From questions to insights - your SIEM, now truly conversational. Security made simple, powerful, and human-centric.**
-
-> _"Project by **Team Kartavya**. Made with passion, for (SIH) 2025"._
+**Built for ISRO | SIH 2025 | Problem Statement #25173**

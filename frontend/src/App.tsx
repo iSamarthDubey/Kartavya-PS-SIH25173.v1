@@ -1,58 +1,58 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sidebar } from './components/Sidebar';
-import { Chat } from './pages/Chat';
-import { Dashboard } from './pages/Dashboard';
-import { Reports } from './pages/Reports';
-import { SettingsPage } from './pages/Settings';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'react-hot-toast';
+import { ThemeProvider } from './contexts/ThemeContext';
 
-const App: React.FC = () => {
-  const [activeTab, setActiveTab] = React.useState('chat');
+// Pages
+import Dashboard from './pages/Dashboard';
+import ChatInterface from './pages/ChatInterface';
+import ThreatHunting from './pages/ThreatHunting';
+import Reports from './pages/Reports';
+import Settings from './pages/Settings';
 
-  const getCurrentPage = () => {
-    switch (activeTab) {
-      case 'chat':
-        return <Chat />;
-      case 'dashboard':
-        return <Dashboard />;
-      case 'reports':
-        return <Reports />;
-      case 'settings':
-        return <SettingsPage />;
-      default:
-        return <Chat />;
-    }
-  };
+// Layout
+import MainLayout from './layouts/MainLayout';
 
+// Create query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
+function App() {
   return (
-    <Router>
-      <div className="min-h-screen bg-cyber-dark text-white overflow-hidden">
-        <div className="flex h-screen">
-          {/* Sidebar */}
-          <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-          
-          {/* Main Content */}
-          <main className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 p-6 overflow-hidden">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeTab}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                  className="h-full"
-                >
-                  {getCurrentPage()}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          </main>
-        </div>
-      </div>
-    </Router>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <Router>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#1a1a2e',
+                color: '#fff',
+                border: '1px solid #16213e',
+              },
+            }}
+          />
+          <MainLayout>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/chat" element={<ChatInterface />} />
+              <Route path="/threat-hunting" element={<ThreatHunting />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/settings" element={<Settings />} />
+            </Routes>
+          </MainLayout>
+        </Router>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
-};
+}
 
 export default App;
