@@ -4,7 +4,7 @@
 
 @layer base {
   * {
-    @apply border-glass-medium;
+    border-color: rgba(255, 255, 255, 0.2);
   }
   
   body {
@@ -22,7 +22,8 @@
 
 @layer components {
   .glass-card {
-    @apply bg-glass-light backdrop-blur-md border border-glass-medium rounded-2xl shadow-2xl;
+    background: rgba(255, 255, 255, 0.1);
+    @apply backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl;
   }
   
   .cyber-button {
@@ -32,7 +33,8 @@
   }
   
   .cyber-input {
-    @apply bg-glass-light border border-glass-medium rounded-xl px-4 py-3
+    background: rgba(255, 255, 255, 0.1);
+    @apply border border-white/20 rounded-xl px-4 py-3
            text-white placeholder-gray-400 focus:border-cyber-blue focus:ring-2
            focus:ring-cyber-blue/20 transition-all duration-300 backdrop-blur-sm;
   }
@@ -51,12 +53,16 @@
   
   .sidebar-item {
     @apply flex items-center gap-3 px-4 py-3 rounded-xl text-gray-300
-           hover:text-white hover:bg-glass-light transition-all duration-300
+           hover:text-white transition-all duration-300
            cursor-pointer;
   }
   
+  .sidebar-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
   .sidebar-item.active {
-    @apply bg-cyber-gradient text-white shadow-lg shadow-cyber-blue/25;
+    @apply bg-cyber-gradient text-white shadow-lg;
   }
   
   .message-bubble {
@@ -68,15 +74,18 @@
   }
   
   .message-ai {
-    @apply bg-glass-light border border-glass-medium text-white;
+    background: rgba(255, 255, 255, 0.1);
+    @apply border border-white/20 text-white;
   }
   
   .metric-card {
-    @apply glass-card p-6 hover:glow-effect transition-all duration-300;
+    background: rgba(255, 255, 255, 0.1);
+    @apply backdrop-blur-md border border-white/20 rounded-2xl p-6 hover:shadow-glow transition-all duration-300;
   }
   
   .chart-container {
-    @apply glass-card p-6 hover:glow-effect transition-all duration-300;
+    background: rgba(255, 255, 255, 0.1);
+    @apply backdrop-blur-md border border-white/20 rounded-2xl p-6 hover:shadow-glow transition-all duration-300;
   }
 }
 

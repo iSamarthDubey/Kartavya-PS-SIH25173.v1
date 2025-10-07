@@ -3,14 +3,20 @@ import { motion } from 'framer-motion';
 
 interface QueryInputProps {
   onSendMessage: (message: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
 }
 
-export const QueryInput: React.FC<QueryInputProps> = ({ onSendMessage }) => {
+export const QueryInput: React.FC<QueryInputProps> = ({ 
+  onSendMessage, 
+  disabled = false, 
+  placeholder = "Ask about failed logins last week..." 
+}) => {
   const [message, setMessage] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim()) {
+    if (message.trim() && !disabled) {
       onSendMessage(message.trim());
       setMessage('');
     }
@@ -27,14 +33,16 @@ export const QueryInput: React.FC<QueryInputProps> = ({ onSendMessage }) => {
           type="text"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Ask about failed logins last week..."
-          className="cyber-input flex-1"
+          placeholder={placeholder}
+          disabled={disabled}
+          className={`cyber-input flex-1 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
         />
         <motion.button
           type="submit"
-          className="cyber-button"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+          disabled={disabled || !message.trim()}
+          className={`cyber-button ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+          whileHover={disabled ? {} : { scale: 1.02 }}
+          whileTap={disabled ? {} : { scale: 0.98 }}
         >
           Send
         </motion.button>

@@ -4,9 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/layout/Header';
 import { Chat } from './pages/Chat';
-import { Dashboard } from './components/Dashboard';
-import { Reports } from './components/Reports';
-import { Settings } from './components/Settings';
+import { Dashboard } from './pages/NewDashboard';
+import { Reports } from './pages/Reports';
+import { SettingsPage } from './pages/Settings';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState('chat');
@@ -20,7 +20,7 @@ const App: React.FC = () => {
       case 'reports':
         return <Reports />;
       case 'settings':
-        return <Settings />;
+        return <SettingsPage />;
       case 'investigation':
         return <Chat />; // Use chat for investigation for now
       case 'alerts':
@@ -30,7 +30,7 @@ const App: React.FC = () => {
       case 'history':
         return <Chat />; // Use chat for history for now
       case 'filters':
-        return <Settings />; // Use settings for filters for now
+        return <SettingsPage />; // Use settings for filters for now
       case 'exports':
         return <Reports />; // Use reports for exports for now
       default:
