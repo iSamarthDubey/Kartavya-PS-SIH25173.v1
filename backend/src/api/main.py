@@ -18,7 +18,7 @@ from typing import Optional
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 # Import routers
-from .routes import assistant, query, reports, auth, admin
+from .routes import assistant, query, reports, auth, admin, dashboard
 from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.logging import LoggingMiddleware
 
@@ -121,6 +121,7 @@ app.add_middleware(LoggingMiddleware)
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(assistant.router, prefix="/api/assistant", tags=["Assistant"])
 app.include_router(query.router, prefix="/api/query", tags=["Query"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])

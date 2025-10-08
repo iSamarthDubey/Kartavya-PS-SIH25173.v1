@@ -20,7 +20,7 @@ class SupabaseClient:
         self.client = None
         self.enabled = False
         
-        if settings.is_demo and settings.supabase_url and settings.supabase_anon_key:
+        if settings.supabase_url and settings.supabase_anon_key:
             try:
                 from supabase import create_client
                 self.client = create_client(
@@ -32,12 +32,13 @@ class SupabaseClient:
             except Exception as e:
                 logger.error(f"❌ Failed to initialize Supabase: {e}")
         else:
-            logger.info("🚫 Supabase disabled (production mode or missing config)")
+            logger.info("🚫 Supabase disabled (missing config)")
     
     async def create_user_session(self, user_id: str, session_data: Dict[str, Any]) -> bool:
         """Create user session in Supabase"""
         if not self.enabled:
-            return True  # Mock success in production
+            logger.debug(f"Mock: Created session for user {user_id}")
+            return True  # Mock success when database not available
         
         try:
             result = self.client.table("user_sessions").insert({
@@ -88,7 +89,7 @@ class MongoDBClient:
         self.database = None
         self.enabled = False
         
-        if settings.is_demo and settings.mongodb_uri:
+        if settings.mongodb_uri:
             try:
                 from pymongo import MongoClient
                 self.client = MongoClient(settings.mongodb_uri)
@@ -101,7 +102,7 @@ class MongoDBClient:
             except Exception as e:
                 logger.error(f"❌ Failed to initialize MongoDB: {e}")
         else:
-            logger.info("🚫 MongoDB disabled (production mode or missing config)")
+            logger.info("🚫 MongoDB disabled (missing config)")
     
     async def store_siem_logs(self, logs: List[Dict[str, Any]], collection: str = "siem_logs") -> bool:
         """Store SIEM logs in MongoDB"""
@@ -196,7 +197,7 @@ class RedisClient:
         self.client = None
         self.enabled = False
         
-        if settings.is_demo and settings.redis_url:
+        if settings.redis_url:
             try:
                 import redis
                 # Parse Redis URL and create client
@@ -216,7 +217,7 @@ class RedisClient:
             except Exception as e:
                 logger.error(f"❌ Failed to initialize Redis: {e}")
         else:
-            logger.info("🚫 Redis disabled (production mode or missing config)")
+            logger.info("🚫 Redis disabled (missing config)")
     
     async def set_context(self, session_id: str, context: Dict[str, Any], ttl: int = 3600) -> bool:
         """Set conversation context in Redis"""
@@ -355,7 +356,7 @@ class DatabaseManager:
         if status:
             logger.info(f"🗄️ Database clients enabled: {', '.join(status)}")
         else:
-            logger.info("🗄️ Running in production mode - local databases")
+            logger.info("🗄️ No external databases configured - using local fallbacks")
     
     async def initialize(self):
         """Initialize database schemas and indexes"""

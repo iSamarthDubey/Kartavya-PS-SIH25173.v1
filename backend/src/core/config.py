@@ -147,62 +147,55 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.cors_origins.split(",")]
     
     def get_database_config(self) -> Dict[str, Any]:
-        """Get database configuration based on environment"""
-        config = {}
-        
-        if self.is_demo:
-            # Demo mode: Use cloud services
-            config.update({
-                "supabase": {
-                    "url": self.supabase_url,
-                    "anon_key": self.supabase_anon_key,
-                    "service_key": self.supabase_service_key,
-                },
-                "mongodb": {
-                    "uri": self.mongodb_uri,
-                    "database": self.mongodb_database,
-                },
-                "redis": {
-                    "url": self.redis_url,
-                    "password": self.redis_password,
-                }
-            })
-        else:
-            # Production mode: Use local databases
-            config.update({
-                "postgresql": {
-                    "url": "postgresql://localhost:5432/kartavya",
-                },
-                "redis": {
-                    "url": "redis://localhost:6379",
-                }
-            })
+        """Get database configuration - all databases always available"""
+        # Always provide all database configurations
+        # The actual connection will depend on which environment variables are set
+        config = {
+            "supabase": {
+                "url": self.supabase_url,
+                "anon_key": self.supabase_anon_key,
+                "service_key": self.supabase_service_key,
+            },
+            "mongodb": {
+                "uri": self.mongodb_uri,
+                "database": self.mongodb_database,
+            },
+            "redis": {
+                "url": self.redis_url,
+                "password": self.redis_password,
+            },
+            # Local fallback configurations
+            "postgresql_local": {
+                "url": "postgresql://localhost:5432/kartavya",
+            },
+            "redis_local": {
+                "url": "redis://localhost:6379",
+            }
+        }
         
         return config
     
     def validate_configuration(self) -> bool:
-        """Validate configuration for current environment"""
-        errors = []
+        """Validate configuration - now focuses only on critical requirements"""
+        warnings = []
         
-        if self.is_demo:
-            # Demo mode validations
-            if not self.supabase_url:
-                errors.append("SUPABASE_URL required for demo mode")
-            if not self.mongodb_uri:
-                errors.append("MONGODB_URI required for demo mode")
-            if not self.redis_url:
-                errors.append("REDIS_URL required for demo mode")
+        # Check if at least one database option is available
+        has_supabase = bool(self.supabase_url and self.supabase_anon_key)
+        has_mongodb = bool(self.mongodb_uri)
+        has_redis = bool(self.redis_url)
+        
+        if not (has_supabase or has_mongodb or has_redis):
+            warnings.append("No cloud databases configured - will use local fallbacks")
         
         if self.ai_enabled:
             if not self.gemini_api_key and not self.openai_api_key:
-                errors.append("At least one AI API key required when AI is enabled")
+                warnings.append("No AI API keys configured - AI features will be disabled")
         
-        if errors:
-            for error in errors:
-                logger.error(f"Configuration error: {error}")
-            return False
+        # Log warnings but don't fail startup
+        for warning in warnings:
+            logger.warning(f"Configuration warning: {warning}")
         
-        return True
+        return True  # Always return True - let the app run with fallbacks
 
 
 # Global settings instance
