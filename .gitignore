@@ -524,3 +524,14 @@ docs/UPGRADE-ROADMAP.md
 repo-structure-clean.txt
 .env.demo
 .env.cloud
+deploy_cloud.py
+examine_dataset.py
+examine_results.py
+test_01_backend_server.py
+test_02_dataset_integration.py
+test_03_api_endpoints.py
+test_04_no_mock_verification.py
+test_dataset_connector.py
+test_deployed_system.py
+validate_mock_cleanup.py
+backend/test_server.py
