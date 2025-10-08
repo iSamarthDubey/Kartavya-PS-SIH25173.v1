@@ -7,7 +7,8 @@ import os
 from typing import Optional, Dict, Any
 from enum import Enum
 import logging
-from pydantic import BaseSettings, Field
+from pydantic_settings import BaseSettings
+from pydantic import Field
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class SiemPlatform(str, Enum):
     """Supported SIEM platforms"""
     ELASTICSEARCH = "elasticsearch"
     WAZUH = "wazuh"
-    MOCK = "mock"
+    DATASET = "dataset"
 
 
 class Settings(BaseSettings):
@@ -102,7 +103,7 @@ class Settings(BaseSettings):
     # 🎯 SIEM CONFIGURATION
     # =============================================================================
     default_siem_platform: SiemPlatform = Field(
-        default=SiemPlatform.MOCK,
+        default=SiemPlatform.DATASET,
         env="DEFAULT_SIEM_PLATFORM"
     )
     
@@ -120,6 +121,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "allow"  # Allow extra fields for backwards compatibility
 
     @property
     def is_demo(self) -> bool:

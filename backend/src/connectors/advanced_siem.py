@@ -22,7 +22,7 @@ class SiemPlatform(Enum):
     """Supported SIEM platforms"""
     ELASTICSEARCH = "elasticsearch"
     WAZUH = "wazuh"
-    MOCK = "mock"
+    DATASET = "dataset"
 
 
 class QueryType(Enum):
@@ -68,7 +68,7 @@ class AdvancedSiemConnector:
     def __init__(self, config: Dict[str, Any]):
         """Initialize SIEM connector with configuration"""
         self.config = config
-        self.platform = SiemPlatform(config.get('platform', 'mock'))
+        self.platform = SiemPlatform(config.get('platform', 'dataset'))
         self.is_demo = config.get('is_demo', True)
         
         # Connection instances
@@ -87,8 +87,8 @@ class AdvancedSiemConnector:
                 await self._init_elasticsearch()
             elif self.platform == SiemPlatform.WAZUH:
                 await self._init_wazuh()
-            elif self.platform == SiemPlatform.MOCK:
-                logger.info("✅ Mock SIEM initialized")
+            elif self.platform == SiemPlatform.DATASET:
+                logger.info("✅ Dataset SIEM connector initialized")
                 return True
             
             return True
@@ -102,8 +102,8 @@ class AdvancedSiemConnector:
         es_config = self.config.get('elasticsearch', {})
         
         if self.is_demo:
-            # Demo mode - use mock Elasticsearch or public instance
-            logger.info("🎭 Demo mode - using mock Elasticsearch responses")
+            # Demo mode - use dataset connector instead of direct Elasticsearch
+            logger.info("🎭 Demo mode - will use dataset connector for queries")
             return
         
         # Production mode - real Elasticsearch
@@ -132,7 +132,7 @@ class AdvancedSiemConnector:
         wazuh_config = self.config.get('wazuh', {})
         
         if self.is_demo:
-            logger.info("🎭 Demo mode - using mock Wazuh responses")
+            logger.info("🎭 Demo mode - will use dataset connector for queries")
             return
         
         # Production mode - real Wazuh API
@@ -207,8 +207,23 @@ class AdvancedSiemConnector:
         start_time = asyncio.get_event_loop().time()
         
         try:
-            if self.is_demo or self.platform == SiemPlatform.MOCK:
-                result = await self._execute_mock_query(query)
+            if self.is_demo or self.platform == SiemPlatform.DATASET:
+                # For demo mode or dataset platform, use dataset connector
+                from .dataset_connector import DatasetConnector
+                dataset_connector = DatasetConnector()
+                await dataset_connector.connect()
+                
+                # Convert SIEM-Query to dataset query format
+                dataset_query = self._convert_to_dataset_query(query)
+                dataset_result = await dataset_connector.execute_query(dataset_query, size=query.size)
+                
+                # Convert back to SiemResult
+                events = [hit['_source'] for hit in dataset_result['hits']['hits']]
+                result = SiemResult(
+                    total_hits=dataset_result['hits']['total']['value'],
+                    events=events,
+                    platform="dataset"
+                )
             elif self.platform == SiemPlatform.ELASTICSEARCH:
                 result = await self._execute_elasticsearch_query(query)
             elif self.platform == SiemPlatform.WAZUH:
@@ -229,18 +244,36 @@ class AdvancedSiemConnector:
             logger.error(f"❌ Query execution failed: {e}")
             raise
     
-    async def _execute_mock_query(self, query: SiemQuery) -> SiemResult:
-        """Execute mock query for demo purposes"""
-        await asyncio.sleep(0.1)  # Simulate network latency
+    def _convert_to_dataset_query(self, siem_query: SiemQuery) -> Dict[str, Any]:
+        """Convert SiemQuery to dataset connector query format"""
+        query = {"query": {}}
         
-        # Generate mock data based on query filters
-        mock_events = self._generate_mock_events(query)
+        if siem_query.filters:
+            bool_query = {"bool": {"must": [], "filter": []}}
+            
+            for filter_clause in siem_query.filters:
+                if 'match' in filter_clause:
+                    bool_query["bool"]["must"].append(filter_clause)
+                elif 'term' in filter_clause or 'terms' in filter_clause:
+                    bool_query["bool"]["filter"].append(filter_clause)
+            
+            if bool_query["bool"]["must"] or bool_query["bool"]["filter"]:
+                query["query"] = bool_query
         
-        return SiemResult(
-            total_hits=len(mock_events),
-            events=mock_events,
-            aggregations=self._generate_mock_aggregations(query) if query.aggregations else None
-        )
+        # Add time range if specified
+        if siem_query.time_range:
+            if "query" not in query:
+                query["query"] = {"bool": {"filter": []}}
+            elif "bool" not in query["query"]:
+                query["query"] = {"bool": {"filter": []}}
+            
+            query["query"]["bool"]["filter"].append({
+                "range": {
+                    "@timestamp": siem_query.time_range
+                }
+            })
+        
+        return query
     
     async def _execute_elasticsearch_query(self, query: SiemQuery) -> SiemResult:
         """Execute Elasticsearch query"""
@@ -368,134 +401,12 @@ class AdvancedSiemConnector:
         
         return params
     
-    def _generate_mock_events(self, query: SiemQuery) -> List[Dict[str, Any]]:
-        """Generate realistic mock events for demo"""
-        import random
-        
-        # Base event templates
-        event_templates = [
-            {
-                "@timestamp": None,  # Will be set dynamically
-                "event.type": "authentication_failure",
-                "event.category": "authentication",
-                "source.ip": "192.168.1.{ip}",
-                "user.name": "admin",
-                "host.name": "WS-SEC-{host}",
-                "message": "Failed login attempt for user {user}",
-                "event.severity": "high"
-            },
-            {
-                "@timestamp": None,
-                "event.type": "malware_detection", 
-                "event.category": "malware",
-                "source.ip": "10.0.0.{ip}",
-                "file.name": "suspicious_{file}.exe",
-                "host.name": "SRV-DB-{host}",
-                "message": "Malware signature match: {malware_type}",
-                "event.severity": "critical"
-            },
-            {
-                "@timestamp": None,
-                "event.type": "network_connection",
-                "event.category": "network", 
-                "source.ip": "203.45.12.{ip}",
-                "destination.ip": "192.168.1.{dest_ip}",
-                "source.port": random.randint(1024, 65535),
-                "destination.port": 443,
-                "network.protocol": "https",
-                "message": "Suspicious outbound connection",
-                "event.severity": "medium"
-            }
-        ]
-        
-        events = []
-        num_events = min(query.size, random.randint(10, 100))
-        
-        for i in range(num_events):
-            template = random.choice(event_templates).copy()
-            
-            # Generate timestamp within query range
-            if query.time_range and query.time_range.get('gte'):
-                start_time = datetime.fromisoformat(query.time_range['gte'].replace('Z', '+00:00'))
-            else:
-                start_time = datetime.now() - timedelta(hours=24)
-            
-            if query.time_range and query.time_range.get('lte'):
-                end_time = datetime.fromisoformat(query.time_range['lte'].replace('Z', '+00:00'))
-            else:
-                end_time = datetime.now()
-            
-            # Random timestamp between start and end
-            time_diff = end_time - start_time
-            random_seconds = random.randint(0, int(time_diff.total_seconds()))
-            event_time = start_time + timedelta(seconds=random_seconds)
-            
-            template["@timestamp"] = event_time.isoformat() + 'Z'
-            
-            # Fill template variables
-            replacements = {
-                'ip': random.randint(1, 254),
-                'dest_ip': random.randint(1, 254),
-                'host': random.randint(1, 50),
-                'user': random.choice(['admin', 'service', 'backup', 'guest']),
-                'file': random.choice(['update', 'install', 'backup', 'temp']),
-                'malware_type': random.choice(['Trojan.Generic', 'Backdoor.Agent', 'Virus.Win32'])
-            }
-            
-            # Apply replacements
-            for key, value in template.items():
-                if isinstance(value, str) and '{' in value:
-                    for placeholder, replacement in replacements.items():
-                        value = value.replace(f'{{{placeholder}}}', str(replacement))
-                    template[key] = value
-            
-            events.append(template)
-        
-        return events
-    
-    def _generate_mock_aggregations(self, query: SiemQuery) -> Dict[str, Any]:
-        """Generate mock aggregations for demo"""
-        import random
-        
-        if not query.aggregations:
-            return {}
-        
-        mock_aggs = {}
-        
-        for agg_name, agg_config in query.aggregations.items():
-            if 'terms' in agg_config:
-                # Terms aggregation
-                field = agg_config['terms']['field']
-                mock_aggs[agg_name] = {
-                    "buckets": [
-                        {"key": f"value_{i}", "doc_count": random.randint(1, 100)}
-                        for i in range(1, 6)
-                    ]
-                }
-            elif 'date_histogram' in agg_config:
-                # Date histogram
-                mock_aggs[agg_name] = {
-                    "buckets": [
-                        {
-                            "key_as_string": f"2025-01-08T{i:02d}:00:00.000Z",
-                            "key": 1641600000000 + (i * 3600000),
-                            "doc_count": random.randint(0, 50)
-                        }
-                        for i in range(24)
-                    ]
-                }
-            elif 'cardinality' in agg_config:
-                # Cardinality aggregation
-                mock_aggs[agg_name] = {
-                    "value": random.randint(10, 1000)
-                }
-        
-        return mock_aggs
     
     async def get_indices(self) -> List[str]:
         """Get list of available indices"""
-        if self.is_demo:
-            return list(self.index_mappings.keys())
+        if self.is_demo or self.platform == SiemPlatform.DATASET:
+            # Return available dataset index patterns
+            return ["security-logs", "network-logs", "auth-logs", "system-logs"]
         
         if self.platform == SiemPlatform.ELASTICSEARCH and self.es_client:
             try:
@@ -509,7 +420,7 @@ class AdvancedSiemConnector:
     
     async def get_field_mappings(self, index: str) -> Dict[str, Any]:
         """Get field mappings for an index"""
-        if self.is_demo:
+        if self.is_demo or self.platform == SiemPlatform.DATASET:
             return self.index_mappings.get(index, {}).get('fields', {})
         
         if self.platform == SiemPlatform.ELASTICSEARCH and self.es_client:
@@ -531,11 +442,18 @@ class AdvancedSiemConnector:
     
     async def stream_events(self, query: SiemQuery) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream events for large result sets"""
-        if self.is_demo:
-            events = self._generate_mock_events(query)
-            for event in events:
-                yield event
-                await asyncio.sleep(0.01)  # Simulate streaming delay
+        if self.is_demo or self.platform == SiemPlatform.DATASET:
+            # Use dataset connector for streaming
+            from .dataset_connector import DatasetConnector
+            dataset_connector = DatasetConnector()
+            await dataset_connector.connect()
+            
+            dataset_query = self._convert_to_dataset_query(query)
+            dataset_result = await dataset_connector.execute_query(dataset_query, size=query.size or 1000)
+            
+            for hit in dataset_result['hits']['hits']:
+                yield hit['_source']
+                await asyncio.sleep(0.01)  # Simulate realistic streaming delay
         
         elif self.platform == SiemPlatform.ELASTICSEARCH and self.es_client:
             es_query = self._build_elasticsearch_dsl(query)
@@ -639,10 +557,10 @@ if __name__ == "__main__":
     async def demo():
         config = {
             'is_demo': True,
-            'platform': 'mock'
+            'platform': 'dataset'
         }
         
-        connector = create_siem_connector('mock', config)
+        connector = create_siem_connector('dataset', config)
         await connector.initialize()
         
         # Test query

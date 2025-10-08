@@ -118,8 +118,7 @@ class HFDatasetManager:
                     
         except Exception as e:
             logger.error(f"❌ Failed to load dataset: {e}")
-            # Fallback to mock data
-            yield from self._generate_mock_logs(sample_size or 100)
+            raise RuntimeError(f"Dataset loading failed: {e}. No fallback data available in production.")
     
     def _process_log_entry(self, entry: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -247,36 +246,25 @@ class HFDatasetManager:
         import uuid
         return f"evt_{uuid.uuid4().hex[:12]}"
     
-    def _generate_mock_logs(self, count: int) -> Iterator[Dict[str, Any]]:
-        """Generate mock security logs when dataset is unavailable"""
-        import random
-        
-        logger.warning(f"🔄 Generating {count} mock security logs")
-        
-        mock_events = [
-            "Failed SSH login attempt from {ip}",
-            "Successful VPN connection from {ip}",
-            "Malware detected in file: suspicious.exe",
-            "Network intrusion attempt blocked from {ip}",
-            "Critical system error in authentication service",
-            "Unusual network traffic detected from {ip}",
-            "Database access denied for user 'admin'",
-            "Web application firewall triggered by {ip}",
-        ]
-        
-        for i in range(count):
-            ip = f"{random.randint(192, 203)}.{random.randint(168, 255)}.{random.randint(1, 255)}.{random.randint(1, 254)}"
-            message = random.choice(mock_events).format(ip=ip)
+    def validate_dataset_connection(self) -> bool:
+        """Validate that real datasets can be accessed"""
+        try:
+            # Test connection to primary dataset
+            test_dataset = load_dataset(
+                "isaackd/cyber-security-logs",
+                split="train",
+                streaming=True,
+                use_auth_token=self.hf_token
+            )
             
-            mock_entry = {
-                "message": message,
-                "timestamp": (datetime.utcnow() - timedelta(hours=random.randint(0, 72))).isoformat(),
-                "source_ip": ip,
-                "severity": random.choice(["low", "medium", "high", "critical"]),
-                "user_agent": "Mock Security System",
-            }
+            # Try to get one item
+            next(iter(test_dataset))
+            logger.info("✅ Dataset connection validated")
+            return True
             
-            yield self._process_log_entry(mock_entry)
+        except Exception as e:
+            logger.error(f"❌ Dataset validation failed: {e}")
+            return False
     
     def get_dataset_info(self) -> Dict[str, Any]:
         """Get information about available datasets"""

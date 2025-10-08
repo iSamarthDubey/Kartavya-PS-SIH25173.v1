@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Pipeline initialized")
         
         # Initialize SIEM connector
-        siem_platform = os.getenv("SIEM_PLATFORM", "elasticsearch")
+        siem_platform = os.getenv("DEFAULT_SIEM_PLATFORM", "dataset")
         app_state["siem_connector"] = create_connector(siem_platform)
         logger.info(f"✅ {siem_platform} connector initialized")
         
@@ -106,7 +106,9 @@ app.add_middleware(
         "http://localhost:8501",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
-        "http://127.0.0.1:8501"
+        "http://127.0.0.1:8501",
+        "https://kartavya-siem.vercel.app",
+        "https://kartavya-siem-backend.onrender.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],
