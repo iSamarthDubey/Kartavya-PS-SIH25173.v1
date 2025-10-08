@@ -1,189 +1,190 @@
-import React, { useState, useEffect } from 'react';
-import { MessageSquare, Activity, FileText, Settings, LogOut, Zap, Shield, Database, Search } from 'lucide-react';
-import ChatInterface from './components/ChatInterface';
+/**
+ * KARTAVYA SIEM - Main App Component 
+ * Complete application with React Router and authentication
+ */
+
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Shield } from 'lucide-react';
+
+// Components
+import ErrorBoundary, { 
+  ApiErrorBoundary, 
+  DashboardErrorBoundary, 
+  ChatErrorBoundary 
+} from './components/ErrorBoundary';
+import { 
+  NotificationProvider, 
+  ConnectionStatus
+} from './components/ui/NotificationSystem';
+import { FullPageLoader } from './components/ui/LoadingStates';
+import LandingPage from './pages/LandingPage';
+import LoginPage from './components/auth/LoginPage';
+import OnboardingFlow from './components/OnboardingFlow';
 import Dashboard from './components/Dashboard';
-import Reports from './components/Reports';
-import AdminPanel from './components/AdminPanel';
-import './App.css';
+import ChatInterface from './components/ChatInterface';
+import ErrorHandlingDemo from './components/ErrorHandlingDemo';
 
-interface User {
-  name: string;
-  role: string;
-  clearance: string;
-}
+// Store
+import { useAuth } from './store/appStore';
 
+// Lazy load less critical components
+const Reports = React.lazy(() => import('./components/Reports'));
+const Settings = React.lazy(() => import('./components/Settings'));
+
+// Main App Component
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('chat');
-  const [isConnected, setIsConnected] = useState(false);
-  const [user, setUser] = useState<User>({ name: 'ISRO Analyst', role: 'Security Analyst', clearance: 'Level 2' });
+  return (
+    <ErrorBoundary>
+      <NotificationProvider>
+        <Router>
+          <div className="min-h-screen bg-gray-900 text-white">
+            <ConnectionStatus />
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              
+              {/* Protected Routes */}
+              <Route path="/dashboard" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
+              <Route path="/chat" element={<ProtectedRoute><AppLayout><ChatInterface /></AppLayout></ProtectedRoute>} />
+              <Route path="/reports" element={<ProtectedRoute><AppLayout><React.Suspense fallback={<FullPageLoader message="Loading Reports..." />}><Reports /></React.Suspense></AppLayout></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><AppLayout><React.Suspense fallback={<FullPageLoader message="Loading Settings..." />}><Settings /></React.Suspense></AppLayout></ProtectedRoute>} />
+              <Route path="/demo" element={<ProtectedRoute><AppLayout><ErrorHandlingDemo /></AppLayout></ProtectedRoute>} />
+            </Routes>
+          </div>
+        </Router>
+      </NotificationProvider>
+    </ErrorBoundary>
+  );
+};
 
-  // Simulate connection to backend
-  useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        const response = await fetch('http://localhost:8000/health');
-        if (response.ok) {
-          setIsConnected(true);
-        }
-      } catch (error) {
-        console.log('Backend not connected, using demo mode');
-        setIsConnected(false);
-      }
-    };
-    checkConnection();
-  }, []);
+// Protected Route Component
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return <FullPageLoader message="Initializing SIEM Platform..." />;
+  }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return <>{children}</>;
+};
 
-  const tabs = [
-    { id: 'chat', label: 'SIEM Assistant', icon: MessageSquare, color: 'text-blue-400' },
-    { id: 'dashboard', label: 'Threat Dashboard', icon: Activity, color: 'text-green-400' },
-    { id: 'reports', label: 'Reports', icon: FileText, color: 'text-yellow-400' },
-    { id: 'admin', label: 'Admin', icon: Settings, color: 'text-purple-400' }
-  ];
+// App Layout Component
+const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, logout } = useAuth();
+  const [showOnboarding, setShowOnboarding] = React.useState(false);
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'chat':
-        return <ChatInterface isConnected={isConnected} />;
-      case 'dashboard':
-        return <Dashboard isConnected={isConnected} />;
-      case 'reports':
-        return <Reports isConnected={isConnected} />;
-      case 'admin':
-        return <AdminPanel isConnected={isConnected} />;
-      default:
-        return <ChatInterface isConnected={isConnected} />;
+  // Check if user needs onboarding
+  React.useEffect(() => {
+    const hasCompletedOnboarding = localStorage.getItem('kartavya_onboarding_completed');
+    if (!hasCompletedOnboarding && user) {
+      setShowOnboarding(true);
     }
+  }, [user]);
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex">
-      {/* Sidebar */}
-      <div className="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
-        {/* Header */}
-        <div className="p-6 border-b border-gray-700">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
-              <Shield className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">Kartavya SIEM</h1>
-              <p className="text-sm text-gray-400">Conversational Assistant</p>
-            </div>
-          </div>
-          
-          {/* ISRO Badge */}
-          <div className="bg-orange-600/20 border border-orange-600/30 rounded-lg p-3">
-            <div className="flex items-center space-x-2 mb-1">
-              <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-              <span className="text-sm font-semibold text-orange-300">ISRO - Department of Space</span>
-            </div>
-            <p className="text-xs text-gray-400">Mission-Critical Security Operations</p>
-          </div>
-        </div>
-
-        {/* Connection Status */}
-        <div className="px-6 py-4 border-b border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-yellow-500'} animate-pulse`}></div>
-              <span className="text-sm text-gray-300">
-                {isConnected ? 'Live SIEM Connected' : 'Demo Mode Active'}
-              </span>
-            </div>
-            <Database className={`w-4 h-4 ${isConnected ? 'text-green-400' : 'text-yellow-400'}`} />
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <div className="flex-1 px-6 py-4">
-          <div className="space-y-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                  activeTab === tab.id
-                    ? 'bg-gray-700 text-white shadow-lg'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-                }`}
-              >
-                <tab.icon className={`w-5 h-5 ${activeTab === tab.id ? tab.color : 'text-gray-400'}`} />
-                <span className="font-medium">{tab.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* User Info & Logout */}
-        <div className="p-6 border-t border-gray-700">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-sm font-semibold text-white">{user.name}</p>
-              <p className="text-xs text-gray-400">{user.role}</p>
-              <p className="text-xs text-blue-400">{user.clearance}</p>
-            </div>
-            <button className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
-          
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="bg-gray-700/50 rounded-lg p-2 text-center">
-              <div className="text-blue-400 font-bold">23</div>
-              <div className="text-gray-400">Active Alerts</div>
-            </div>
-            <div className="bg-gray-700/50 rounded-lg p-2 text-center">
-              <div className="text-green-400 font-bold">94%</div>
-              <div className="text-gray-400">System Health</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Top Bar */}
-        <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-white capitalize">
-                {tabs.find(t => t.id === activeTab)?.label}
-              </h2>
-              <p className="text-sm text-gray-400">
-                {activeTab === 'chat' && 'Ask questions in natural language'}
-                {activeTab === 'dashboard' && 'Real-time threat monitoring'}
-                {activeTab === 'reports' && 'Generate security reports'}
-                {activeTab === 'admin' && 'System configuration'}
-              </p>
+    <>
+      <div className="flex h-screen">
+        {/* Sidebar Navigation */}
+        <nav className="w-64 bg-gray-800 border-r border-gray-700">
+          <div className="p-4">
+            <div className="flex items-center space-x-3 mb-8">
+              <Shield className="w-8 h-8 text-blue-400" />
+              <div>
+                <h1 className="text-lg font-bold text-white">KARTAVYA SIEM</h1>
+                <p className="text-xs text-gray-400">{user?.role} • {user?.name}</p>
+              </div>
             </div>
             
-            <div className="flex items-center space-x-4">
-              {/* Performance Indicator */}
-              <div className="flex items-center space-x-2">
-                <Zap className="w-4 h-4 text-yellow-400" />
-                <span className="text-sm text-gray-300">Response: 247ms</span>
-              </div>
-              
-              {/* Search */}
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Quick search..."
-                  className="bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+            <NavigationMenu />
+            
+            {/* User Profile & Logout */}
+            <div className="mt-auto pt-4 border-t border-gray-700">
+              <LogoutButton />
             </div>
           </div>
-        </div>
+        </nav>
 
-        {/* Content Area */}
-        <div className="flex-1 p-6 overflow-auto">
-          {renderContent()}
-        </div>
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
       </div>
-    </div>
+      
+      {/* Onboarding Overlay */}
+      {showOnboarding && (
+        <OnboardingFlow onComplete={handleOnboardingComplete} />
+      )}
+    </>
+  );
+};
+
+// Navigation Menu Component
+const NavigationMenu: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  const navItems = [
+    { path: '/dashboard', label: 'Dashboard', icon: <Shield className="w-4 h-4" /> },
+    { path: '/chat', label: 'AI Assistant', icon: <Shield className="w-4 h-4" /> },
+    { path: '/reports', label: 'Reports', icon: <Shield className="w-4 h-4" /> },
+    { path: '/settings', label: 'Settings', icon: <Shield className="w-4 h-4" /> },
+    { path: '/demo', label: '🚨 Error Demo', icon: <Shield className="w-4 h-4" /> }
+  ];
+  
+  return (
+    <ul className="space-y-2">
+      {navItems.map((item) => (
+        <li key={item.path}>
+          <button
+            onClick={() => navigate(item.path)}
+            className={`flex items-center space-x-3 w-full text-left p-3 rounded-lg transition-colors ${
+              location.pathname === item.path
+                ? 'bg-blue-600 text-white' 
+                : 'text-gray-300 hover:bg-gray-700'
+            }`}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+// Logout Button Component
+const LogoutButton: React.FC = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  
+  const handleLogout = async () => {
+    logout();
+    navigate('/');
+  };
+  
+  return (
+    <button
+      onClick={handleLogout}
+      className="w-full flex items-center space-x-3 p-3 text-gray-300 hover:bg-gray-700 rounded-lg transition-colors"
+    >
+      <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
+        <span className="text-xs font-semibold">{user?.name?.charAt(0) || 'U'}</span>
+      </div>
+      <div className="flex-1 text-left">
+        <p className="text-sm font-medium">{user?.name}</p>
+        <p className="text-xs text-gray-500">Click to logout</p>
+      </div>
+    </button>
   );
 };
 

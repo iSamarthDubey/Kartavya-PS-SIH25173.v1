@@ -370,6 +370,8 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                       ...prev,
                       timeRange: { ...prev.timeRange, start: new Date(e.target.value) }
                     }))}
+                    placeholder="Select start date and time"
+                    title="Start Date and Time"
                   />
                 </div>
                 <div>
