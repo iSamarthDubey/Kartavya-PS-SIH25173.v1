@@ -18,14 +18,14 @@ import {
   CheckCircle
 } from 'lucide-react';
 
-import { useErrorDemo, ErrorTypes, ErrorType } from '../utils/errorDemo';
+import { useErrorDemo, ErrorTypes } from '../utils/errorDemo';
 import { useNotifications } from './ui/NotificationSystem';
 import { LoadingButton, InlineLoading } from './ui/LoadingStates';
 
 const ErrorHandlingDemo: React.FC = () => {
   const [isTestingAll, setIsTestingAll] = useState(false);
   const [completedTests, setCompletedTests] = useState<Set<string>>(new Set());
-  const { triggerError, testAllErrors, simulateSecurityAlert } = useErrorDemo();
+  const { simulateError, simulateSuccess, clearState, isLoading, error, successCount, errorCount } = useErrorDemo();
   const { showInfo, clearAllNotifications } = useNotifications();
 
   const errorCategories = [

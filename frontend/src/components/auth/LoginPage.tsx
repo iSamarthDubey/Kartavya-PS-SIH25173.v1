@@ -60,25 +60,28 @@ const LoginContent: React.FC = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  // Demo users with realistic credentials
+  // Demo users from environment variables (real users in database)
   const demoUsers = {
     admin: {
-      email: 'admin@kartavya.demo',
-      password: 'admin123',
+      email: import.meta.env.VITE_DEMO_ADMIN_EMAIL || 'admin@kartavya.demo',
+      password: import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'SecureAdmin2025!',
+      username: import.meta.env.VITE_DEMO_ADMIN_USERNAME || 'security_admin',
       name: 'Security Administrator',
       role: 'admin',
       description: 'Full system access, user management, configuration'
     },
     analyst: {
-      email: 'analyst@kartavya.demo', 
-      password: 'analyst123',
+      email: import.meta.env.VITE_DEMO_ANALYST_EMAIL || 'analyst@kartavya.demo',
+      password: import.meta.env.VITE_DEMO_ANALYST_PASSWORD || 'SecureAnalyst2025!',
+      username: import.meta.env.VITE_DEMO_ANALYST_USERNAME || 'security_analyst',
       name: 'Security Analyst',
       role: 'analyst',
       description: 'Incident analysis, threat hunting, investigations'
     },
     viewer: {
-      email: 'viewer@kartavya.demo',
-      password: 'viewer123', 
+      email: import.meta.env.VITE_DEMO_VIEWER_EMAIL || 'viewer@kartavya.demo',
+      password: import.meta.env.VITE_DEMO_VIEWER_PASSWORD || 'SecureViewer2025!',
+      username: import.meta.env.VITE_DEMO_VIEWER_USERNAME || 'security_viewer',
       name: 'Security Viewer',
       role: 'viewer',
       description: 'Read-only access to dashboards and reports'
@@ -93,9 +96,7 @@ const LoginContent: React.FC = () => {
     }
   }, [selectedDemoUser, showDemoOptions]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleLogin = async () => {
     if (!email || !password) return;
     
     try {
@@ -256,7 +257,7 @@ const LoginContent: React.FC = () => {
           )}
 
           {/* Login Form */}
-          <form onSubmit={handleLogin} className="space-y-6">
+          <div className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                 Email Address
@@ -312,15 +313,15 @@ const LoginContent: React.FC = () => {
             )}
 
             <LoadingButton
-              type="submit"
               loading={loading}
               disabled={!email || !password}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-2"
+              onClick={handleLogin}
             >
               <UserCheck className="w-5 h-5" />
               <span>Sign In to Platform</span>
             </LoadingButton>
-          </form>
+          </div>
 
           {/* Footer */}
           <div className="text-center space-y-4">

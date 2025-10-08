@@ -41,7 +41,7 @@ import {
   Cloud,
   HardDrive,
   Cpu,
-  Memory,
+  // Memory, // Not available in this version
   Network,
   Globe,
   MapPin,

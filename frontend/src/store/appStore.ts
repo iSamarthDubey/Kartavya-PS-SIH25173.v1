@@ -189,18 +189,19 @@ export const useAppStore = create<StoreState>()(
             
             set({
               isAuthenticated: true,
-              user: response.user,
-              token: response.token,
+              user: response.data?.user,
+              token: response.data?.token,
               loading: false,
               error: null,
             });
             
+            // Show success notification  
             get().addNotification({
               type: 'success',
               title: 'Login Successful',
-              message: `Welcome back, ${response.user.name}!`,
+              message: `Welcome back, ${response.data?.user?.name || 'User'}!`,
               read: false,
-              autoClose: 5000,
+              autoClose: 3000,
             });
             
           } catch (error) {
@@ -330,7 +331,7 @@ export const useAppStore = create<StoreState>()(
           const { alerts } = get();
           const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
           const unreadCount = alerts.filter(alert => 
-            new Date(alert.time) > fiveMinutesAgo && alert.status === 'open'
+            new Date(alert.timestamp) > fiveMinutesAgo && alert.status === 'active'
           ).length;
           
           set({ unreadAlertCount: unreadCount });

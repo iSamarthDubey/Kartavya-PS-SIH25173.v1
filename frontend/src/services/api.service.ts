@@ -107,12 +107,18 @@ class ApiClient {
 
   constructor(config: ApiConfig) {
     this.config = {
-      timeout: 10000,
-      retries: 3,
-      retryDelay: 1000,
+      timeout: 15000, // Increased timeout for backend
+      retries: 2, // Reduced retries to fail faster to backend
+      retryDelay: 2000,
       ...config,
     };
     this.mockService = mockApiService;
+    
+    // Log API configuration
+    console.log('🌐 API Client initialized with:', {
+      baseUrl: this.config.baseUrl,
+      environment: import.meta.env.VITE_ENVIRONMENT || 'development'
+    });
   }
 
   // Set notification callback
@@ -347,17 +353,15 @@ class ApiClient {
 
   // ============= AUTHENTICATION APIs =============
 
-  async login(identifier: string, password: string): Promise<ApiResponse<{ token: string; user: any }>> {
-    // Flexible login - supports email, username, or user ID
-    return this.makeRequest<{ token: string; user: any }>('/api/auth/login', {
+  async login(identifier: string, password: string): Promise<ApiResponse<{ token: string; user: any; permissions?: string[] }>> {
+    console.log('🔐 Attempting login with identifier:', identifier);
+    
+    // Match the backend FastAPI endpoint structure
+    return this.makeRequest<{ token: string; user: any; permissions?: string[] }>('/auth/login', {
       method: 'POST',
       body: { 
         identifier, // Can be email, username, or ID
-        password,
-        // Also send all possible fields for maximum compatibility
-        email: identifier,
-        username: identifier,
-        userId: identifier
+        password
       },
       skipNotification: true, // Handle login errors specially
     });
@@ -519,14 +523,3 @@ export const useApiClient = () => {
 // ============= EXPORTS =============
 
 export { apiClient, ApiClient };
-export type {
-  ApiConfig,
-  ApiResponse,
-  RequestConfig,
-  SecurityAlert,
-  DashboardMetrics,
-  ChatMessage,
-  NetworkTraffic,
-  UserActivity,
-  SystemStatus,
-};
