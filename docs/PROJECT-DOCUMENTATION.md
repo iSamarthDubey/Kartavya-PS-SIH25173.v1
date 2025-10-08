@@ -485,26 +485,27 @@ class WazuhConnector(BaseSIEMConnector):
     - WAZUH_API_PASSWORD
 ```
 
-#### **Mock Connector (`mock.py`)**
+#### **Dataset Connector (`dataset_connector.py`)**
 
 ```python
-class MockConnector(BaseSIEMConnector):
+class DatasetConnector(BaseSIEMConnector):
     """
-    Mock connector for testing and demos
+    Real dataset connector for demo and testing
     
     Features:
-    - Realistic synthetic data
-    - Configurable event generation
-    - Query simulation
-    - Performance testing support
+    - HuggingFace dataset integration
+    - Public SIEM datasets (Kaggle, GitHub)
+    - Elastic Common Schema (ECS) compliance
+    - Real-world security data
+    - Caching and offline support
     """
     
-    Data Types:
-    - Failed login attempts
-    - Malware detections
-    - Network anomalies
-    - VPN connections
-    - File integrity changes
+    Supported Datasets:
+    - cyber-security-logs (HuggingFace)
+    - network-traffic-analysis
+    - authentication-logs
+    - malware-detection-logs
+    - system-audit-logs
 ```
 
 #### **Connector Factory (`factory.py`)**
@@ -517,7 +518,7 @@ def create_connector(platform: str) -> BaseSIEMConnector:
     Supported Platforms:
     - elasticsearch
     - wazuh
-    - mock
+    - dataset
     - splunk (future)
     - qradar (future)
     """

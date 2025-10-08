@@ -1,0 +1,362 @@
+version: '3.8'
+
+# 🚀 Kartavya SIEM Assistant - Advanced Docker Compose
+# Supports both demo (cloud-connected) and production (air-gapped) modes
+
+services:
+  # 🎯 SIEM Assistant Backend - FastAPI
+  siem-backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-production}
+    container_name: kartavya-backend
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      # Environment Configuration
+      - ENVIRONMENT=${ENVIRONMENT:-demo}
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      
+      # AI Configuration (Demo only)
+      - ENABLE_AI=${ENABLE_AI:-true}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      
+      # Database Configuration (Demo mode)
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
+      - MONGODB_URI=${MONGODB_URI:-}
+      - REDIS_URL=${REDIS_URL:-}
+      
+      # SIEM Configuration
+      - DEFAULT_SIEM_PLATFORM=${DEFAULT_SIEM_PLATFORM:-mock}
+      - ELASTICSEARCH_URL=${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      - WAZUH_API_URL=${WAZUH_API_URL:-}
+      
+      # Security
+      - JWT_SECRET=${JWT_SECRET:-change-in-production}
+      - RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS:-60}
+      
+      # Hugging Face Dataset
+      - HF_TOKEN=${HF_TOKEN:-}
+      - HF_CACHE_DIR=/app/data/hf_cache
+    
+    volumes:
+      - siem_logs:/app/logs
+      - siem_data:/app/data
+      - ${HOST_CONFIG_DIR:-./config}:/app/config:ro
+    
+    networks:
+      - siem_network
+    
+    depends_on:
+      - elasticsearch
+      - redis-cache
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 🎨 SIEM Assistant Frontend - React/Vite
+  siem-frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-production}
+    container_name: kartavya-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    environment:
+      - REACT_APP_API_URL=${API_URL:-http://localhost:8000}
+      - REACT_APP_ENVIRONMENT=${ENVIRONMENT:-demo}
+    
+    networks:
+      - siem_network
+    
+    depends_on:
+      - siem-backend
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 📊 Elasticsearch (Production mode or demo with local data)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: kartavya-elasticsearch
+    environment:
+      - node.name=es-node-01
+      - cluster.name=kartavya-siem
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+      - ./elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
+      - "9300:9300"
+    
+    networks:
+      - siem_network
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  # 🚀 Redis Cache (Production mode or demo caching)
+  redis-cache:
+    image: redis:7-alpine
+    container_name: kartavya-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-kartavya2025}
+    
+    volumes:
+      - redis_data:/data
+    
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    
+    networks:
+      - siem_network
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # 🗄️ PostgreSQL (Production mode only)
+  postgres:
+    image: postgres:15-alpine
+    container_name: kartavya-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-kartavya}
+      - POSTGRES_USER=${POSTGRES_USER:-kartavya}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-kartavya2025}
+    
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    
+    networks:
+      - siem_network
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kartavya}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    
+    profiles:
+      - production  # Only run in production mode
+
+  # 🛡️ Wazuh Manager (Optional for advanced setup)
+  wazuh-manager:
+    image: wazuh/wazuh-manager:4.7.0
+    container_name: kartavya-wazuh-manager
+    hostname: wazuh-manager
+    environment:
+      - WAZUH_MANAGER_HOST=wazuh-manager
+    
+    volumes:
+      - wazuh_api_configuration:/var/ossec/api/configuration
+      - wazuh_etc:/var/ossec/etc
+      - wazuh_logs:/var/ossec/logs
+      - wazuh_queue:/var/ossec/queue
+      - wazuh_var_multigroups:/var/ossec/var/multigroups
+      - wazuh_integrations:/var/ossec/integrations
+      - wazuh_active_response:/var/ossec/active-response/bin
+      - wazuh_agentless:/var/ossec/agentless
+      - wazuh_wodles:/var/ossec/wodles
+    
+    ports:
+      - "1514:1514"
+      - "1515:1515"
+      - "514:514/udp"
+      - "55000:55000"
+    
+    networks:
+      - siem_network
+    
+    restart: unless-stopped
+    
+    profiles:
+      - wazuh  # Optional Wazuh setup
+
+  # 📈 Grafana (Monitoring and Visualization)
+  grafana:
+    image: grafana/grafana-oss:10.2.0
+    container_name: kartavya-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-kartavya2025}
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+    
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    
+    networks:
+      - siem_network
+    
+    depends_on:
+      - elasticsearch
+    
+    restart: unless-stopped
+    
+    profiles:
+      - monitoring  # Optional monitoring stack
+
+  # 🔍 Kibana (Elasticsearch Dashboard)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: kartavya-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_NAME=kartavya-kibana
+    
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
+    
+    networks:
+      - siem_network
+    
+    depends_on:
+      - elasticsearch
+    
+    restart: unless-stopped
+    
+    profiles:
+      - monitoring  # Optional Kibana dashboard
+
+  # 🔄 Log Generator (Demo data generator)
+  log-generator:
+    build:
+      context: ../backend
+      dockerfile: scripts/Dockerfile.log-generator
+    container_name: kartavya-log-generator
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - LOG_RATE=${LOG_RATE:-10}  # Events per second
+      - LOG_TYPES=auth,network,security,malware
+    
+    networks:
+      - siem_network
+    
+    depends_on:
+      - elasticsearch
+    
+    restart: unless-stopped
+    
+    profiles:
+      - demo  # Only for demo mode with sample data
+
+  # 🚦 Nginx Reverse Proxy (Production)
+  nginx:
+    image: nginx:alpine
+    container_name: kartavya-nginx
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/ssl/certs:ro
+      - nginx_logs:/var/log/nginx
+    
+    networks:
+      - siem_network
+    
+    depends_on:
+      - siem-frontend
+      - siem-backend
+    
+    restart: unless-stopped
+    
+    profiles:
+      - production  # Production reverse proxy
+
+volumes:
+  # Application data
+  siem_logs:
+    driver: local
+  siem_data:
+    driver: local
+  
+  # Database volumes
+  es_data:
+    driver: local
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+  
+  # Monitoring
+  grafana_data:
+    driver: local
+  nginx_logs:
+    driver: local
+  
+  # Wazuh volumes
+  wazuh_api_configuration:
+    driver: local
+  wazuh_etc:
+    driver: local
+  wazuh_logs:
+    driver: local
+  wazuh_queue:
+    driver: local
+  wazuh_var_multigroups:
+    driver: local
+  wazuh_integrations:
+    driver: local
+  wazuh_active_response:
+    driver: local
+  wazuh_agentless:
+    driver: local
+  wazuh_wodles:
+    driver: local
+
+networks:
+  siem_network:
+    driver: bridge
+    name: kartavya_siem_network
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

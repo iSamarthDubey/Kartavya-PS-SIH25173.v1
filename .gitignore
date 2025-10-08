@@ -522,3 +522,5 @@ about.txt
 docs/CLEANUP-PLAN.md
 docs/UPGRADE-ROADMAP.md
 repo-structure-clean.txt
+.env.demo
+.env.cloud
