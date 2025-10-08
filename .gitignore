@@ -279,6 +279,10 @@ mlflow/
 # DATASETS & EMBEDDINGS
 # ========================================
 
+# Data directory with datasets (large files)
+data/datasets/
+datasets/
+
 # Large dataset files (optional - uncomment if needed)
 # datasets/raw/**/*.csv
 # datasets/raw/**/*.json
