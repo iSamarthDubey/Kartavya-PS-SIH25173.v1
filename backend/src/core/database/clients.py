@@ -290,6 +290,45 @@ class RedisClient:
         except Exception as e:
             logger.error(f"Failed to increment rate limit: {e}")
             return 1
+    
+    async def set_user_cache(self, username: str, user_data: Dict[str, Any], ttl: int = 86400) -> bool:
+        """Cache user session data"""
+        if not self.enabled:
+            return True
+        
+        try:
+            key = f"user:{username}"
+            value = json.dumps(user_data, default=str)
+            result = self.client.setex(key, ttl, value)
+            return bool(result)
+        except Exception as e:
+            logger.error(f"Failed to cache user data: {e}")
+            return False
+    
+    async def set_with_expiry(self, key: str, data: Dict[str, Any], ttl: int) -> bool:
+        """Set data with expiry"""
+        if not self.enabled:
+            return True
+        
+        try:
+            value = json.dumps(data, default=str)
+            result = self.client.setex(key, ttl, value)
+            return bool(result)
+        except Exception as e:
+            logger.error(f"Failed to set data with expiry: {e}")
+            return False
+    
+    async def delete(self, key: str) -> bool:
+        """Delete key from Redis"""
+        if not self.enabled:
+            return True
+        
+        try:
+            result = self.client.delete(key)
+            return bool(result)
+        except Exception as e:
+            logger.error(f"Failed to delete key: {e}")
+            return False
 
 
 class DatabaseManager:
