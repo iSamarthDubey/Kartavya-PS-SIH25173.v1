@@ -52,6 +52,10 @@ export interface DashboardMetrics {
   activeAlerts: number;
   systemsOnline: number;
   incidentsToday: number;
+  securityScore?: number;
+  attackVectors?: number;
+  dataProcessed?: string;
+  responseTime?: string;
   threatTrends: Array<{ date: string; count: number }>;
   topThreats: Array<{ name: string; count: number; severity: string }>;
 }
@@ -104,6 +108,7 @@ class ApiClient {
   private notificationCallback?: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
   private fallbackMode: boolean = false;
   private mockService: MockApiService;
+  private allowFallback: boolean;
 
   constructor(config: ApiConfig) {
     this.config = {
@@ -114,11 +119,21 @@ class ApiClient {
     };
     this.mockService = mockApiService;
     
+    // FALLBACK IS DISABLED BY DEFAULT - only enable via env var
+    this.allowFallback = import.meta.env.VITE_ENABLE_MOCK_FALLBACK === 'true';
+    
     // Log API configuration
     console.log('🌐 API Client initialized with:', {
       baseUrl: this.config.baseUrl,
-      environment: import.meta.env.VITE_ENVIRONMENT || 'development'
+      environment: import.meta.env.VITE_ENVIRONMENT || 'development',
+      mockFallbackEnabled: this.allowFallback
     });
+    
+    if (this.allowFallback) {
+      console.warn('⚠️ Mock fallback is ENABLED - disable in production!');
+    } else {
+      console.log('✅ Mock fallback is DISABLED - real data only!');
+    }
   }
 
   // Set notification callback
@@ -192,10 +207,19 @@ class ApiClient {
       }
     }
 
-    // If all attempts failed, try fallback
-    console.warn(`Backend failed for ${endpoint}, switching to fallback mode`);
-    this.fallbackMode = true;
-    return this.handleFallbackRequest<T>(endpoint, config);
+    // If all attempts failed, only use fallback if explicitly enabled
+    if (this.allowFallback) {
+      console.warn(`📊 Backend failed for ${endpoint}, using mock fallback (FALLBACK ENABLED)`);
+      this.fallbackMode = true;
+      return this.handleFallbackRequest<T>(endpoint, config);
+    } else {
+      console.error(`❌ Backend failed for ${endpoint} - NO FALLBACK (Real data only)`);
+      return {
+        success: false,
+        error: `Backend API unavailable: ${lastError?.message || 'Unknown error'}`,
+        status: lastError?.response?.status || 500,
+      };
+    }
   }
 
   // Handle requests using mock data
@@ -357,7 +381,7 @@ class ApiClient {
     console.log('🔐 Attempting login with identifier:', identifier);
     
     // Match the backend FastAPI endpoint structure
-    return this.makeRequest<{ token: string; user: any; permissions?: string[] }>('/auth/login', {
+    return this.makeRequest<{ token: string; user: any; permissions?: string[] }>('/api/auth/login', {
       method: 'POST',
       body: { 
         identifier, // Can be email, username, or ID

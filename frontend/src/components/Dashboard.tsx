@@ -89,7 +89,7 @@ const DashboardContent: React.FC = () => {
     setLoading('dashboard', true);
     
     try {
-      // Load metrics
+      // Load metrics with fallback to empty metrics
       const metricsData = await callApi(
         () => api.getDashboardMetrics(),
         {
@@ -97,23 +97,38 @@ const DashboardContent: React.FC = () => {
           onSuccess: (data) => {
             setDashboardMetrics(data);
             setLastUpdate(new Date());
+          },
+          onError: () => {
+            // Set empty metrics object so dashboard still renders with zeros
+            setDashboardMetrics({
+              totalThreats: 0,
+              activeAlerts: 0,
+              systemsOnline: 0,
+              incidentsToday: 0,
+              threatTrends: [],
+              topThreats: [],
+              securityScore: 0,
+              attackVectors: 0
+            });
           }
         }
       );
 
-      // Load security alerts
+      // Load security alerts with fallback to empty array
       const alertsData = await callApi(
         () => api.getSecurityAlerts(50),
         {
-          onSuccess: (data) => setAlerts(data)
+          onSuccess: (data) => setAlerts(data),
+          onError: () => setAlerts([])
         }
       );
 
-      // Load system status
+      // Load system status with fallback to empty array
       const statusData = await callApi(
         () => api.getSystemStatus(),
         {
-          onSuccess: (data) => setSystemStatus(data)
+          onSuccess: (data) => setSystemStatus(data),
+          onError: () => setSystemStatus([])
         }
       );
 
@@ -122,7 +137,7 @@ const DashboardContent: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
-      showError('SOC Data Error', 'Unable to synchronize security data from SIEM engines');
+      showError('Backend Connection Failed', 'Unable to connect to backend. Check if backend server is running.');
     } finally {
       setLoading('dashboard', false);
       setRefreshing(false);
@@ -162,6 +177,9 @@ const DashboardContent: React.FC = () => {
   if (loadingStates.dashboard && !metrics) {
     return <DashboardSkeleton />;
   }
+  
+  // Show dashboard with fallback data when no metrics are available
+  // This ensures users always see stat cards with zeros instead of empty state
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -298,7 +316,7 @@ const DashboardContent: React.FC = () => {
                   (metrics?.totalThreats || 0) > 1200 ? 'text-red-400' : 'text-orange-400'
                 }`}>
                   <TrendingUp className="w-3 h-3" />
-                  <span>+{Math.floor((metrics?.totalThreats || 1247) / 100)}% vs yesterday</span>
+                  <span>+{Math.floor((metrics?.totalThreats || 0) / 100)}% vs yesterday</span>
                 </div>
               </div>
             </div>
@@ -343,7 +361,7 @@ const DashboardContent: React.FC = () => {
               </div>
             </div>
             <div className="text-3xl font-bold text-white mb-2">
-              {(metrics?.systemsOnline || 98.5).toFixed(1)}%
+              {(metrics?.systemsOnline || 0).toFixed(1)}%
             </div>
             <div className="text-sm text-gray-400">Systems operational</div>
           </div>
@@ -360,7 +378,7 @@ const DashboardContent: React.FC = () => {
               </div>
             </div>
             <div className="text-3xl font-bold text-white mb-2">
-              {metrics?.topThreats?.length || 8}
+              {metrics?.topThreats?.length || 0}
             </div>
             <div className="text-sm text-gray-400">Unique TTPs identified</div>
           </div>
@@ -377,7 +395,7 @@ const DashboardContent: React.FC = () => {
               </div>
             </div>
             <div className="text-3xl font-bold text-white mb-2">
-              2.3TB
+              {metrics?.dataProcessed || '0 GB'}
             </div>
             <div className="text-sm text-gray-400">Last 24 hours</div>
           </div>
@@ -394,7 +412,7 @@ const DashboardContent: React.FC = () => {
               </div>
             </div>
             <div className="text-3xl font-bold text-white mb-2">
-              &lt;3s
+              {metrics?.responseTime || '0s'}
             </div>
             <div className="text-sm text-gray-400">Mean time to detect</div>
           </div>
@@ -419,7 +437,7 @@ const DashboardContent: React.FC = () => {
               <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-purple-900/20" />
               <div className="text-center z-10">
                 <div className="text-3xl font-bold text-red-400 mb-2">
-                  {(metrics?.totalThreats || 1247).toLocaleString()}
+                  {(metrics?.totalThreats || 0).toLocaleString()}
                 </div>
                 <div className="text-sm text-gray-400">Active threat vectors worldwide</div>
                 <div className="flex items-center justify-center space-x-4 mt-4 text-xs">
@@ -459,13 +477,13 @@ const DashboardContent: React.FC = () => {
               <span>MITRE ATT&CK</span>
             </h3>
             <div className="space-y-3">
-              {[
-                { tactic: 'Initial Access', count: 23, color: 'red' },
-                { tactic: 'Persistence', count: 18, color: 'orange' },
-                { tactic: 'Privilege Escalation', count: 15, color: 'yellow' },
-                { tactic: 'Defense Evasion', count: 31, color: 'red' },
-                { tactic: 'Lateral Movement', count: 12, color: 'blue' }
-              ].map((item, index) => (
+              {(metrics?.mitreTactics || [
+                { tactic: 'Initial Access', count: 0, color: 'red' },
+                { tactic: 'Persistence', count: 0, color: 'orange' },
+                { tactic: 'Privilege Escalation', count: 0, color: 'yellow' },
+                { tactic: 'Defense Evasion', count: 0, color: 'red' },
+                { tactic: 'Lateral Movement', count: 0, color: 'blue' }
+              ]).map((item, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <div className={`w-2 h-2 rounded-full bg-${item.color}-400`} />
@@ -508,7 +526,7 @@ const DashboardContent: React.FC = () => {
                     stroke="#10B981"
                     strokeWidth="8"
                     strokeLinecap="round"
-                    strokeDasharray={`${(metrics?.securityScore || 87) * 2.51}, 251`}
+                    strokeDasharray={`${(metrics?.securityScore || 0) * 2.51}, 251`}
                     className="transition-all duration-1000"
                   />
                 </svg>
@@ -1026,6 +1044,57 @@ const UserActivityCard: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// Empty State Component
+const EmptyDashboardState: React.FC = () => {
+  return (
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="text-center space-y-6 max-w-md mx-auto px-6">
+        <div className="w-24 h-24 mx-auto bg-gray-800 rounded-full flex items-center justify-center">
+          <Database className="w-12 h-12 text-gray-600" />
+        </div>
+        
+        <div className="space-y-3">
+          <h2 className="text-2xl font-bold text-white">No Data Available</h2>
+          <p className="text-gray-400">
+            Unable to connect to SIEM backend. Please ensure:
+          </p>
+          <ul className="text-sm text-gray-500 text-left space-y-1">
+            <li>• Backend server is running on port 8000</li>
+            <li>• Database connections are established</li>
+            <li>• SIEM data sources are configured</li>
+            <li>• Network connectivity is available</li>
+          </ul>
+        </div>
+        
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Retry Connection</span>
+          </button>
+          
+          <button 
+            onClick={() => {
+              localStorage.setItem('VITE_ENABLE_MOCK_FALLBACK', 'true');
+              window.location.reload();
+            }}
+            className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
+          >
+            <Eye className="w-4 h-4" />
+            <span>Enable Demo Data</span>
+          </button>
+        </div>
+        
+        <p className="text-xs text-gray-600">
+          In production, this dashboard displays real SIEM data from your security infrastructure.
+        </p>
       </div>
     </div>
   );
