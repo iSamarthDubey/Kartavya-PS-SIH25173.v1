@@ -92,9 +92,9 @@ class MongoDBClient:
         if settings.mongodb_uri:
             try:
                 from pymongo import MongoClient
-                self.client = MongoClient(settings.mongodb_uri)
+                import certifi
+                self.client = MongoClient(settings.mongodb_uri, tls=True, tlsCAFile=certifi.where())
                 self.database = self.client[settings.mongodb_database]
-                
                 # Test connection
                 self.client.server_info()
                 self.enabled = True
