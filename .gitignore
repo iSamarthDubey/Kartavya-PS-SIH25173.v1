@@ -548,3 +548,4 @@ backend/test_endpoints.py
 backend/final_test.py
 CLEANUP_PROJECT.py
 backend/test_backend.py
+.env
