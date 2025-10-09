@@ -112,38 +112,13 @@ const ChatContent: React.FC = () => {
   const { currentSessionId, setCurrentSessionId, addChatMessage } = useAppStore();
   const { showError, showSuccess } = useNotifications();
 
-  // Initialize chat session
+  // Initialize chat session with simple ID generation
   useEffect(() => {
-    const initializeChat = async () => {
-      try {
-        const sessionResponse = await callApi(
-          () => api.createChatSession(),
-          {
-            onSuccess: (data) => {
-              setSessionId(data.sessionId);
-              setCurrentSessionId(data.sessionId);
-            }
-          }
-        );
-
-        // Load chat history if available
-        if (sessionResponse?.sessionId) {
-          await callApi(
-            () => api.getChatHistory(sessionResponse.sessionId),
-            {
-              onSuccess: (history) => {
-                setChatMessages(history);
-              }
-            }
-          );
-        }
-      } catch (error) {
-        console.error('Failed to initialize chat:', error);
-      }
-    };
-
-    initializeChat();
-  }, [api, callApi, setCurrentSessionId]);
+    const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    setSessionId(newSessionId);
+    setCurrentSessionId(newSessionId);
+    console.log('Chat session initialized:', newSessionId);
+  }, [setCurrentSessionId]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {

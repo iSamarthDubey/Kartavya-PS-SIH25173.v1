@@ -192,11 +192,52 @@ class ApiClient {
 
         const data = await response.json();
         
-        return {
-          success: true,
-          data,
-          status: response.status,
-        };
+        // Handle different response formats
+        // Dashboard endpoints return { success: true, data: {...} }
+        // Chat endpoints return { status: "success", ... } directly
+        if (data.hasOwnProperty('success')) {
+          // Dashboard format
+          return {
+            success: data.success,
+            data: data.data,
+            status: response.status,
+          };
+        } else if (data.hasOwnProperty('status')) {
+          // Chat format - convert to expected format
+          if (data.status === 'success') {
+            return {
+              success: true,
+              data: {
+                id: `msg_${Date.now()}`,
+                content: data.summary || 'Response received',
+                role: 'assistant',
+                timestamp: data.metadata?.timestamp || new Date().toISOString(),
+                metadata: {
+                  intent: data.intent,
+                  confidence: data.confidence,
+                  results_count: data.results?.length || 0,
+                  processing_time: data.metadata?.processing_time,
+                  conversation_id: data.conversation_id
+                }
+              },
+              status: response.status,
+            };
+          } else {
+            // Chat error format
+            return {
+              success: false,
+              error: data.error || data.summary || 'Chat request failed',
+              status: response.status,
+            };
+          }
+        } else {
+          // Default format
+          return {
+            success: true,
+            data,
+            status: response.status,
+          };
+        }
 
       } catch (error: any) {
         lastError = error;
@@ -307,14 +348,10 @@ class ApiClient {
   }
 
   async getChatHistory(sessionId: string): Promise<ApiResponse<ChatMessage[]>> {
-    return this.makeRequest<ChatMessage[]>(`/api/chat/history/${sessionId}`);
+    return this.makeRequest<ChatMessage[]>(`/api/assistant/history/${sessionId}`);
   }
 
-  async createChatSession(): Promise<ApiResponse<{ sessionId: string }>> {
-    return this.makeRequest<{ sessionId: string }>('/api/chat/session', {
-      method: 'POST',
-    });
-  }
+  // Session creation is handled client-side with generated IDs
 
   // ============= NETWORK MONITORING APIs =============
 

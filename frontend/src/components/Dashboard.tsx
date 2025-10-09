@@ -477,13 +477,11 @@ const DashboardContent: React.FC = () => {
               <span>MITRE ATT&CK</span>
             </h3>
             <div className="space-y-3">
-              {(metrics?.mitreTactics || [
-                { tactic: 'Initial Access', count: 0, color: 'red' },
-                { tactic: 'Persistence', count: 0, color: 'orange' },
-                { tactic: 'Privilege Escalation', count: 0, color: 'yellow' },
-                { tactic: 'Defense Evasion', count: 0, color: 'red' },
-                { tactic: 'Lateral Movement', count: 0, color: 'blue' }
-              ]).map((item, index) => (
+              {(metrics?.mitreTactics || []).length === 0 ? (
+                <div className="text-center text-gray-400 py-4">
+                  <p>Loading MITRE ATT&CK data...</p>
+                </div>
+              ) : (metrics?.mitreTactics || []).map((item, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <div className={`w-2 h-2 rounded-full bg-${item.color}-400`} />
@@ -495,7 +493,7 @@ const DashboardContent: React.FC = () => {
             </div>
             <div className="mt-4 pt-4 border-t border-gray-600">
               <div className="text-center">
-                <div className="text-2xl font-bold text-purple-400">{metrics?.attackVectors || 89}</div>
+                <div className="text-2xl font-bold text-purple-400">{metrics?.attackVectors || 0}</div>
                 <div className="text-xs text-gray-400">Unique TTPs</div>
               </div>
             </div>
@@ -531,7 +529,7 @@ const DashboardContent: React.FC = () => {
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-2xl font-bold text-green-400">{metrics?.securityScore || 87}%</span>
+                  <span className="text-2xl font-bold text-green-400">{metrics?.securityScore || 0}%</span>
                 </div>
               </div>
               <div className="text-center mt-4">
@@ -633,16 +631,28 @@ const MetricCard: React.FC<MetricCardProps> = ({
 const ThreatTrendsChart: React.FC<{ data: Array<{ date: string; count: number }> }> = ({ data }) => {
   const maxValue = Math.max(...data.map(d => d.count), 100);
   
-  // Generate sample data if none provided
-  const chartData = data.length > 0 ? data : [
-    { date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(), count: 134 },
-    { date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), count: 89 },
-    { date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(), count: 167 },
-    { date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), count: 203 },
-    { date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), count: 156 },
-    { date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), count: 234 },
-    { date: new Date().toISOString(), count: 287 }
-  ];
+  // Only show data if provided from backend - no fallback data
+  const chartData = data.length > 0 ? data : [];
+  
+  // Handle empty data case
+  if (chartData.length === 0) {
+    return (
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
+            <BarChart3 className="w-5 h-5 text-blue-400" />
+            <span>Threat Detection Trends</span>
+          </h3>
+        </div>
+        <div className="h-48 flex items-center justify-center text-gray-400">
+          <div className="text-center">
+            <p>Loading threat trend data...</p>
+            <p className="text-sm mt-2">Connecting to real-time threat intelligence</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   const actualMaxValue = Math.max(...chartData.map(d => d.count), 100);
   const totalThreats = chartData.reduce((sum, item) => sum + item.count, 0);
@@ -763,16 +773,27 @@ const TopThreatsCard: React.FC<{ threats: Array<{ name: string; count: number; s
     }
   };
 
-  // Generate sample threats if none provided
-  const threatData = threats.length > 0 ? threats : [
-    { name: 'Advanced Persistent Threat (APT29)', count: 47, severity: 'critical', category: 'Nation-State' },
-    { name: 'Ransomware - LockBit 3.0', count: 34, severity: 'critical', category: 'Malware' },
-    { name: 'SQL Injection Attack', count: 89, severity: 'high', category: 'Web Attack' },
-    { name: 'Privilege Escalation Attempt', count: 23, severity: 'high', category: 'System' },
-    { name: 'Suspicious PowerShell Execution', count: 156, severity: 'medium', category: 'Behavioral' },
-    { name: 'Brute Force Login Attempts', count: 234, severity: 'medium', category: 'Authentication' },
-    { name: 'DDoS Traffic Detected', count: 78, severity: 'low', category: 'Network' }
-  ];
+  // Only show threats if provided from backend - no fallback data
+  const threatData = threats.length > 0 ? threats : [];
+
+  if (threatData.length === 0) {
+    return (
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
+            <Target className="w-5 h-5 text-red-400" />
+            <span>Active Threat Intelligence</span>
+          </h3>
+        </div>
+        <div className="h-48 flex items-center justify-center text-gray-400">
+          <div className="text-center">
+            <p>Loading threat intelligence...</p>
+            <p className="text-sm mt-2">Analyzing security events from dataset</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const totalIncidents = threatData.reduce((sum, threat) => sum + threat.count, 0);
 
@@ -975,6 +996,79 @@ const RecentAlertsCard: React.FC<{ alerts: any[] }> = ({ alerts }) => {
 };
 
 const NetworkActivityCard: React.FC = () => {
+  const [networkData, setNetworkData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const { api } = useApiClient();
+
+  useEffect(() => {
+    const loadNetworkData = async () => {
+      setLoading(true);
+      try {
+        const response = await api.getNetworkTraffic('1h', 100);
+        if (response.success && response.data) {
+          // Calculate metrics from network traffic data
+          const traffic = response.data;
+          const totalBytes = traffic.reduce((sum: number, item: any) => sum + (item.bytes || 0), 0);
+          const inboundBytes = traffic.filter((item: any) => item.direction === 'inbound').reduce((sum: number, item: any) => sum + (item.bytes || 0), 0);
+          const outboundBytes = traffic.filter((item: any) => item.direction === 'outbound').reduce((sum: number, item: any) => sum + (item.bytes || 0), 0);
+          const blockedConnections = traffic.filter((item: any) => item.blocked || item.suspicious).length;
+          
+          setNetworkData({
+            inboundTraffic: (inboundBytes / (1024 * 1024 * 1024)).toFixed(2), // Convert to GB
+            outboundTraffic: (outboundBytes / (1024 * 1024 * 1024)).toFixed(2), // Convert to GB
+            blockedConnections,
+            totalConnections: traffic.length,
+            maxTraffic: Math.max(inboundBytes, outboundBytes) / (1024 * 1024 * 1024)
+          });
+        } else {
+          setNetworkData(null);
+        }
+      } catch (error) {
+        console.error('Failed to load network data:', error);
+        setNetworkData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadNetworkData();
+  }, [api]);
+
+  if (loading) {
+    return (
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
+          <Network className="w-5 h-5" />
+          <span>Network Activity</span>
+        </h3>
+        <div className="space-y-4">
+          <InlineLoading message="Loading network metrics..." />
+        </div>
+      </div>
+    );
+  }
+
+  if (!networkData) {
+    return (
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
+          <Network className="w-5 h-5" />
+          <span>Network Activity</span>
+        </h3>
+        <div className="flex items-center justify-center h-32 text-gray-400">
+          <div className="text-center">
+            <p>No network data available</p>
+            <p className="text-sm mt-2">Check network monitoring configuration</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const inboundProgress = networkData.maxTraffic > 0 ? (parseFloat(networkData.inboundTraffic) / networkData.maxTraffic) * 100 : 0;
+  const outboundProgress = networkData.maxTraffic > 0 ? (parseFloat(networkData.outboundTraffic) / networkData.maxTraffic) * 100 : 0;
+  const blockedProgress = networkData.totalConnections > 0 ? (networkData.blockedConnections / networkData.totalConnections) * 100 : 0;
+
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
       <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
@@ -985,27 +1079,132 @@ const NetworkActivityCard: React.FC = () => {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <span className="text-gray-400">Inbound Traffic</span>
-          <span className="text-white">2.3 GB/s</span>
+          <span className="text-white">{networkData.inboundTraffic} GB/h</span>
         </div>
-        <ProgressBar progress={75} color="primary" />
+        <ProgressBar progress={Math.min(inboundProgress, 100)} color="primary" />
         
         <div className="flex items-center justify-between">
           <span className="text-gray-400">Outbound Traffic</span>
-          <span className="text-white">1.8 GB/s</span>
+          <span className="text-white">{networkData.outboundTraffic} GB/h</span>
         </div>
-        <ProgressBar progress={60} color="success" />
+        <ProgressBar progress={Math.min(outboundProgress, 100)} color="success" />
         
         <div className="flex items-center justify-between">
           <span className="text-gray-400">Blocked Connections</span>
-          <span className="text-red-400">247</span>
+          <span className="text-red-400">{networkData.blockedConnections}</span>
         </div>
-        <ProgressBar progress={25} color="error" />
+        <ProgressBar progress={Math.min(blockedProgress, 100)} color="error" />
+        
+        <div className="mt-4 pt-4 border-t border-gray-700 text-xs text-gray-500">
+          Total connections analyzed: {networkData.totalConnections}
+        </div>
       </div>
     </div>
   );
 };
 
 const UserActivityCard: React.FC = () => {
+  const [userData, setUserData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const { api } = useApiClient();
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      setLoading(true);
+      try {
+        const response = await api.getUserActivity(100);
+        if (response.success && response.data) {
+          const activities = response.data;
+          
+          // Calculate metrics from user activity data
+          const uniqueUsers = new Set(activities.map((activity: any) => activity.userId || activity.username)).size;
+          const failedLogins = activities.filter((activity: any) => 
+            activity.action && activity.action.toLowerCase().includes('login') && 
+            (activity.action.toLowerCase().includes('failed') || activity.action.toLowerCase().includes('error'))
+          ).length;
+          const privilegedActions = activities.filter((activity: any) => 
+            activity.action && (
+              activity.action.toLowerCase().includes('admin') ||
+              activity.action.toLowerCase().includes('privilege') ||
+              activity.action.toLowerCase().includes('elevated') ||
+              (activity.riskScore && activity.riskScore > 7)
+            )
+          ).length;
+          
+          // Get top locations from IP addresses (simplified)
+          const locationCounts: Record<string, number> = {};
+          activities.forEach((activity: any) => {
+            if (activity.ipAddress) {
+              // Simplified location mapping based on IP patterns
+              const ip = activity.ipAddress;
+              let location = 'Unknown';
+              if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.16.')) {
+                location = 'Internal Network';
+              } else if (ip.includes('.')){ 
+                // Simple geographic guess (in real app, use IP geolocation service)
+                location = 'External Network';
+              }
+              locationCounts[location] = (locationCounts[location] || 0) + 1;
+            }
+          });
+          
+          const topLocations = Object.entries(locationCounts)
+            .sort(([,a], [,b]) => b - a)
+            .slice(0, 3)
+            .map(([location, count]) => ({ location, count }));
+          
+          setUserData({
+            activeSessions: uniqueUsers,
+            failedLogins,
+            privilegedActions,
+            totalActivities: activities.length,
+            topLocations
+          });
+        } else {
+          setUserData(null);
+        }
+      } catch (error) {
+        console.error('Failed to load user activity data:', error);
+        setUserData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [api]);
+
+  if (loading) {
+    return (
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
+          <Users className="w-5 h-5" />
+          <span>User Activity</span>
+        </h3>
+        <div className="space-y-4">
+          <InlineLoading message="Loading user activity metrics..." />
+        </div>
+      </div>
+    );
+  }
+
+  if (!userData) {
+    return (
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
+          <Users className="w-5 h-5" />
+          <span>User Activity</span>
+        </h3>
+        <div className="flex items-center justify-center h-32 text-gray-400">
+          <div className="text-center">
+            <p>No user activity data available</p>
+            <p className="text-sm mt-2">Check user activity monitoring configuration</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
       <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
@@ -1016,33 +1215,40 @@ const UserActivityCard: React.FC = () => {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <span className="text-gray-400">Active Sessions</span>
-          <span className="text-white">1,247</span>
+          <span className="text-white">{userData.activeSessions.toLocaleString()}</span>
         </div>
         
         <div className="flex items-center justify-between">
           <span className="text-gray-400">Failed Logins (1h)</span>
-          <span className="text-yellow-400">23</span>
+          <span className={`${userData.failedLogins > 50 ? 'text-red-400' : userData.failedLogins > 10 ? 'text-yellow-400' : 'text-green-400'}`}>
+            {userData.failedLogins}
+          </span>
         </div>
         
         <div className="flex items-center justify-between">
           <span className="text-gray-400">Privileged Actions</span>
-          <span className="text-blue-400">89</span>
+          <span className={`${userData.privilegedActions > 100 ? 'text-orange-400' : 'text-blue-400'}`}>
+            {userData.privilegedActions}
+          </span>
         </div>
         
-        <div className="mt-4">
-          <h4 className="text-sm font-medium text-white mb-2">Recent Locations</h4>
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2 text-sm">
-              <MapPin className="w-3 h-3 text-gray-400" />
-              <span className="text-gray-400">New York, US - </span>
-              <span className="text-white">45 users</span>
-            </div>
-            <div className="flex items-center space-x-2 text-sm">
-              <MapPin className="w-3 h-3 text-gray-400" />
-              <span className="text-gray-400">London, UK - </span>
-              <span className="text-white">32 users</span>
+        {userData.topLocations && userData.topLocations.length > 0 && (
+          <div className="mt-4">
+            <h4 className="text-sm font-medium text-white mb-2">Top Access Locations</h4>
+            <div className="space-y-2">
+              {userData.topLocations.map((location: any, index: number) => (
+                <div key={index} className="flex items-center space-x-2 text-sm">
+                  <MapPin className="w-3 h-3 text-gray-400" />
+                  <span className="text-gray-400">{location.location} - </span>
+                  <span className="text-white">{location.count} access{location.count !== 1 ? 'es' : ''}</span>
+                </div>
+              ))}
             </div>
           </div>
+        )}
+        
+        <div className="mt-4 pt-4 border-t border-gray-700 text-xs text-gray-500">
+          Total activities analyzed: {userData.totalActivities}
         </div>
       </div>
     </div>
