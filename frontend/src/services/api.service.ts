@@ -69,6 +69,13 @@ export interface ChatMessage {
     sources?: string[];
     confidence?: number;
     actions?: string[];
+    error?: boolean;
+    siemAnalysis?: {
+      threatLevel?: string;
+      iocCount?: number;
+      [key: string]: any;
+    };
+    language?: string;
   };
 }
 
