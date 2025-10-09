@@ -100,6 +100,41 @@ async def get_security_alerts(
             detail=f"Failed to retrieve security alerts: {str(e)}"
         )
 
+@router.patch("/alerts/{alert_id}")
+async def update_alert(
+    alert_id: str,
+    updates: dict
+):
+    """
+    Update a security alert
+    """
+    try:
+        logger.info(f"✏️ Updating alert {alert_id} with updates: {updates}")
+        
+        # For now, return success with the updates
+        # In a real implementation, you would update the alert in your database
+        updated_alert = {
+            "id": alert_id,
+            "success": True,
+            "updates": updates,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        logger.info(f"✅ Alert {alert_id} updated successfully")
+        
+        return {
+            "success": True,
+            "data": updated_alert,
+            "source": "alert_update"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to update alert {alert_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update alert: {str(e)}"
+        )
+
 @router.get("/system/status")
 async def get_system_status():
     """

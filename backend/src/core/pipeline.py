@@ -81,13 +81,20 @@ class ConversationalPipeline:
         
         try:
             # Step 1: Intent Classification
-            intent_result = await self.intent_classifier.classify(query)
-            result["intent"] = intent_result["intent"]
-            result["confidence"] = intent_result["confidence"]
+            intent, confidence = self.intent_classifier.classify_intent(query)
+            result["intent"] = intent.value if hasattr(intent, 'value') else str(intent)
+            result["confidence"] = confidence
             
             # Step 2: Entity Extraction
-            entities = await self.entity_extractor.extract(query)
-            result["entities"] = entities
+            entities = self.entity_extractor.extract_entities(query)
+            # Convert Entity objects to dictionaries for JSON serialization
+            result["entities"] = [{
+                "type": entity.type,
+                "value": entity.value,
+                "confidence": entity.confidence,
+                "start_pos": entity.start_pos,
+                "end_pos": entity.end_pos
+            } for entity in entities]
             
             # Step 3: Check for ambiguities
             if await self._has_ambiguities(query, entities):

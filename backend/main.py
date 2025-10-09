@@ -108,13 +108,13 @@ async def startup_event():
     db_status = db_manager.get_status()
     ai_status = hybrid_ai.get_status()
     
-    logger.info("✅ Kartavya SIEM Assistant started successfully!")
+    logger.info("✅ Conversational Assistant started successfully!")
 
 
 @app.on_event("shutdown") 
 async def shutdown_event():
     """Cleanup on shutdown"""
-    logger.info("🛑 Shutting down Kartavya SIEM Assistant...")
+    logger.info("🛑 Shutting down Conversational Assistant...")
 
 
 # === API ENDPOINTS ===

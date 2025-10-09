@@ -20,7 +20,7 @@ security = HTTPBearer()
 supabase_client = SupabaseClient()
 mongodb_client = MongoDBClient()
 redis_client = RedisClient()
-auth_manager = AuthManager()
+auth_manager = AuthManager(user_store_path="data/users.json")
 rbac = RBAC()
 
 # Pydantic models
@@ -134,20 +134,78 @@ async def get_user_by_identifier(identifier: str) -> Optional[Dict[str, Any]]:
     """Get user by email, username, or user_id from MongoDB"""
     if not mongodb_client.enabled:
         logger.warning("MongoDB not enabled, using auth manager fallback")
-        # Fallback to auth manager for basic authentication
-        role = auth_manager.get_role(identifier)
-        if role:
-            return {
-                'username': identifier,
-                'email': f"{identifier}@kartavya.demo",
-                'full_name': identifier.replace('_', ' ').title(),
-                'role': role,
-                'department': 'Demo',
-                'location': 'Demo Location',
-                'preferences': {},
-                'account_locked': False
+        
+        # Create mapping from email/username to actual username for demo users
+        demo_user_mapping = {
+            # Email mappings
+            "admin@kartavya.demo": "security_admin",
+            "analyst@kartavya.demo": "security_analyst", 
+            "viewer@kartavya.demo": "security_viewer",
+            # Username mappings (direct)
+            "security_admin": "security_admin",
+            "security_analyst": "security_analyst",
+            "security_viewer": "security_viewer"
+        }
+        
+        # Try to find the actual username
+        actual_username = demo_user_mapping.get(identifier)
+        if not actual_username:
+            logger.warning(f"No mapping found for identifier: {identifier}")
+            return None
+            
+        # Get role from auth manager using actual username
+        role = auth_manager.get_role(actual_username)
+        if not role:
+            logger.warning(f"No role found for username: {actual_username}")
+            return None
+            
+        # Create user profile from demo data
+        demo_profiles = {
+            "security_admin": {
+                'username': 'security_admin',
+                'email': 'admin@kartavya.demo',
+                'full_name': 'Security Administrator',
+                'role': 'admin',
+                'department': 'IT Security',
+                'location': 'Mumbai, India',
+                'security_clearance': 'Level 5'
+            },
+            "security_analyst": {
+                'username': 'security_analyst',
+                'email': 'analyst@kartavya.demo',
+                'full_name': 'Security Analyst',
+                'role': 'analyst',
+                'department': 'SOC Team',
+                'location': 'Delhi, India',
+                'security_clearance': 'Level 3'
+            },
+            "security_viewer": {
+                'username': 'security_viewer',
+                'email': 'viewer@kartavya.demo',
+                'full_name': 'Security Viewer',
+                'role': 'viewer',
+                'department': 'Management',
+                'location': 'Bangalore, India',
+                'security_clearance': 'Level 2'
             }
-        return None
+        }
+        
+        profile = demo_profiles.get(actual_username, {
+            'username': actual_username,
+            'email': f"{actual_username}@kartavya.demo",
+            'full_name': actual_username.replace('_', ' ').title(),
+            'role': role,
+            'department': 'Demo',
+            'location': 'Demo Location',
+            'security_clearance': 'Level 1'
+        })
+        
+        profile.update({
+            'preferences': {},
+            'account_locked': False
+        })
+        
+        return profile
     
     try:
         collection = mongodb_client.database["user_profiles"]

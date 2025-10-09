@@ -94,6 +94,22 @@ async def chat(
             filters=request.filters
         )
         
+        # Handle pipeline processing errors
+        if not result or "error" in result:
+            return ChatResponse(
+                conversation_id=conversation_id,
+                query=request.query,
+                intent="error",
+                confidence=0.0,
+                entities=[],
+                siem_query={},
+                results=[],
+                summary="I apologize, but I'm experiencing technical difficulties processing your request. Please try again or rephrase your question.",
+                metadata={"timestamp": datetime.now().isoformat(), "error": result.get("error", "Unknown pipeline error") if result else "Pipeline returned no result"},
+                status="error",
+                error=result.get("error", "Pipeline processing failed") if result else "No pipeline result"
+            )
+        
         # Check if clarification is needed
         if result.get("needs_clarification"):
             return ChatResponse(
@@ -113,13 +129,18 @@ async def chat(
                 error=None
             )
         
+        # Ensure entities exist
+        entities = result.get("entities", [])
+        intent = result.get("intent", "unknown")
+        confidence = result.get("confidence", 0.0)
+        
         # Map entities to SIEM schema
-        field_mappings = await schema_mapper.map_entities(result["entities"])
+        field_mappings = await schema_mapper.map_entities(entities)
         
         # Build SIEM query
         siem_query = await pipeline.build_query(
-            intent=result["intent"],
-            entities=result["entities"],
+            intent=intent,
+            entities=entities,
             field_mappings=field_mappings,
             context=context
         )
@@ -130,9 +151,9 @@ async def chat(
             return ChatResponse(
                 conversation_id=conversation_id,
                 query=request.query,
-                intent=result["intent"],
-                confidence=result["confidence"],
-                entities=result["entities"],
+                intent=intent,
+                confidence=confidence,
+                entities=entities,
                 siem_query=siem_query,
                 results=[],
                 summary=f"Query blocked for safety: {validation_error}",
@@ -150,14 +171,14 @@ async def chat(
         # Format results
         formatted_results = await pipeline.format_results(
             results=search_results,
-            query_type=result["intent"]
+            query_type=intent
         )
         
         # Generate summary
         summary = await pipeline.generate_summary(
             results=formatted_results,
             query=request.query,
-            intent=result["intent"]
+            intent=intent
         )
         
         # Generate visualizations if applicable
@@ -180,8 +201,8 @@ async def chat(
             conversation_id=conversation_id,
             query=request.query,
             response={
-                "intent": result["intent"],
-                "entities": result["entities"],
+                "intent": intent,
+                "entities": entities,
                 "results_count": len(formatted_results),
                 "siem_query": siem_query
             }
@@ -199,9 +220,9 @@ async def chat(
         return ChatResponse(
             conversation_id=conversation_id,
             query=request.query,
-            intent=result["intent"],
-            confidence=result["confidence"],
-            entities=result["entities"],
+            intent=intent,
+            confidence=confidence,
+            entities=entities,
             siem_query=siem_query,
             results=formatted_results[:request.limit],
             summary=summary,
