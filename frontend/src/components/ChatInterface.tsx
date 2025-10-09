@@ -665,7 +665,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               <CodeBlock
                 key={index}
                 code={part.content}
-                language={part.language}
+                language={part.language ?? 'plaintext'}
                 onCopy={() => navigator.clipboard.writeText(part.content)}
               />
             );
