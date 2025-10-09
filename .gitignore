@@ -540,7 +540,6 @@ test_deployed_system.py
 validate_mock_cleanup.py
 backend/test_server.py
 deploy_quick.ps1
-frontend/src/components/Settings.tsx
 CHECKLIST.TXT
 backend/scripts/create_demo_users.py
 backend/test_api_connection.py
@@ -549,3 +548,5 @@ backend/final_test.py
 CLEANUP_PROJECT.py
 backend/test_backend.py
 .env
+frontend/BLUEPRINT.TXT
+frontend/BLUEPRINTv2.TXT
