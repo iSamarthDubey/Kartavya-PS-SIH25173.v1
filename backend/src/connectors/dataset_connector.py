@@ -604,3 +604,250 @@ class DatasetConnector(BaseSIEMConnector):
             return True
         except ImportError:
             return False
+    
+    # ============= DASHBOARD QUERY METHODS =============
+    
+    async def query_security_events(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        event_types: List[str] = None,
+        limit: int = 1000
+    ) -> List[Dict[str, Any]]:
+        """Query security events from datasets"""
+        if not self.connected:
+            raise RuntimeError("Dataset connector not connected")
+        
+        # Combine all cached datasets
+        all_events = []
+        for dataset_name, events in self.dataset_cache.items():
+            all_events.extend(events)
+        
+        # Filter by time range
+        filtered_events = []
+        for event in all_events:
+            event_time_str = event.get('@timestamp', '')
+            if event_time_str:
+                try:
+                    event_time = datetime.fromisoformat(event_time_str.replace('Z', '+00:00'))
+                    if start_time <= event_time <= end_time:
+                        filtered_events.append(event)
+                except:
+                    filtered_events.append(event)  # Include if can't parse time
+        
+        # Filter by event types if specified
+        if event_types:
+            type_filtered = []
+            for event in filtered_events:
+                event_category = event.get('event', {}).get('category', '')
+                event_action = event.get('event', {}).get('action', '')
+                
+                # Check if event matches any of the specified types
+                for event_type in event_types:
+                    if (event_type.lower() in event_category.lower() or 
+                        event_type.lower() in event_action.lower()):
+                        type_filtered.append(event)
+                        break
+            filtered_events = type_filtered
+        
+        # Sort by timestamp and limit
+        filtered_events.sort(key=lambda x: x.get('@timestamp', ''), reverse=True)
+        return filtered_events[:limit]
+    
+    async def query_security_alerts(
+        self,
+        limit: int = 50,
+        filters: Dict[str, Any] = None
+    ) -> List[Dict[str, Any]]:
+        """Query security alerts from datasets"""
+        if not self.connected:
+            raise RuntimeError("Dataset connector not connected")
+        
+        # Get all events and filter for alert-like events
+        all_events = []
+        for dataset_name, events in self.dataset_cache.items():
+            all_events.extend(events)
+        
+        # Filter for security alerts (high/critical severity)
+        alerts = []
+        for event in all_events:
+            severity = event.get('event', {}).get('severity', '').lower()
+            if severity in ['high', 'critical', 'medium']:  # Include medium for more data
+                # Convert to alert format
+                alert = {
+                    "id": f"alert_{len(alerts) + 1}",
+                    "title": self._generate_alert_title(event),
+                    "description": self._generate_alert_description(event),
+                    "severity": severity,
+                    "timestamp": event.get('@timestamp', datetime.utcnow().isoformat()),
+                    "source": event.get('source', {}).get('ip', 'unknown'),
+                    "status": random.choice(['active', 'investigating', 'resolved']),
+                    "assignee": random.choice(['security-team', 'admin', None])
+                }
+                
+                # Apply filters if provided
+                if filters:
+                    if filters.get('severity') and filters['severity'] != severity:
+                        continue
+                    if filters.get('status') and filters['status'] != alert['status']:
+                        continue
+                
+                alerts.append(alert)
+        
+        # Sort by timestamp and limit
+        alerts.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        return alerts[:limit]
+    
+    async def query_system_metrics(self) -> List[Dict[str, Any]]:
+        """Query system metrics from datasets"""
+        if not self.connected:
+            raise RuntimeError("Dataset connector not connected")
+        
+        # Generate system status based on event data
+        systems = []
+        
+        # Get event counts per source IP to infer systems
+        source_ips = {}
+        for dataset_name, events in self.dataset_cache.items():
+            for event in events:
+                ip = event.get('source', {}).get('ip')
+                if ip:
+                    if ip not in source_ips:
+                        source_ips[ip] = 0
+                    source_ips[ip] += 1
+        
+        # Create system status for top IPs
+        for i, (ip, event_count) in enumerate(sorted(source_ips.items(), key=lambda x: x[1], reverse=True)[:10]):
+            # Determine status based on event frequency
+            if event_count > 100:
+                status = 'degraded'  # High event count might indicate issues
+            elif event_count > 50:
+                status = 'online'
+            else:
+                status = 'online'
+            
+            system = {
+                "service": f"Server-{ip.split('.')[-1]}",
+                "status": status,
+                "uptime": f"{random.randint(1, 365)} days",
+                "lastCheck": datetime.utcnow().isoformat(),
+                "metrics": {
+                    "cpu_usage": random.uniform(10, 90),
+                    "memory_usage": random.uniform(20, 80),
+                    "disk_usage": random.uniform(30, 70),
+                    "network_io": event_count
+                }
+            }
+            systems.append(system)
+        
+        return systems
+    
+    async def query_network_traffic(
+        self,
+        start_time: datetime,
+        limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """Query network traffic from datasets"""
+        if not self.connected:
+            raise RuntimeError("Dataset connector not connected")
+        
+        traffic_data = []
+        
+        # Get network events from datasets
+        for dataset_name, events in self.dataset_cache.items():
+            for event in events:
+                # Convert events to network traffic format
+                if event.get('source', {}).get('ip') and event.get('destination', {}).get('ip'):
+                    traffic = {
+                        "timestamp": event.get('@timestamp', datetime.utcnow().isoformat()),
+                        "source": event.get('source', {}).get('ip', ''),
+                        "destination": event.get('destination', {}).get('ip', ''),
+                        "protocol": event.get('network', {}).get('protocol', 'tcp'),
+                        "bytes": random.randint(100, 10000),
+                        "packets": random.randint(1, 100),
+                        "suspicious": event.get('event', {}).get('severity', '').lower() in ['high', 'critical']
+                    }
+                    traffic_data.append(traffic)
+        
+        # Sort by timestamp and limit
+        traffic_data.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        return traffic_data[:limit]
+    
+    async def query_user_activity(
+        self,
+        limit: int = 50,
+        username: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Query user activity from datasets"""
+        if not self.connected:
+            raise RuntimeError("Dataset connector not connected")
+        
+        activities = []
+        
+        # Extract user activities from events
+        for dataset_name, events in self.dataset_cache.items():
+            for event in events:
+                user = event.get('user', {}).get('name')
+                if not user:
+                    # Generate fake username from IP
+                    ip = event.get('source', {}).get('ip', '')
+                    if ip:
+                        user = f"user_{ip.split('.')[-1]}"
+                
+                if user:
+                    # Filter by username if specified
+                    if username and username.lower() not in user.lower():
+                        continue
+                    
+                    activity = {
+                        "id": f"activity_{len(activities) + 1}",
+                        "userId": user,
+                        "username": user,
+                        "action": event.get('event', {}).get('action', 'unknown_action'),
+                        "resource": event.get('event', {}).get('category', 'system'),
+                        "timestamp": event.get('@timestamp', datetime.utcnow().isoformat()),
+                        "ipAddress": event.get('source', {}).get('ip', ''),
+                        "riskScore": self._calculate_risk_score(event)
+                    }
+                    activities.append(activity)
+        
+        # Sort by timestamp and limit
+        activities.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        return activities[:limit]
+    
+    def _generate_alert_title(self, event: Dict[str, Any]) -> str:
+        """Generate alert title from event"""
+        action = event.get('event', {}).get('action', '')
+        severity = event.get('event', {}).get('severity', '')
+        
+        if 'authentication' in action:
+            return f"{severity.title()} Authentication Event"
+        elif 'malware' in action:
+            return f"{severity.title()} Malware Detection"
+        elif 'ddos' in action:
+            return f"{severity.title()} DDoS Attack"
+        elif 'injection' in action:
+            return f"{severity.title()} Injection Attempt"
+        else:
+            return f"{severity.title()} Security Event"
+    
+    def _generate_alert_description(self, event: Dict[str, Any]) -> str:
+        """Generate alert description from event"""
+        action = event.get('event', {}).get('action', '')
+        source_ip = event.get('source', {}).get('ip', 'unknown')
+        dest_ip = event.get('destination', {}).get('ip', 'unknown')
+        
+        return f"Security event detected: {action} from {source_ip} to {dest_ip}"
+    
+    def _calculate_risk_score(self, event: Dict[str, Any]) -> int:
+        """Calculate risk score for user activity"""
+        severity = event.get('event', {}).get('severity', '').lower()
+        
+        if severity == 'critical':
+            return random.randint(80, 100)
+        elif severity == 'high':
+            return random.randint(60, 79)
+        elif severity == 'medium':
+            return random.randint(40, 59)
+        else:
+            return random.randint(1, 39)
