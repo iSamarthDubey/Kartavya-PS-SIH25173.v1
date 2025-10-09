@@ -29,6 +29,20 @@ class Entity:
     confidence: float
     start_pos: int
     end_pos: int
+    
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get attribute value with dict-like interface for backwards compatibility."""
+        return getattr(self, key, default)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "type": self.type,
+            "value": self.value,
+            "confidence": self.confidence,
+            "start_pos": self.start_pos,
+            "end_pos": self.end_pos
+        }
 
 
 class EntityExtractor:

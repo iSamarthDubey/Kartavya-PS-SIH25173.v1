@@ -55,5 +55,6 @@ openai>=1.0.0
 # Database Clients
 supabase>=2.0.0
 pymongo>=4.0.0
+motor>=3.3.0
 redis>=5.0.0
 asyncpg>=0.29.0

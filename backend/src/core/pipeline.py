@@ -86,15 +86,10 @@ class ConversationalPipeline:
             result["confidence"] = confidence
             
             # Step 2: Entity Extraction
-            entities = self.entity_extractor.extract_entities(query)
-            # Convert Entity objects to dictionaries for JSON serialization
-            result["entities"] = [{
-                "type": entity.type,
-                "value": entity.value,
-                "confidence": entity.confidence,
-                "start_pos": entity.start_pos,
-                "end_pos": entity.end_pos
-            } for entity in entities]
+            raw_entities = self.entity_extractor.extract_entities(query)
+            # Convert Entity objects to dictionaries for consistent processing
+            entities = [entity.to_dict() for entity in raw_entities]
+            result["entities"] = entities
             
             # Step 3: Check for ambiguities
             if await self._has_ambiguities(query, entities):
