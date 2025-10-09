@@ -203,23 +203,53 @@ class ApiClient {
             status: response.status,
           };
         } else if (data.hasOwnProperty('status')) {
-          // Chat format - convert to expected format
+          // Chat format - convert backend ChatResponse to frontend ChatMessage
+          console.log('🔍 RAW BACKEND RESPONSE:', data);
+          
           if (data.status === 'success') {
+            const chatMessage = {
+              id: `msg_${Date.now()}_${Math.random().toString(36).substring(2)}`,
+              content: data.summary || 'Response received',
+              role: 'assistant' as const,
+              timestamp: data.metadata?.timestamp || new Date().toISOString(),
+              metadata: {
+                // Core chat metadata
+                intent: data.intent,
+                confidence: data.confidence,
+                results_count: data.results?.length || 0,
+                processing_time: data.metadata?.processing_time,
+                conversation_id: data.conversation_id,
+                
+                // SIEM Analysis for rich UI display
+                siemAnalysis: {
+                  threatLevel: data.intent?.includes('threat') ? 'High' : 
+                              data.intent?.includes('critical') ? 'Critical' : 'Medium',
+                  iocCount: data.entities?.length || 0,
+                  queryType: data.intent || 'general',
+                  totalResults: data.metadata?.total_results || data.results?.length || 0,
+                  confidenceScore: data.confidence || 0
+                },
+                
+                // Data sources
+                sources: data.results?.length > 0 ? ['SIEM Database', 'Security Logs'] : [],
+                
+                // Follow-up suggestions
+                actions: data.suggestions || [],
+                
+                // Backend context for debugging
+                rawData: {
+                  query: data.query,
+                  entities: data.entities,
+                  visualizations: data.visualizations
+                }
+              }
+            };
+            
+            console.log('✅ CONVERTED TO ChatMessage:', chatMessage);
+            
             return {
               success: true,
-              data: {
-                id: `msg_${Date.now()}`,
-                content: data.summary || 'Response received',
-                role: 'assistant',
-                timestamp: data.metadata?.timestamp || new Date().toISOString(),
-                metadata: {
-                  intent: data.intent,
-                  confidence: data.confidence,
-                  results_count: data.results?.length || 0,
-                  processing_time: data.metadata?.processing_time,
-                  conversation_id: data.conversation_id
-                }
-              } as T,
+              data: chatMessage as T,
               status: response.status,
             };
           } else {
@@ -507,7 +537,7 @@ class ApiClient {
 const getApiBaseUrl = (): string => {
   // Development
   if (import.meta.env.DEV) {
-    return import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+    return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
   }
   
   // Production - use relative path or environment variable

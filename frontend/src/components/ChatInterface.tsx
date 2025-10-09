@@ -147,14 +147,26 @@ const ChatContent: React.FC = () => {
     setIsLoading(true);
 
     try {
+      console.log('💬 Sending chat message:', {
+        message: message.trim(),
+        sessionId,
+        currentMessages: chatMessages.length
+      });
+      
       const response = await callApi(
         () => api.sendChatMessage(message.trim(), sessionId),
         {
           onSuccess: (aiResponse) => {
-            setChatMessages(prev => [...prev, aiResponse]);
+            console.log('🎉 Received AI response:', aiResponse);
+            setChatMessages(prev => {
+              const newMessages = [...prev, aiResponse];
+              console.log('📝 Updated messages array:', newMessages.length);
+              return newMessages;
+            });
             addChatMessage(aiResponse);
           },
           onError: (error) => {
+            console.error('❌ Chat error:', error);
             // Add error message to chat
             const errorMessage: ChatMessage = {
               id: `error_${Date.now()}`,
@@ -290,7 +302,49 @@ const ChatContent: React.FC = () => {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
         {chatMessages.length === 0 ? (
-          <WelcomeScreen onSuggestedQuery={setMessage} />
+          <WelcomeScreen onSuggestedQuery={(query) => {
+            setMessage(query);
+            // Auto-send the suggested query after a brief delay
+            setTimeout(() => {
+              if (!isLoading) {
+                console.log('🚀 Auto-sending suggested query:', query);
+                const userMessage: ChatMessage = {
+                  id: `user_${Date.now()}`,
+                  content: query,
+                  role: 'user',
+                  timestamp: new Date().toISOString()
+                };
+                setChatMessages(prev => [...prev, userMessage]);
+                addChatMessage(userMessage);
+                setMessage('');
+                setIsLoading(true);
+                
+                callApi(
+                  () => api.sendChatMessage(query, sessionId),
+                  {
+                    onSuccess: (aiResponse) => {
+                      console.log('🎉 Suggested query response:', aiResponse);
+                      setChatMessages(prev => [...prev, aiResponse]);
+                      addChatMessage(aiResponse);
+                      setIsLoading(false);
+                    },
+                    onError: (error) => {
+                      console.error('❌ Suggested query error:', error);
+                      const errorMessage: ChatMessage = {
+                        id: `error_${Date.now()}`,
+                        content: "I'm sorry, I encountered an error processing your request. Please try again.",
+                        role: 'assistant',
+                        timestamp: new Date().toISOString(),
+                        metadata: { error: true }
+                      };
+                      setChatMessages(prev => [...prev, errorMessage]);
+                      setIsLoading(false);
+                    }
+                  }
+                );
+              }
+            }, 100);
+          }} />
         ) : (
           chatMessages.map((msg, index) => (
             <MessageBubble
