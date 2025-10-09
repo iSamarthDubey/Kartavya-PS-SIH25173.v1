@@ -33,6 +33,10 @@ class DatasetConnector(BaseSIEMConnector):
             }
         }
     
+    async def initialize(self) -> bool:
+        """Initialize the dataset connector by connecting to datasets"""
+        return await self.connect()
+    
     async def connect(self) -> bool:
         """Load and cache datasets"""
         try:

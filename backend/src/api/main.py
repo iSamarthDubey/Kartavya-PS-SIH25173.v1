@@ -60,6 +60,11 @@ async def lifespan(app: FastAPI):
         # Initialize SIEM connector
         siem_platform = os.getenv("DEFAULT_SIEM_PLATFORM", "dataset")
         app_state["siem_connector"] = create_connector(siem_platform)
+        # Actually connect to the datasets
+        if hasattr(app_state["siem_connector"], 'initialize'):
+            await app_state["siem_connector"].initialize()
+        else:
+            await app_state["siem_connector"].connect()
         logger.info(f"✅ {siem_platform} connector initialized")
         
         # Initialize context manager
