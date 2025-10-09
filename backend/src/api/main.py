@@ -198,6 +198,15 @@ async def global_exception_handler(request: Request, exc: Exception):
         }
     )
 
+
+# Error reporting endpoint for frontend ErrorBoundary
+from fastapi import Body
+@app.post("/api/errors")
+async def report_error(error: dict = Body(...)):
+    """Receive error reports from frontend"""
+    logger.error(f"Frontend error reported: {error}")
+    return {"status": "received", "timestamp": datetime.now().isoformat()}
+
 # Make app state accessible to routes
 @app.get("/api/state")
 async def get_app_state():
