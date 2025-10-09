@@ -543,3 +543,4 @@ deploy_quick.ps1
 frontend/src/components/Settings.tsx
 CHECKLIST.TXT
 backend/scripts/create_demo_users.py
+backend/test_api_connection.py

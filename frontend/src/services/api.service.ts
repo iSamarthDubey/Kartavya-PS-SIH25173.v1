@@ -230,9 +230,9 @@ class ApiClient {
       // Route to appropriate mock service method
       if (endpoint.includes('/dashboard/metrics')) {
         data = await this.mockService.getDashboardMetrics();
-      } else if (endpoint.includes('/alerts')) {
+      } else if (endpoint.includes('/dashboard/alerts')) {
         data = await this.mockService.getSecurityAlerts();
-      } else if (endpoint.includes('/system/status')) {
+      } else if (endpoint.includes('/dashboard/system/status')) {
         data = await this.mockService.getSystemStatus();
       } else if (endpoint.includes('/chat/message')) {
         const message = config.body?.message || 'Hello';
@@ -241,9 +241,9 @@ class ApiClient {
         data = await this.mockService.createChatSession();
       } else if (endpoint.includes('/chat/history')) {
         data = await this.mockService.getChatHistory('mock');
-      } else if (endpoint.includes('/network/traffic')) {
+      } else if (endpoint.includes('/dashboard/network/traffic')) {
         data = await this.mockService.getNetworkTraffic();
-      } else if (endpoint.includes('/users/activity')) {
+      } else if (endpoint.includes('/dashboard/users/activity')) {
         data = await this.mockService.getUserActivity();
       } else if (endpoint.includes('/health')) {
         data = await this.mockService.healthCheck();
@@ -273,26 +273,29 @@ class ApiClient {
   }
 
   async getSecurityAlerts(limit = 50): Promise<ApiResponse<SecurityAlert[]>> {
-    return this.makeRequest<SecurityAlert[]>(`/api/alerts?limit=${limit}`);
+    return this.makeRequest<SecurityAlert[]>(`/api/dashboard/alerts?limit=${limit}`);
   }
 
   async updateAlert(alertId: string, updates: Partial<SecurityAlert>): Promise<ApiResponse<SecurityAlert>> {
-    return this.makeRequest<SecurityAlert>(`/api/alerts/${alertId}`, {
+    return this.makeRequest<SecurityAlert>(`/api/dashboard/alerts/${alertId}`, {
       method: 'PATCH',
       body: updates,
     });
   }
 
   async getSystemStatus(): Promise<ApiResponse<SystemStatus[]>> {
-    return this.makeRequest<SystemStatus[]>('/api/system/status');
+    return this.makeRequest<SystemStatus[]>('/api/dashboard/system/status');
   }
 
   // ============= CHAT APIs =============
 
   async sendChatMessage(message: string, sessionId?: string): Promise<ApiResponse<ChatMessage>> {
-    return this.makeRequest<ChatMessage>('/api/chat/message', {
+    return this.makeRequest<ChatMessage>('/api/assistant/chat', {
       method: 'POST',
-      body: { message, sessionId },
+      body: { 
+        query: message, 
+        conversation_id: sessionId 
+      },
     });
   }
 
@@ -312,7 +315,7 @@ class ApiClient {
     timeRange: string = '1h',
     limit = 100
   ): Promise<ApiResponse<NetworkTraffic[]>> {
-    return this.makeRequest<NetworkTraffic[]>(`/api/network/traffic?range=${timeRange}&limit=${limit}`);
+    return this.makeRequest<NetworkTraffic[]>(`/api/dashboard/network/traffic?time_range=${timeRange}&limit=${limit}`);
   }
 
   async getTopConnections(limit = 10): Promise<ApiResponse<any[]>> {
@@ -326,7 +329,7 @@ class ApiClient {
   // ============= USER ACTIVITY APIs =============
 
   async getUserActivity(limit = 50): Promise<ApiResponse<UserActivity[]>> {
-    return this.makeRequest<UserActivity[]>(`/api/users/activity?limit=${limit}`);
+    return this.makeRequest<UserActivity[]>(`/api/dashboard/users/activity?limit=${limit}`);
   }
 
   async getUserRiskScores(): Promise<ApiResponse<Record<string, number>>> {
@@ -446,7 +449,7 @@ class ApiClient {
   // ============= HEALTH CHECK =============
 
   async healthCheck(): Promise<ApiResponse<{ status: string; timestamp: string }>> {
-    return this.makeRequest<{ status: string; timestamp: string }>('/api/health', {
+    return this.makeRequest<{ status: string; timestamp: string }>('/health', {
       timeout: 5000,
       retries: 1,
       skipNotification: true,
