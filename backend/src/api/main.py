@@ -245,9 +245,22 @@ def get_schema_mapper():
         raise HTTPException(status_code=503, detail="Schema mapper not initialized")
     return app_state["schema_mapper"]
 
+# Create a router instance for the main.py to export
+from fastapi import APIRouter
+router = APIRouter()
+
+# Include all the routes in the router
+router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
+router.include_router(assistant.router, prefix="/assistant", tags=["Assistant"])
+router.include_router(query.router, prefix="/query", tags=["Query"])
+router.include_router(reports.router, prefix="/reports", tags=["Reports"])
+router.include_router(admin.router, prefix="/admin", tags=["Admin"])
+
 # Export dependencies for use in routes
 __all__ = [
     'app',
+    'router',
     'get_pipeline',
     'get_siem_connector',
     'get_context_manager',
