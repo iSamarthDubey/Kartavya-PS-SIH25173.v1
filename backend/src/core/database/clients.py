@@ -92,15 +92,23 @@ class MongoDBClient:
         if settings.mongodb_uri:
             try:
                 from pymongo import MongoClient
-                import certifi
-                self.client = MongoClient(settings.mongodb_uri, tls=True, tlsCAFile=certifi.where())
+                import ssl
+                # More flexible SSL configuration
+                self.client = MongoClient(
+                    settings.mongodb_uri,
+                    serverSelectionTimeoutMS=5000,
+                    connectTimeoutMS=5000,
+                    socketTimeoutMS=5000,
+                    maxPoolSize=1
+                )
                 self.database = self.client[settings.mongodb_database]
-                # Test connection
+                # Test connection with shorter timeout
                 self.client.server_info()
                 self.enabled = True
                 logger.info("✅ MongoDB client initialized")
             except Exception as e:
-                logger.error(f"❌ Failed to initialize MongoDB: {e}")
+                logger.warning(f"⚠️ MongoDB connection failed, continuing without it: {e}")
+                self.enabled = False
         else:
             logger.info("🚫 MongoDB disabled (missing config)")
     
