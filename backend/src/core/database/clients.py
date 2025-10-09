@@ -343,13 +343,25 @@ class RedisClient:
 class DatabaseManager:
     """Manages all database clients"""
     
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(DatabaseManager, cls).__new__(cls)
+        return cls._instance
+    
     def __init__(self):
         """Initialize all database clients"""
+        if DatabaseManager._initialized:
+            return
+            
         self.supabase = SupabaseClient()
         self.mongodb = MongoDBClient()
         self.redis = RedisClient()
         
         self._log_status()
+        DatabaseManager._initialized = True
     
     def _log_status(self):
         """Log database status"""
@@ -393,5 +405,5 @@ class DatabaseManager:
         }
 
 
-# Global database manager
+# Global database manager instance (singleton)
 db_manager = DatabaseManager()
