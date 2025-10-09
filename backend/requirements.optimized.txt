@@ -1,0 +1,67 @@
+# KARTAVYA SIEM ASSISTANT - OPTIMIZED DEPENDENCIES
+# Production-ready minimal requirements for SIH 2025
+
+# ===== CORE WEB FRAMEWORK =====
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+python-multipart>=0.0.6
+
+# ===== NLP & TEXT PROCESSING =====
+spacy>=3.7.0
+scikit-learn>=1.3.2
+nltk>=3.8.1
+dateparser>=1.2.0
+textstat>=0.7.3
+
+# ===== DATA PROCESSING =====
+pandas>=2.1.4
+numpy>=1.24.4
+elasticsearch>=8.11.1
+aiohttp>=3.9.0
+
+# ===== SECURITY & AUTHENTICATION =====
+cryptography>=41.0.7
+bcrypt>=4.1.2
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# ===== CONFIGURATION & UTILITIES =====
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+python-json-logger>=2.0.7
+requests>=2.31.0
+
+# ===== DATABASE CONNECTORS =====
+asyncpg>=0.29.0
+redis>=5.0.1
+
+# ===== TESTING & DEVELOPMENT =====
+pytest>=7.4.3
+pytest-asyncio>=0.23.2
+black>=23.12.0
+
+# ===== CONDITIONAL DEPENDENCIES (Demo Mode Only) =====
+# Uncomment these ONLY for demo/development:
+# google-generativeai>=0.3.2      # Only if DEMO_MODE=true
+# datasets>=2.16.0                # Only for demo datasets
+# matplotlib>=3.8.2               # Only for demo visualizations
+# plotly>=5.17.0                  # Only for demo charts
+
+# ===== REMOVED DEPENDENCIES (Previously 69 → Now 22) =====
+# ❌ streamlit - Not used in production API
+# ❌ torch - Too heavy, not needed for rule-based NLP
+# ❌ transformers - Using lightweight spaCy instead
+# ❌ sentence-transformers - Not used in current architecture
+# ❌ langchain* - Complex dependencies, using custom implementation
+# ❌ chromadb - Not used, using Elasticsearch
+# ❌ vector-store - Custom implementation
+# ❌ motor - Using asyncpg for PostgreSQL
+# ❌ pymongo - MongoDB not used in core
+# ❌ supabase - Not used in production
+# ❌ openai - Using rule-based NLP primarily
+# ❌ joblib - Included in scikit-learn
+# ❌ watchdog - Not needed in production
+# ❌ seaborn - Only needed for advanced analytics
+# ❌ jsonlines - Standard json module sufficient
+# ❌ faiss-cpu - Not used in current implementation
