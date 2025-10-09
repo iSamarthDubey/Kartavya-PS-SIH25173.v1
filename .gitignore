@@ -544,3 +544,5 @@ frontend/src/components/Settings.tsx
 CHECKLIST.TXT
 backend/scripts/create_demo_users.py
 backend/test_api_connection.py
+backend/test_endpoints.py
+backend/final_test.py
