@@ -219,7 +219,7 @@ class ApiClient {
                   processing_time: data.metadata?.processing_time,
                   conversation_id: data.conversation_id
                 }
-              },
+              } as T,
               status: response.status,
             };
           } else {
@@ -234,7 +234,7 @@ class ApiClient {
           // Default format
           return {
             success: true,
-            data,
+            data: data as T,
             status: response.status,
           };
         }
@@ -302,7 +302,7 @@ class ApiClient {
 
       return {
         success: true,
-        data,
+        data: data as T,
         status: 200,
       };
     } catch (error: any) {
