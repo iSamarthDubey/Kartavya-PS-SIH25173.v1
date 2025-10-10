@@ -21,8 +21,8 @@ import { FullPageLoader } from './components/ui/LoadingStates';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './components/auth/LoginPage';
 import OnboardingFlow from './components/OnboardingFlow';
-import Dashboard from './components/Dashboard';
-import ChatInterface from './components/ChatInterface';
+import SimpleDashboard from './components/SimpleDashboard/SimpleDashboard';
+import MainConsole from './components/MainConsole';
 import ErrorHandlingDemo from './components/ErrorHandlingDemo';
 
 // Store
@@ -46,8 +46,8 @@ const App: React.FC = () => {
               <Route path="/login" element={<LoginPage />} />
               
               {/* Protected Routes */}
-              <Route path="/dashboard" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
-              <Route path="/chat" element={<ProtectedRoute><AppLayout><ChatInterface /></AppLayout></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><AppLayout><SimpleDashboard /></AppLayout></ProtectedRoute>} />
+              <Route path="/console" element={<ProtectedRoute><AppLayout><MainConsole /></AppLayout></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute><AppLayout><React.Suspense fallback={<FullPageLoader message="Loading Reports..." />}><Reports /></React.Suspense></AppLayout></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><AppLayout><React.Suspense fallback={<FullPageLoader message="Loading Settings..." />}><Settings /></React.Suspense></AppLayout></ProtectedRoute>} />
               <Route path="/demo" element={<ProtectedRoute><AppLayout><ErrorHandlingDemo /></AppLayout></ProtectedRoute>} />
@@ -135,7 +135,7 @@ const NavigationMenu: React.FC = () => {
   
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: <Shield className="w-4 h-4" /> },
-    { path: '/chat', label: 'AI Assistant', icon: <Shield className="w-4 h-4" /> },
+    { path: '/console', label: 'AI Assistant', icon: <Shield className="w-4 h-4" /> },
     { path: '/reports', label: 'Reports', icon: <Shield className="w-4 h-4" /> },
     { path: '/settings', label: 'Settings', icon: <Shield className="w-4 h-4" /> },
     { path: '/demo', label: '🚨 Error Demo', icon: <Shield className="w-4 h-4" /> }
