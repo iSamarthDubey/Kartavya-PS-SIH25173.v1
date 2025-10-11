@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, MoreHorizontal, Trash2, Download, Eye, Wifi, WifiOff } from 'lucide-react'
+import { Settings, MoreHorizontal, Trash2, Download, Eye, Wifi, WifiOff, ArrowDown } from 'lucide-react'
 
 import MessageBubble from './MessageBubble'
 import Composer from './Composer'
@@ -22,6 +22,10 @@ export default function ChatWindow({
   onSettingsClick 
 }: ChatWindowProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const lastMessageCountRef = useRef(0)
+  const [showScrollButton, setShowScrollButton] = useState(false)
+  const [hasNewMessages, setHasNewMessages] = useState(false)
   const { 
     clearMessages, 
     toggleExplainQuery, 
@@ -55,14 +59,43 @@ export default function ChatWindow({
 
   const { streamingMessage, isStreaming } = useStreamingChat()
 
-  // Auto-scroll to bottom when new messages arrive
+  // Smart auto-scroll: only scroll if user is near bottom or it's a new message
   useEffect(() => {
-    scrollToBottom()
+    if (messages.length > lastMessageCountRef.current) {
+      // New message added
+      const container = messagesContainerRef.current
+      if (container) {
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
+        if (isNearBottom || lastMessageCountRef.current === 0) {
+          // Only auto-scroll if user is near bottom or it's the first message
+          scrollToBottom('smooth')
+          setHasNewMessages(false)
+        } else {
+          // User is scrolled up, mark as having new messages
+          setHasNewMessages(true)
+        }
+      }
+    }
+    lastMessageCountRef.current = messages.length
   }, [messages])
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  const scrollToBottom = (behavior: ScrollBehavior = 'instant') => {
+    messagesEndRef.current?.scrollIntoView({ behavior })
   }
+
+  // Handle scroll events to show/hide scroll button
+  useEffect(() => {
+    const container = messagesContainerRef.current
+    if (!container) return
+
+    const handleScroll = () => {
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
+      setShowScrollButton(!isNearBottom && messages.length > 0)
+    }
+
+    container.addEventListener('scroll', handleScroll)
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [messages.length])
 
   const handleExportChat = () => {
     // TODO: Implement chat export functionality
@@ -90,10 +123,11 @@ export default function ChatWindow({
   }
 
   return (
-    <div className={`flex flex-col h-full bg-synrgy-bg-900 ${className}`}>
+    <div className={`flex flex-col h-full bg-synrgy-bg-900 overflow-hidden ${className}`}>
       {/* Header */}
-      {showHeader && (
-        <div className="flex items-center justify-between p-6 border-b border-synrgy-primary/10">
+{showHeader && (
+        <div className="sticky top-0 z-10 border-b border-synrgy-primary/10 bg-synrgy-bg-900/80 backdrop-blur-xs">
+          <div className="mx-auto w-full max-w-3xl flex items-center justify-between px-4 sm:px-6 md:px-8 py-4">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-synrgy-primary/20 to-synrgy-accent/20 border border-synrgy-primary/30 rounded-full flex items-center justify-center">
@@ -164,6 +198,7 @@ export default function ChatWindow({
               <MoreHorizontal className="w-5 h-5" />
             </button>
           </div>
+          </div>
         </div>
       )}
 
@@ -192,9 +227,9 @@ export default function ChatWindow({
         )}
       </AnimatePresence>
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto px-6 py-6">
+      {/* Messages Area - Scrollable, fills remaining space */}
+      <div className="flex-1 overflow-y-auto">
+        <div ref={messagesContainerRef} className="px-4 sm:px-6 md:px-8 py-6 mx-auto w-full max-w-3xl">
           {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <motion.div
@@ -257,55 +292,45 @@ export default function ChatWindow({
             </div>
           )}
         </div>
+
+        {/* Floating Scroll to Bottom Button */}
+        <AnimatePresence>
+          {showScrollButton && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              onClick={() => {
+                scrollToBottom('smooth')
+                setHasNewMessages(false)
+              }}
+              className="absolute bottom-24 right-6 w-10 h-10 bg-synrgy-primary hover:bg-synrgy-primary/90 text-synrgy-bg-900 rounded-full shadow-lg hover:shadow-synrgy-glow/50 transition-all duration-200 flex items-center justify-center z-10"
+              title={hasNewMessages ? 'New messages - scroll to bottom' : 'Scroll to bottom'}
+            >
+              <ArrowDown className="w-5 h-5" />
+              {hasNewMessages && (
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-synrgy-accent rounded-full animate-pulse" />
+              )}
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Composer */}
-      <div className="border-t border-synrgy-primary/10 p-6">
-        <Composer
-          disabled={false}
-          placeholder={
-            messages.length === 0 
-              ? "Ask SYNRGY anything about your security data..." 
-              : "Continue the conversation..."
-          }
-        />
-      </div>
-
-      {/* Connection Status */}
-      <div className="flex items-center justify-center py-2 text-xs text-synrgy-muted border-t border-synrgy-primary/5">
-        <div className="flex items-center gap-2">
-          {isConnected ? (
-            <>
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <Wifi className="w-3 h-3" />
-              <span>Connected to SYNRGY</span>
-            </>
-          ) : isReconnecting ? (
-            <>
-              <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-              <span>Reconnecting... (attempt {reconnectAttempts})</span>
-            </>
-          ) : (
-            <>
-              <div className="w-2 h-2 bg-red-500 rounded-full" />
-              <WifiOff className="w-3 h-3" />
-              <span>Disconnected</span>
-            </>
-          )}
-          
-          {context?.conversation_id && (
-            <>
-              <span>•</span>
-              <span>{messages.length} messages</span>
-            </>
-          )}
-          
-          {isStreaming && (
-            <>
-              <span>•</span>
-              <span className="text-synrgy-accent animate-pulse">Streaming...</span>
-            </>
-          )}
+      {/* Composer (sticky like ChatGPT) */}
+      <div className="sticky bottom-0 border-t border-synrgy-primary/10 bg-synrgy-bg-900/90 backdrop-blur-xs">
+        <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 md:px-8 py-4">
+          <Composer
+            disabled={false}
+            placeholder={
+              messages.length === 0 
+                ? "Ask SYNRGY anything about your security data..." 
+                : "Continue the conversation..."
+            }
+          />
+          <div className="mt-2 flex items-center justify-between text-[11px] text-synrgy-muted">
+            <span>Press Enter to send • Shift + Enter for new line • Esc to close suggestions</span>
+            <span className="hidden sm:inline">Model: SYNRGY Pipeline</span>
+          </div>
         </div>
       </div>
     </div>

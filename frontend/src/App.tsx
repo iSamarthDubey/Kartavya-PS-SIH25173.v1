@@ -60,7 +60,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-synrgy-bg-900 text-synrgy-text">
+    <div className="h-screen bg-synrgy-bg-900 text-synrgy-text overflow-hidden">
       <Routes>
         {/* Public routes */}
         <Route 
