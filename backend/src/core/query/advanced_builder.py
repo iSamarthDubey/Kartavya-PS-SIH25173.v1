@@ -122,8 +122,9 @@ class AdvancedQueryBuilder:
             # Apply query optimization
             query = self._optimize_query(query, query_type)
             
-            # Add metadata
-            query["_metadata"] = {
+            # Store metadata separately (don't add to query DSL as it breaks Elasticsearch)
+            # Metadata will be added to response later by the connector
+            self._last_query_metadata = {
                 "intent": intent,
                 "query_type": query_type.value,
                 "platform": self.platform.value,
