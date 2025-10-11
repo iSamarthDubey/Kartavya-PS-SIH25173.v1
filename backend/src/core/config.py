@@ -201,18 +201,25 @@ class Settings(BaseSettings):
 # Global settings instance
 settings = Settings()
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+# Import secure logging after settings are initialized
+try:
+    from .security_filter import setup_secure_logging
+    # Setup secure logging with credential redaction
+    setup_secure_logging(settings.log_level)
+except ImportError:
+    # Fallback to basic logging if security filter is not available
+    logging.basicConfig(
+        level=getattr(logging, settings.log_level.upper()),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    logger.warning("⚠️ Secure logging filter not available, using basic logging")
 
 # Validate configuration on startup
 if not settings.validate_configuration():
     logger.error("❌ Configuration validation failed!")
 else:
     logger.info(f"✅ Configuration loaded for {settings.environment.upper()} mode")
-    logger.info(f"🤖 AI enabled: {settings.ai_enabled}")
+    logger.info(f"🤖 AI enabled: {settings.gemini_api_key is not None or settings.openai_api_key is not None}")
     logger.info(f"🎯 Default SIEM: {settings.default_siem_platform}")
 
 
