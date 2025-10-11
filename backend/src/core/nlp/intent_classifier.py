@@ -39,7 +39,10 @@ class IntentClassifier:
                 r'\blogin\s+(fail|error|attempt)\b',
                 r'\b(4625|528|529|530|531|532|533|534|535|536|537|538|539)\b',  # Windows event codes
                 r'\bssh\s+(fail|error|denied)\b',
-                r'\bbrute\s?force\b'
+                r'\bbrute\s?force\b',
+                r'\b(bad|wrong|incorrect|invalid)\s+(password|credential)\b',
+                r'\baccount\s+(lock|disabled|expired)\b',
+                r'\b(winlogbeat|windows)\s+.*\s+(fail|error)\b'
             ],
             
             QueryIntent.SHOW_SUCCESSFUL_LOGINS: [
@@ -78,7 +81,11 @@ class IntentClassifier:
                 r'\b(privilege|permission)\s+(escalation|change)\b',
                 r'\baccount\s+(creation|deletion|modification)\b',
                 r'\bfile\s+(access|modification|deletion)\b',
-                r'\badmin\s+(activity|action)\b'
+                r'\badmin\s+(activity|action)\b',
+                r'\bprocess\s+(creation|start|launch)\b',
+                r'\b4688\b',  # Windows process creation event
+                r'\b(suspicious|unusual)\s+(process|executable)\b',
+                r'\b(powershell|cmd|wscript|cscript)\s+(execution|run)\b'
             ],
             
             QueryIntent.SYSTEM_ERRORS: [

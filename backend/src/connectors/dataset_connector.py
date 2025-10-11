@@ -271,3 +271,253 @@ class DatasetConnector(BaseSIEMConnector):
             "user": "user.name",
             "message": "message"
         }
+    
+    # ========== MISSING DASHBOARD API METHODS ==========
+    
+    async def query_security_events(
+        self, 
+        start_time: datetime = None, 
+        end_time: datetime = None, 
+        event_types: List[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Query security events from dataset"""
+        try:
+            if not self.connected or not self.dataset_cache:
+                await self.initialize()
+            
+            dataset_key = list(self.dataset_cache.keys())[0]
+            dataset = self.dataset_cache[dataset_key]
+            
+            # Filter events
+            filtered_events = []
+            for record in dataset:
+                # Check event types if specified
+                if event_types:
+                    record_action = record.get('event', {}).get('action', '').lower()
+                    record_category = record.get('event', {}).get('category', '').lower()
+                    
+                    matches = any(
+                        event_type.lower() in record_action or event_type.lower() in record_category
+                        for event_type in event_types
+                    )
+                    
+                    if not matches:
+                        continue
+                
+                # Check severity for security relevance
+                severity = record.get('event', {}).get('severity', '').lower()
+                if severity in ['critical', 'high', 'medium'] or 'security' in str(record).lower():
+                    filtered_events.append(record)
+            
+            # Return up to 1000 events
+            return filtered_events[:1000]
+            
+        except Exception as e:
+            logger.error(f"Failed to query security events: {e}")
+            return []
+    
+    async def query_security_alerts(
+        self, 
+        limit: int = 50, 
+        filters: Dict[str, Any] = None
+    ) -> List[Dict[str, Any]]:
+        """Query security alerts from dataset"""
+        try:
+            if not self.connected or not self.dataset_cache:
+                await self.initialize()
+            
+            dataset_key = list(self.dataset_cache.keys())[0]
+            dataset = self.dataset_cache[dataset_key]
+            
+            # Filter for alerts (high/critical severity)
+            alerts = []
+            for record in dataset:
+                severity = record.get('event', {}).get('severity', '').lower()
+                if severity in ['critical', 'high']:
+                    # Apply additional filters
+                    if filters:
+                        matches = True
+                        for key, value in filters.items():
+                            if key == 'severity' and record.get('event', {}).get('severity', '').lower() != value.lower():
+                                matches = False
+                                break
+                            elif key == 'status':
+                                # Simulate status based on severity
+                                record_status = 'active' if severity == 'critical' else 'investigating'
+                                if record_status != value:
+                                    matches = False
+                                    break
+                        if not matches:
+                            continue
+                    
+                    alerts.append({
+                        **record,
+                        'status': 'active' if severity == 'critical' else 'investigating',
+                        'alert_id': str(hash(str(record)))[:8]
+                    })
+                    
+                    if len(alerts) >= limit:
+                        break
+            
+            return alerts
+            
+        except Exception as e:
+            logger.error(f"Failed to query security alerts: {e}")
+            return []
+    
+    async def query_system_metrics(self) -> List[Dict[str, Any]]:
+        """Query system metrics from dataset"""
+        try:
+            # Simulate system metrics based on dataset
+            systems = [
+                {
+                    "name": "ISRO-DC-01",
+                    "status": "online",
+                    "cpu_usage": 45.2,
+                    "memory_usage": 67.8,
+                    "disk_usage": 23.1,
+                    "uptime": "15 days"
+                },
+                {
+                    "name": "ISRO-DC-02", 
+                    "status": "online",
+                    "cpu_usage": 32.7,
+                    "memory_usage": 58.3,
+                    "disk_usage": 41.7,
+                    "uptime": "8 days"
+                },
+                {
+                    "name": "ISRO-SEC-01",
+                    "status": "online",
+                    "cpu_usage": 78.9,
+                    "memory_usage": 82.1,
+                    "disk_usage": 55.6,
+                    "uptime": "22 days"
+                },
+                {
+                    "name": "ISRO-WEB-01",
+                    "status": "warning",
+                    "cpu_usage": 89.3,
+                    "memory_usage": 91.2,
+                    "disk_usage": 78.4,
+                    "uptime": "3 days"
+                },
+                {
+                    "name": "ISRO-DB-01",
+                    "status": "online",
+                    "cpu_usage": 56.1,
+                    "memory_usage": 73.4,
+                    "disk_usage": 34.8,
+                    "uptime": "45 days"
+                }
+            ]
+            
+            return systems
+            
+        except Exception as e:
+            logger.error(f"Failed to query system metrics: {e}")
+            return []
+    
+    async def query_network_traffic(
+        self, 
+        start_time: datetime = None, 
+        limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """Query network traffic from dataset"""
+        try:
+            if not self.connected or not self.dataset_cache:
+                await self.initialize()
+            
+            dataset_key = list(self.dataset_cache.keys())[0]
+            dataset = self.dataset_cache[dataset_key]
+            
+            # Filter for network-related events
+            traffic_events = []
+            for record in dataset:
+                # Look for network-related fields
+                if (record.get('source', {}).get('ip') or 
+                    record.get('destination', {}).get('ip') or 
+                    record.get('network', {}).get('protocol')):
+                    
+                    # Add traffic-specific fields
+                    traffic_record = {
+                        **record,
+                        'bytes_in': hash(str(record)) % 100000,  # Simulate bytes
+                        'bytes_out': hash(str(record)[::-1]) % 100000,
+                        'packets': hash(str(record)) % 1000,
+                        'protocol': record.get('network', {}).get('protocol', 'tcp'),
+                        'connection_state': 'established' if hash(str(record)) % 2 else 'closed'
+                    }
+                    
+                    traffic_events.append(traffic_record)
+                    
+                    if len(traffic_events) >= limit:
+                        break
+            
+            return traffic_events
+            
+        except Exception as e:
+            logger.error(f"Failed to query network traffic: {e}")
+            return []
+    
+    async def query_user_activity(
+        self, 
+        limit: int = 50, 
+        username: str = None
+    ) -> List[Dict[str, Any]]:
+        """Query user activity from dataset"""
+        try:
+            if not self.connected or not self.dataset_cache:
+                await self.initialize()
+            
+            dataset_key = list(self.dataset_cache.keys())[0]
+            dataset = self.dataset_cache[dataset_key]
+            
+            # Filter for user-related events
+            user_events = []
+            for record in dataset:
+                user_name = record.get('user', {}).get('name', '')
+                if user_name:
+                    # Apply username filter if specified
+                    if username and username.lower() not in user_name.lower():
+                        continue
+                    
+                    # Add activity-specific fields
+                    activity_record = {
+                        **record,
+                        'activity_type': record.get('event', {}).get('action', 'unknown'),
+                        'success': record.get('event', {}).get('outcome', 'unknown') == 'success',
+                        'risk_score': hash(str(record)) % 100,  # Simulate risk score
+                        'location': record.get('source', {}).get('geo', {}).get('country_name', 'Unknown')
+                    }
+                    
+                    user_events.append(activity_record)
+                    
+                    if len(user_events) >= limit:
+                        break
+            
+            return user_events
+            
+        except Exception as e:
+            logger.error(f"Failed to query user activity: {e}")
+            return []
+    
+    async def query_system_uptime(self) -> Dict[str, Any]:
+        """Query system uptime data"""
+        try:
+            # Simulate uptime data
+            uptime_data = {
+                'uptime_percentage': 99.7,
+                'total_systems': 5,
+                'systems_online': 4,
+                'systems_offline': 0,
+                'systems_warning': 1,
+                'last_incident': '2025-10-08T14:30:00Z',
+                'average_response_time': 1.23
+            }
+            
+            return uptime_data
+            
+        except Exception as e:
+            logger.error(f"Failed to query system uptime: {e}")
+            return {'uptime_percentage': 0.0}

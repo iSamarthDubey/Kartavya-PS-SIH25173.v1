@@ -35,7 +35,20 @@ def create_connector(
     
     platform_lower = platform.lower()
     
-    # For demo mode, always use dataset connector regardless of platform
+    # For demo mode with elasticsearch platform, use real Elasticsearch
+    if environment == "demo" and platform_lower == "elasticsearch":
+        logger.info("🎭 Demo mode with Elasticsearch: Using live Elasticsearch connector")
+        try:
+            connector = ElasticConnector(**kwargs)
+            if connector.is_available():
+                logger.info("✅ Elasticsearch connection successful in demo mode")
+                return connector
+            else:
+                logger.warning("⚠️ Elasticsearch not available, falling back to dataset")
+        except Exception as e:
+            logger.warning(f"⚠️ Elasticsearch connection failed: {e}, using dataset fallback")
+    
+    # For demo mode with other platforms, use dataset connector
     if environment == "demo":
         logger.info("🎭 Demo mode: Using dataset connector with real SIEM datasets")
         return DatasetConnector(

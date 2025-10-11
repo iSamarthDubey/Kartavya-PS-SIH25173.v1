@@ -499,3 +499,290 @@ class ConversationalPipeline:
         """Cleanup pipeline resources"""
         self.initialized = False
         logger.info("Pipeline cleaned up")
+    
+    # ========== MISSING METHODS FOR COMPLETE FUNCTIONALITY ==========
+    
+    async def format_results(
+        self,
+        results: Dict[str, Any],
+        query_type: str
+    ) -> List[Dict[str, Any]]:
+        """Format SIEM query results for frontend consumption"""
+        try:
+            formatted_results = []
+            
+            # Handle different result formats
+            if isinstance(results, list):
+                # Results is already a list
+                raw_results = results
+            elif isinstance(results, dict):
+                # Extract hits from Elasticsearch-style response
+                if 'hits' in results and 'hits' in results['hits']:
+                    raw_results = [hit.get('_source', hit) for hit in results['hits']['hits']]
+                elif '_source' in results:
+                    raw_results = [results['_source']]
+                else:
+                    raw_results = [results]
+            else:
+                raw_results = []
+            
+            # Format each result
+            for result in raw_results:
+                formatted_result = {
+                    '@timestamp': result.get('@timestamp', result.get('timestamp', '')),
+                    'message': result.get('message', result.get('event', {}).get('action', 'No message')),
+                    'severity': result.get('event', {}).get('severity', result.get('severity', 'unknown')),
+                    'source': {
+                        'ip': result.get('source', {}).get('ip', ''),
+                        'name': result.get('host', {}).get('name', '')
+                    },
+                    'destination': {
+                        'ip': result.get('destination', {}).get('ip', ''),
+                        'port': result.get('destination', {}).get('port', '')
+                    },
+                    'user': {
+                        'name': result.get('user', {}).get('name', '')
+                    },
+                    'event': {
+                        'action': result.get('event', {}).get('action', ''),
+                        'category': result.get('event', {}).get('category', ''),
+                        'outcome': result.get('event', {}).get('outcome', '')
+                    },
+                    'network': {
+                        'protocol': result.get('network', {}).get('protocol', '')
+                    },
+                    'raw': result  # Keep original data
+                }
+                
+                formatted_results.append(formatted_result)
+            
+            logger.info(f"Formatted {len(formatted_results)} results for query type: {query_type}")
+            return formatted_results
+            
+        except Exception as e:
+            logger.error(f"Failed to format results: {e}")
+            return []
+    
+    async def generate_summary(
+        self,
+        results: List[Dict[str, Any]],
+        query: str,
+        intent: str
+    ) -> str:
+        """Generate a human-readable summary of the query results"""
+        try:
+            if not results:
+                return f"No results found for your query: '{query}'. Try refining your search criteria or expanding the time range."
+            
+            result_count = len(results)
+            
+            # Generate intent-specific summaries
+            if intent == "failed_login" or intent == "show_failed_logins":
+                unique_users = len(set(r.get('user', {}).get('name', '') for r in results if r.get('user', {}).get('name', '')))
+                unique_ips = len(set(r.get('source', {}).get('ip', '') for r in results if r.get('source', {}).get('ip', '')))
+                
+                summary = f"Found {result_count} failed login attempts"
+                if unique_users > 0:
+                    summary += f" from {unique_users} unique user(s)"
+                if unique_ips > 0:
+                    summary += f" and {unique_ips} unique IP address(es)"
+                
+                # Add top offenders
+                if result_count > 0:
+                    summary += ". Recent attempts detected - investigate for potential brute force attacks."
+                    
+            elif intent == "successful_login" or intent == "show_successful_logins":
+                unique_users = len(set(r.get('user', {}).get('name', '') for r in results if r.get('user', {}).get('name', '')))
+                summary = f"Found {result_count} successful login events from {unique_users} unique user(s). All authentication attempts completed successfully."
+                
+            elif intent == "malware" or intent == "malware_detection":
+                high_severity = len([r for r in results if r.get('severity', '').lower() in ['critical', 'high']])
+                summary = f"Detected {result_count} malware-related events, with {high_severity} high/critical severity incidents requiring immediate attention."
+                
+            elif intent == "network" or intent == "network_traffic":
+                protocols = set(r.get('network', {}).get('protocol', '') for r in results if r.get('network', {}).get('protocol', ''))
+                summary = f"Analyzed {result_count} network events across {len(protocols)} protocols ({', '.join(list(protocols)[:3])})."
+                
+            elif intent == "user_activity":
+                users = set(r.get('user', {}).get('name', '') for r in results if r.get('user', {}).get('name', ''))
+                summary = f"Found {result_count} user activity events from {len(users)} unique user(s)."
+                
+            else:
+                # Generic summary
+                summary = f"Found {result_count} security events matching your query"
+                
+                # Add severity breakdown
+                severity_counts = {}
+                for result in results:
+                    severity = result.get('severity', 'unknown').lower()
+                    severity_counts[severity] = severity_counts.get(severity, 0) + 1
+                
+                if severity_counts:
+                    severity_parts = []
+                    for sev in ['critical', 'high', 'medium', 'low']:
+                        if sev in severity_counts:
+                            severity_parts.append(f"{severity_counts[sev]} {sev}")
+                    
+                    if severity_parts:
+                        summary += f" (Severity breakdown: {', '.join(severity_parts)})"
+                
+                summary += "."
+            
+            return summary
+            
+        except Exception as e:
+            logger.error(f"Failed to generate summary: {e}")
+            return f"Found {len(results)} results for your query."
+    
+    async def create_visualizations(
+        self,
+        data: List[Dict[str, Any]],
+        query_type: str
+    ) -> List[Dict[str, Any]]:
+        """Create visualizations based on the data and query type"""
+        try:
+            visualizations = []
+            
+            if not data:
+                return visualizations
+            
+            # Time series visualization
+            if len(data) > 1:
+                time_data = []
+                for i, record in enumerate(data[:20]):  # Limit to 20 points
+                    timestamp = record.get('@timestamp', f'Point {i+1}')
+                    time_data.append({
+                        'x': timestamp,
+                        'y': 1
+                    })
+                
+                visualizations.append({
+                    'type': 'time_series',
+                    'title': f'{query_type.replace("_", " ").title()} Over Time',
+                    'data': time_data,
+                    'config': {
+                        'x_field': 'x',
+                        'y_field': 'y',
+                        'chart_type': 'line'
+                    }
+                })
+            
+            # Top sources/users chart
+            if query_type in ['failed_login', 'successful_login', 'user_activity']:
+                user_counts = {}
+                for record in data:
+                    user = record.get('user', {}).get('name', 'Unknown')
+                    user_counts[user] = user_counts.get(user, 0) + 1
+                
+                top_users = sorted(user_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+                
+                if top_users:
+                    visualizations.append({
+                        'type': 'bar_chart',
+                        'title': 'Top Users',
+                        'data': [{'name': user, 'value': count} for user, count in top_users],
+                        'config': {
+                            'x_field': 'name',
+                            'y_field': 'value'
+                        }
+                    })
+            
+            # IP address analysis
+            if len(data) > 0 and any(r.get('source', {}).get('ip') for r in data):
+                ip_counts = {}
+                for record in data:
+                    ip = record.get('source', {}).get('ip', '')
+                    if ip:
+                        ip_counts[ip] = ip_counts.get(ip, 0) + 1
+                
+                top_ips = sorted(ip_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+                
+                if top_ips:
+                    visualizations.append({
+                        'type': 'bar_chart',
+                        'title': 'Top Source IPs',
+                        'data': [{'name': ip, 'value': count} for ip, count in top_ips],
+                        'config': {
+                            'x_field': 'name',
+                            'y_field': 'value'
+                        }
+                    })
+            
+            return visualizations
+            
+        except Exception as e:
+            logger.error(f"Failed to create visualizations: {e}")
+            return []
+    
+    async def generate_suggestions(
+        self,
+        current_query: str,
+        results: List[Dict[str, Any]],
+        context: Optional[Dict[str, Any]] = None
+    ) -> List[str]:
+        """Generate follow-up query suggestions based on current results"""
+        try:
+            suggestions = []
+            
+            if not results:
+                # No results - suggest broadening the search
+                suggestions.extend([
+                    "Try expanding the time range (e.g., 'last 24 hours' instead of 'last hour')",
+                    "Remove specific filters to see more results",
+                    "Check for similar events with different keywords"
+                ])
+                return suggestions
+            
+            # Get unique values for suggestions
+            unique_users = set(r.get('user', {}).get('name', '') for r in results if r.get('user', {}).get('name', ''))
+            unique_ips = set(r.get('source', {}).get('ip', '') for r in results if r.get('source', {}).get('ip', ''))
+            severities = set(r.get('severity', '') for r in results if r.get('severity', ''))
+            
+            # Intent-based suggestions
+            if "login" in current_query.lower():
+                if unique_users:
+                    user = list(unique_users)[0]
+                    suggestions.append(f"Show all activity for user {user}")
+                if unique_ips:
+                    ip = list(unique_ips)[0]
+                    suggestions.append(f"Investigate all events from IP {ip}")
+                suggestions.extend([
+                    "Show successful logins for comparison",
+                    "Find brute force attack patterns",
+                    "Check for login anomalies by time"
+                ])
+                
+            elif "malware" in current_query.lower():
+                suggestions.extend([
+                    "Show quarantined files",
+                    "Find all infected hosts",
+                    "Check for lateral movement",
+                    "Analyze malware families detected"
+                ])
+                
+            elif "network" in current_query.lower():
+                suggestions.extend([
+                    "Show blocked connections",
+                    "Analyze bandwidth usage",
+                    "Find port scan attempts",
+                    "Check for data exfiltration"
+                ])
+            
+            # Add time-based suggestions
+            if "hour" not in current_query.lower():
+                suggestions.append("Show trends over the last 24 hours")
+            
+            # Add severity-based suggestions
+            if "critical" in severities:
+                suggestions.append("Focus on critical severity events only")
+            
+            # Limit to top 5 suggestions
+            return suggestions[:5]
+            
+        except Exception as e:
+            logger.error(f"Failed to generate suggestions: {e}")
+            return [
+                "Try refining your search with more specific terms",
+                "Expand the time range to see more results",
+                "Filter by severity level (critical, high, medium, low)"
+            ]

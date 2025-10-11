@@ -155,7 +155,8 @@ class SchemaMapper:
         """
         try:
             if hasattr(connector, 'get_field_mappings'):
-                self.discovered_fields = await connector.get_field_mappings()
+                # get_field_mappings() is not async, so don't await it
+                self.discovered_fields = connector.get_field_mappings()
                 logger.info(f"Discovered {len(self.discovered_fields)} field mappings from SIEM")
         except Exception as e:
             logger.warning(f"Could not discover schema from SIEM: {e}")

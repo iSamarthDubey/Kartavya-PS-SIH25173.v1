@@ -1,5 +1,5 @@
 """
-Unified SIEM NLP Assistant API
+Conversational Assistant API
 Main FastAPI application combining all backend services
 """
 
@@ -18,7 +18,7 @@ from typing import Optional
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 # Import routers
-from .routes import assistant, query, reports, auth, admin, dashboard
+from .routes import assistant, query, reports, auth, admin, dashboard, websocket
 from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.logging import LoggingMiddleware
 
@@ -57,14 +57,29 @@ async def lifespan(app: FastAPI):
         await app_state["pipeline"].initialize()
         logger.info("✅ Pipeline initialized")
         
-        # Initialize SIEM connector
-        siem_platform = os.getenv("DEFAULT_SIEM_PLATFORM", "dataset")
-        app_state["siem_connector"] = create_connector(siem_platform)
-        # Actually connect to the datasets
-        if hasattr(app_state["siem_connector"], 'initialize'):
-            await app_state["siem_connector"].initialize()
-        else:
-            await app_state["siem_connector"].connect()
+        # Initialize SIEM connector - FORCE ELASTICSEARCH
+        siem_platform = os.getenv("DEFAULT_SIEM_PLATFORM", "elasticsearch")
+        logger.info(f"🎯 FORCING ELASTICSEARCH: Using {siem_platform} platform")
+        
+        # DIRECTLY CREATE ELASTICSEARCH CONNECTOR
+        from src.connectors.elastic import ElasticConnector
+        try:
+            es_connector = ElasticConnector()
+            if es_connector.is_available():
+                app_state["siem_connector"] = es_connector
+                logger.info("🔥 SUCCESS: Using live Elasticsearch with your Windows data!")
+            else:
+                logger.warning("⚠️ Elasticsearch not available, using dataset fallback")
+                app_state["siem_connector"] = create_connector("dataset")
+                # Only call connect on dataset connector
+                if hasattr(app_state["siem_connector"], 'connect'):
+                    await app_state["siem_connector"].connect()
+        except Exception as e:
+            logger.error(f"❌ Elasticsearch failed: {e}, using dataset fallback")
+            app_state["siem_connector"] = create_connector("dataset")
+            # Only call connect on dataset connector
+            if hasattr(app_state["siem_connector"], 'connect'):
+                await app_state["siem_connector"].connect()
         logger.info(f"✅ {siem_platform} connector initialized")
         
         # Initialize context manager
@@ -131,6 +146,7 @@ app.include_router(assistant.router, prefix="/api/assistant", tags=["Assistant"]
 app.include_router(query.router, prefix="/api/query", tags=["Query"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(websocket.router, tags=["WebSocket"])
 
 # Root endpoint
 @app.get("/")
