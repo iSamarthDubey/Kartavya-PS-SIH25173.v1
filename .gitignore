@@ -551,3 +551,4 @@ backend/test_backend.py
 frontend/BLUEPRINT.TXT
 frontend/BLUEPRINTv2.TXT
 SYNRGY.TXT
+backend/data/users.json
