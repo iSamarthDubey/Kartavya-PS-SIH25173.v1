@@ -1,23 +1,23 @@
 {
   "security_admin": {
     "username": "security_admin",
-    "password_hash": "fcdd3bd361c0676885539785ec28f825efbf3bf6b00fcf1a263080414326a21d",
-    "salt": "2d2361d331857e3fc3495e84e8e2f595",
+    "password_hash": "210a137be4cdc2c0b58d62babda6cfef390fb910bc88657bf3ae249c12909bcc",
+    "salt": "8d004e7b0f8417832a2824bc00aa8bdc",
     "role": "admin",
-    "created_at": "2025-10-08T22:28:44+00:00"
+    "created_at": "2025-10-11T00:17:53.813727+00:00"
   },
   "security_analyst": {
     "username": "security_analyst",
-    "password_hash": "bd8fbda9c48da6c11c2c0429b4df0b46a15290adb8811c27123e82fdafac6467",
-    "salt": "b601acdf53ed1134a60a8d8a77066b3d",
+    "password_hash": "d8e61a513ac95ee4ec6de867304fa10114d7fa7635df27ef0bf8520196f095f2",
+    "salt": "ead0c962b1323b6d1774d13df11919b8",
     "role": "analyst",
-    "created_at": "2025-10-08T22:28:44+00:00"
+    "created_at": "2025-10-11T00:17:53.871281+00:00"
   },
   "security_viewer": {
     "username": "security_viewer",
-    "password_hash": "4797fcb930825fe556c1128b964276d3eb76eb51c3b5d51890e4a860786f6d56",
-    "salt": "508bd5f153926d9334fa60db29302100",
+    "password_hash": "e4159e386db7ddbbf497fb386490882451d3e993be6ba4f405571d5563ae1244",
+    "salt": "58ba8a979cb62caa3da11fc3155d54ec",
     "role": "viewer",
-    "created_at": "2025-10-08T22:28:44+00:00"
+    "created_at": "2025-10-11T00:17:53.930212+00:00"
   }
 }

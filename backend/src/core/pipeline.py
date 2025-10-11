@@ -34,13 +34,18 @@ class ConversationalPipeline:
             from .nlp.schema_mapper import SchemaMapper
             from .query.builder import QueryBuilder
             from .query.validator import QueryValidator
+            from .query.advanced_builder import AdvancedQueryBuilder, QueryValidator as AdvancedValidator
+            from .ai.response_generator import ResponseGenerator
             
             # Initialize components
             self.intent_classifier = IntentClassifier()
             self.entity_extractor = EntityExtractor()
             self.schema_mapper = SchemaMapper()
             self.query_builder = QueryBuilder()
+            self.advanced_query_builder = AdvancedQueryBuilder()
             self.query_validator = QueryValidator()
+            self.advanced_validator = AdvancedValidator()
+            self.response_generator = ResponseGenerator()
             
             self.initialized = True
             logger.info("Pipeline initialized successfully")
@@ -84,6 +89,9 @@ class ConversationalPipeline:
             intent, confidence = self.intent_classifier.classify_intent(query)
             result["intent"] = intent.value if hasattr(intent, 'value') else str(intent)
             result["confidence"] = confidence
+            
+            # Store intent for AI suggestions
+            self._last_intent = result["intent"]
             
             # Step 2: Entity Extraction
             raw_entities = self.entity_extractor.extract_entities(query)
@@ -151,6 +159,16 @@ class ConversationalPipeline:
         Returns:
             SIEM query dictionary
         """
+        # Use advanced query builder if available
+        if hasattr(self, 'advanced_query_builder') and self.advanced_query_builder:
+            return self.advanced_query_builder.build_query(
+                intent=intent,
+                entities=entities,
+                field_mappings=field_mappings,
+                context=context
+            )
+        
+        # Fallback to basic query builder
         if not self.query_builder:
             from .query.builder import QueryBuilder
             self.query_builder = QueryBuilder()
@@ -175,6 +193,11 @@ class ConversationalPipeline:
         Returns:
             Tuple of (is_valid, error_message)
         """
+        # Use advanced validator if available
+        if hasattr(self, 'advanced_validator') and self.advanced_validator:
+            return await self.advanced_validator.validate_query(query)
+        
+        # Fallback to basic validator
         if not self.query_validator:
             from .query.validator import QueryValidator
             self.query_validator = QueryValidator()
@@ -258,6 +281,15 @@ class ConversationalPipeline:
         Returns:
             Natural language summary
         """
+        # Use AI response generator if available
+        if hasattr(self, 'response_generator') and self.response_generator:
+            return await self.response_generator.generate_summary(
+                results=results,
+                query=query,
+                intent=intent
+            )
+        
+        # Fallback to template-based summary
         if not results:
             return "No results found for your query."
         
@@ -347,6 +379,16 @@ class ConversationalPipeline:
         Returns:
             List of suggested queries
         """
+        # Use AI response generator if available
+        if hasattr(self, 'response_generator') and self.response_generator:
+            intent = getattr(self, '_last_intent', 'unknown')
+            return await self.response_generator.generate_follow_up_questions(
+                query=current_query,
+                results=results,
+                intent=intent
+            )
+        
+        # Fallback to template-based suggestions
         suggestions = []
         
         if results:
