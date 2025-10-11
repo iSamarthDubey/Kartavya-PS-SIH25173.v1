@@ -6,6 +6,7 @@ streamlit>=1.50.0
 fastapi>=0.118.0
 uvicorn[standard]>=0.37.0
 pydantic>=2.11.0
+pydantic-settings>=2.4.0
 python-multipart>=0.0.20
 
 # Machine Learning & NLP
