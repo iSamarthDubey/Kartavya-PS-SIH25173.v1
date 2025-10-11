@@ -1,0 +1,313 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* SYNRGY Global Styles */
+
+@layer base {
+  :root {
+    /* SYNRGY Brand Colors */
+    --synrgy-bg-900: #0A0F1E;
+    --synrgy-primary: #00EFFF;
+    --synrgy-accent: #FF7A00;
+    --synrgy-muted: #94A3B8;
+    --synrgy-surface: #0F1724;
+    --synrgy-text: #E6EEF8;
+    
+    /* Semantic Colors for shadcn/ui compatibility */
+    --background: 10 15 30;
+    --foreground: 230 238 248;
+    --card: 15 23 36;
+    --card-foreground: 230 238 248;
+    --popover: 15 23 36;
+    --popover-foreground: 230 238 248;
+    --primary: 0 239 255;
+    --primary-foreground: 10 15 30;
+    --secondary: 148 163 184;
+    --secondary-foreground: 10 15 30;
+    --muted: 148 163 184;
+    --muted-foreground: 230 238 248;
+    --accent: 255 122 0;
+    --accent-foreground: 10 15 30;
+    --destructive: 239 68 68;
+    --destructive-foreground: 230 238 248;
+    --border: 30 41 59;
+    --input: 30 41 59;
+    --ring: 0 239 255;
+    --radius: 0.5rem;
+  }
+  
+  /* Dark mode is default for SYNRGY */
+  .dark {
+    --background: 10 15 30;
+    --foreground: 230 238 248;
+  }
+  
+  /* Font faces */
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--synrgy-bg-900);
+    color: var(--synrgy-text);
+  }
+  
+  body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    background-color: var(--synrgy-bg-900);
+    color: var(--synrgy-text);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-variation-settings: normal;
+    overflow-x: hidden;
+  }
+  
+  /* Headings use Space Grotesk */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+  }
+  
+  /* Better antialiasing */
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Custom scrollbars */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: var(--synrgy-bg-900);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: var(--synrgy-muted);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--synrgy-primary);
+  }
+  
+  /* Focus rings with SYNRGY colors */
+  *:focus-visible {
+    outline: 2px solid var(--synrgy-primary);
+    outline-offset: 2px;
+  }
+  
+  /* Selection colors */
+  ::selection {
+    background-color: var(--synrgy-primary);
+    color: var(--synrgy-bg-900);
+  }
+  
+  ::-moz-selection {
+    background-color: var(--synrgy-primary);
+    color: var(--synrgy-bg-900);
+  }
+}
+
+@layer components {
+  /* SYNRGY Button Styles */
+  .btn-primary {
+    @apply bg-synrgy-primary text-synrgy-bg-900 hover:bg-synrgy-primary/90 focus:bg-synrgy-primary/90;
+    @apply font-semibold px-4 py-2 rounded-lg transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-synrgy-primary/50 focus:ring-offset-2 focus:ring-offset-synrgy-bg-900;
+    @apply active:scale-95;
+  }
+  
+  .btn-secondary {
+    @apply bg-synrgy-surface text-synrgy-text border border-synrgy-primary/20;
+    @apply hover:border-synrgy-primary/40 hover:bg-synrgy-primary/5;
+    @apply font-semibold px-4 py-2 rounded-lg transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-synrgy-primary/50 focus:ring-offset-2 focus:ring-offset-synrgy-bg-900;
+  }
+  
+  .btn-accent {
+    @apply bg-synrgy-accent text-synrgy-bg-900 hover:bg-synrgy-accent/90 focus:bg-synrgy-accent/90;
+    @apply font-semibold px-4 py-2 rounded-lg transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-synrgy-accent/50 focus:ring-offset-2 focus:ring-offset-synrgy-bg-900;
+  }
+  
+  .btn-ghost {
+    @apply bg-transparent text-synrgy-text hover:bg-synrgy-primary/10 hover:text-synrgy-primary;
+    @apply font-medium px-4 py-2 rounded-lg transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-synrgy-primary/50 focus:ring-offset-2 focus:ring-offset-synrgy-bg-900;
+  }
+  
+  /* SYNRGY Card Styles */
+  .card {
+    @apply bg-synrgy-surface border border-synrgy-primary/10 rounded-xl shadow-lg;
+    @apply backdrop-blur-sm;
+  }
+  
+  .card-hover {
+    @apply card hover:border-synrgy-primary/20 hover:shadow-synrgy-glow transition-all duration-300;
+    @apply hover:-translate-y-1;
+  }
+  
+  .card-glow {
+    @apply card border-synrgy-primary/30 shadow-synrgy-glow;
+  }
+  
+  /* SYNRGY Input Styles */
+  .input {
+    @apply bg-synrgy-surface border border-synrgy-primary/20 text-synrgy-text placeholder:text-synrgy-muted;
+    @apply rounded-lg px-3 py-2 focus:border-synrgy-primary focus:ring-2 focus:ring-synrgy-primary/20 focus:outline-none;
+    @apply transition-all duration-200;
+  }
+  
+  .input-large {
+    @apply input px-4 py-3 text-lg;
+  }
+  
+  /* Chat-specific styles */
+  .chat-bubble {
+    @apply max-w-[80%] p-4 rounded-2xl break-words;
+  }
+  
+  .chat-bubble-user {
+    @apply chat-bubble bg-synrgy-primary text-synrgy-bg-900 ml-auto rounded-br-sm;
+  }
+  
+  .chat-bubble-assistant {
+    @apply chat-bubble bg-synrgy-surface border border-synrgy-primary/10 mr-auto rounded-bl-sm;
+  }
+  
+  .chat-bubble-system {
+    @apply chat-bubble bg-synrgy-accent/10 border border-synrgy-accent/20 text-synrgy-accent text-center mx-auto text-sm;
+  }
+  
+  /* Typography utilities */
+  .text-gradient {
+    @apply bg-gradient-to-r from-synrgy-primary to-synrgy-accent bg-clip-text text-transparent;
+  }
+  
+  .heading-xl {
+    @apply text-3xl md:text-4xl lg:text-5xl font-heading font-bold text-gradient leading-tight;
+  }
+  
+  .heading-lg {
+    @apply text-2xl md:text-3xl font-heading font-bold text-synrgy-text leading-tight;
+  }
+  
+  .heading-md {
+    @apply text-xl md:text-2xl font-heading font-semibold text-synrgy-text;
+  }
+  
+  /* Animation utilities */
+  .animate-pulse-glow {
+    @apply animate-pulse-glow;
+  }
+  
+  .animate-fade-in {
+    @apply animate-fade-in;
+  }
+  
+  /* Loading states */
+  .loading-dots::after {
+    content: '';
+    animation: dots 1.5s steps(5, end) infinite;
+  }
+  
+  @keyframes dots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+  }
+  
+  /* Glassmorphism effect */
+  .glass {
+    @apply bg-synrgy-surface/80 backdrop-blur-md border border-synrgy-primary/20;
+  }
+  
+  .glass-strong {
+    @apply bg-synrgy-surface/90 backdrop-blur-lg border border-synrgy-primary/30;
+  }
+  
+  /* Utility for hiding scrollbars but keeping functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer utilities {
+  /* Custom grid areas for dashboard */
+  .grid-dashboard {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    gap: 1rem;
+    height: calc(100vh - 4rem);
+  }
+  
+  /* Responsive text sizing */
+  .text-responsive {
+    font-size: clamp(0.875rem, 2.5vw, 1rem);
+  }
+  
+  .text-responsive-lg {
+    font-size: clamp(1.125rem, 3vw, 1.25rem);
+  }
+  
+  .text-responsive-xl {
+    font-size: clamp(1.5rem, 4vw, 2rem);
+  }
+  
+  /* Safe area utilities for mobile */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Print styles */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-break-before {
+    page-break-before: always;
+  }
+  
+  .print-break-after {
+    page-break-after: always;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
