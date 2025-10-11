@@ -23,7 +23,7 @@ export default function Hybrid() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="w-full h-screen bg-synrgy-bg-900"
+        className="h-full overflow-hidden"
       >
         <HybridConsole className="w-full h-full" />
       </motion.div>

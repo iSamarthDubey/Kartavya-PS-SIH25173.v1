@@ -11,13 +11,14 @@ import HybridPage from '@/pages/Hybrid'
 import ReportsPage from '@/pages/Reports'
 import InvestigationsPage from '@/pages/Investigations'
 import AdminPage from '@/pages/Admin'
+import SettingsPage from '@/pages/Settings'
 
 // Layout components
 import AppLayout from '@/components/Layout/AppLayout'
 import LoadingScreen from '@/components/ui/LoadingScreen'
 
 // Utility to check if route requires authentication
-const protectedRoutes = ['/dashboard', '/chat', '/hybrid', '/reports', '/investigations', '/admin']
+const protectedRoutes = ['/dashboard', '/chat', '/hybrid', '/reports', '/investigations', '/admin', '/settings']
 
 function App() {
   const { isAuthenticated, user } = useAuth()
@@ -47,6 +48,8 @@ function App() {
       setMode('investigations')
     } else if (path === '/admin') {
       setMode('admin')
+    } else if (path === '/settings') {
+      setMode('settings')
     }
   }, [checkSystemHealth, setMode, location.pathname])
 
@@ -161,6 +164,19 @@ function App() {
             ) : (
               <AppLayout>
                 <AdminPage />
+              </AppLayout>
+            )
+          } 
+        />
+        
+        <Route 
+          path="/settings" 
+          element={
+            shouldRedirectToLogin ? (
+              <Navigate to="/login" replace />
+            ) : (
+              <AppLayout>
+                <SettingsPage />
               </AppLayout>
             )
           } 

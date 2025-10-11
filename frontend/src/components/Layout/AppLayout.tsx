@@ -7,7 +7,9 @@ import {
   Search, 
   Settings, 
   Shield,
-  Activity
+  Activity,
+  UserCog,
+  LogOut
 } from 'lucide-react'
 import { useAuth } from '@/stores/appStore'
 
@@ -21,6 +23,14 @@ const navigation = [
   { name: 'Hybrid', href: '/hybrid', icon: Activity },
   { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Investigations', href: '/investigations', icon: Search },
+]
+
+const adminNavigation = [
+  { name: 'Admin Panel', href: '/admin', icon: UserCog },
+]
+
+const bottomNavigation = [
+  { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
 export default function AppLayout({ children }: AppLayoutProps) {
@@ -41,8 +51,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
           
           {/* Navigation */}
-          <nav className="flex-1 px-3">
-            <ul className="space-y-1">
+          <nav className="flex-1 px-3 flex flex-col">
+            {/* Main Navigation */}
+            <ul className="space-y-1 mb-6">
               {navigation.map((item) => {
                 const isActive = location.pathname === item.href
                 return (
@@ -62,11 +73,66 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 )
               })}
             </ul>
+
+            {/* Admin Navigation (only for admins) */}
+            {user?.role === 'admin' && (
+              <>
+                <div className="px-3 mb-2">
+                  <div className="text-xs font-medium text-synrgy-muted uppercase tracking-wide">
+                    Administration
+                  </div>
+                </div>
+                <ul className="space-y-1 mb-6">
+                  {adminNavigation.map((item) => {
+                    const isActive = location.pathname === item.href
+                    return (
+                      <li key={item.name}>
+                        <button
+                          onClick={() => navigate(item.href)}
+                          className={`w-full flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
+                            isActive
+                              ? 'bg-synrgy-primary/10 text-synrgy-primary border border-synrgy-primary/20'
+                              : 'text-synrgy-muted hover:text-synrgy-text hover:bg-synrgy-primary/5'
+                          }`}
+                        >
+                          <item.icon className="w-5 h-5 mr-3" />
+                          {item.name}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </>
+            )}
+
+            {/* Bottom Navigation */}
+            <div className="mt-auto">
+              <ul className="space-y-1">
+                {bottomNavigation.map((item) => {
+                  const isActive = location.pathname === item.href
+                  return (
+                    <li key={item.name}>
+                      <button
+                        onClick={() => navigate(item.href)}
+                        className={`w-full flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
+                          isActive
+                            ? 'bg-synrgy-primary/10 text-synrgy-primary border border-synrgy-primary/20'
+                            : 'text-synrgy-muted hover:text-synrgy-text hover:bg-synrgy-primary/5'
+                        }`}
+                      >
+                        <item.icon className="w-5 h-5 mr-3" />
+                        {item.name}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
           </nav>
           
-          {/* User info */}
+          {/* User info with logout */}
           <div className="p-4 border-t border-synrgy-primary/10">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mb-3">
               <div className="w-8 h-8 bg-synrgy-primary/10 rounded-full flex items-center justify-center">
                 <Shield className="w-4 h-4 text-synrgy-primary" />
               </div>
@@ -79,6 +145,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </p>
               </div>
             </div>
+            
+            {/* Logout Button */}
+            <button
+              onClick={logout}
+              className="w-full flex items-center px-3 py-2 text-sm text-synrgy-muted hover:text-synrgy-text hover:bg-synrgy-primary/5 rounded-lg transition-colors"
+            >
+              <LogOut className="w-4 h-4 mr-3" />
+              Sign out
+            </button>
           </div>
         </div>
         
