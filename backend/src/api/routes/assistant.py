@@ -75,8 +75,8 @@ async def chat(
         # Get dependencies
         pipeline = get_pipeline()
         context_manager = get_context_manager()
-        siem_connector = get_siem_connector()
-        schema_mapper = get_schema_mapper()
+        siem_connector = get_siem_connector()  # Can be None in offline mode
+        schema_mapper = get_schema_mapper()  # Can be None in offline mode
         
         # Generate conversation ID if not provided
         conversation_id = request.conversation_id or f"conv_{uuid.uuid4().hex[:8]}"
@@ -134,8 +134,29 @@ async def chat(
         intent = result.get("intent", "unknown")
         confidence = result.get("confidence", 0.0)
         
-        # Map entities to SIEM schema
-        field_mappings = await schema_mapper.map_entities(entities)
+        # Handle offline mode
+        if not siem_connector:
+            return ChatResponse(
+                conversation_id=conversation_id,
+                query=request.query,
+                intent=intent,
+                confidence=confidence,
+                entities=entities,
+                siem_query={},
+                results=[],
+                summary="I'm currently running in offline mode. To process security queries, please connect to a SIEM platform like Elasticsearch, Splunk, or QRadar.",
+                metadata={"timestamp": datetime.now().isoformat(), "mode": "offline"},
+                status="offline",
+                error=None
+            )
+        
+        # Map entities to SIEM schema (skip if no schema mapper)
+        field_mappings = {}
+        if schema_mapper:
+            field_mappings = await schema_mapper.map_entities(entities)
+        else:
+            # Basic fallback mapping
+            field_mappings = {entity.get("type", "field"): entity.get("value", "") for entity in entities if isinstance(entity, dict)}
         
         # Build SIEM query
         siem_query = await pipeline.build_query(

@@ -58,30 +58,49 @@ async def lifespan(app: FastAPI):
         await app_state["pipeline"].initialize()
         logger.info("✅ Pipeline initialized")
         
-        # Initialize SIEM connector - FORCE ELASTICSEARCH
-        siem_platform = os.getenv("DEFAULT_SIEM_PLATFORM", "elasticsearch")
-        logger.info(f"🎯 FORCING ELASTICSEARCH: Using {siem_platform} platform")
+        # Initialize SIEM connector - Platform agnostic approach
+        siem_platform = os.getenv("DEFAULT_SIEM_PLATFORM", "auto")
+        logger.info(f"🎯 Initializing SIEM platform: {siem_platform}")
         
-        # DIRECTLY CREATE ELASTICSEARCH CONNECTOR
-        from src.connectors.elastic import ElasticConnector
+        # Try to auto-detect or use specified platform
         try:
-            es_connector = ElasticConnector()
-            if es_connector.is_available():
-                app_state["siem_connector"] = es_connector
-                logger.info("🔥 SUCCESS: Using live Elasticsearch with your Windows data!")
+            if siem_platform == "auto":
+                # Try to detect available platforms
+                connector = None
+                
+                # Try Elasticsearch first
+                try:
+                    from src.connectors.elastic import ElasticConnector
+                    es_connector = ElasticConnector()
+                    if es_connector.is_available():
+                        connector = es_connector
+                        logger.info("✅ Auto-detected: Using Elasticsearch")
+                except Exception:
+                    logger.info("Elasticsearch not available, trying other platforms...")
+                
+                # Try other platforms if Elasticsearch fails
+                if not connector:
+                    try:
+                        connector = create_connector("splunk")
+                        if hasattr(connector, 'is_available') and connector.is_available():
+                            logger.info("✅ Auto-detected: Using Splunk")
+                        else:
+                            connector = None
+                    except Exception:
+                        pass
+                
+                if not connector:
+                    logger.info("⚠️ No live SIEM detected, running in offline mode")
+                    app_state["siem_connector"] = None
+                else:
+                    app_state["siem_connector"] = connector
             else:
-                logger.warning("⚠️ Elasticsearch not available, using dataset fallback")
-                app_state["siem_connector"] = create_connector("dataset")
-                # Only call connect on dataset connector
-                if hasattr(app_state["siem_connector"], 'connect'):
-                    await app_state["siem_connector"].connect()
+                # Use specified platform
+                app_state["siem_connector"] = create_connector(siem_platform)
+                logger.info(f"✅ Using specified platform: {siem_platform}")
         except Exception as e:
-            logger.error(f"❌ Elasticsearch failed: {e}, using dataset fallback")
-            app_state["siem_connector"] = create_connector("dataset")
-            # Only call connect on dataset connector
-            if hasattr(app_state["siem_connector"], 'connect'):
-                await app_state["siem_connector"].connect()
-        logger.info(f"✅ {siem_platform} connector initialized")
+            logger.error(f"❌ SIEM initialization failed: {e}, running in offline mode")
+            app_state["siem_connector"] = None
         
         # Initialize context manager
         app_state["context_manager"] = ContextManager()
@@ -246,9 +265,7 @@ def get_pipeline():
     return app_state["pipeline"]
 
 def get_siem_connector():
-    """Dependency to get SIEM connector"""
-    if not app_state["siem_connector"]:
-        raise HTTPException(status_code=503, detail="SIEM connector not initialized")
+    """Dependency to get SIEM connector - returns None if not available"""
     return app_state["siem_connector"]
 
 def get_context_manager():
@@ -258,9 +275,7 @@ def get_context_manager():
     return app_state["context_manager"]
 
 def get_schema_mapper():
-    """Dependency to get schema mapper"""
-    if not app_state["schema_mapper"]:
-        raise HTTPException(status_code=503, detail="Schema mapper not initialized")
+    """Dependency to get schema mapper - returns None if not available"""
     return app_state["schema_mapper"]
 
 # Create a router instance for the main.py to export
