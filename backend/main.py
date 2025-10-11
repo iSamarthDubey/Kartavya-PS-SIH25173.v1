@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Kartavya SIEM Assistant - Main Entry Point
+Backend - Main Entry Point
 Run: python main.py
 
 Enhancements:
@@ -47,7 +47,7 @@ if __name__ == "__main__":
         sys.exit(2)
 
     # Print startup banner (no secrets)
-    print("🚀 Starting Kartavya SIEM Assistant Backend...")
+    print("🚀 Starting Backend...")
     print(f"📖 API docs: http://localhost:{final_port}/api/docs")
     print(f"💬 Chat: http://localhost:{final_port}/api/assistant/chat")
     print(f"❤️ Health: http://localhost:{final_port}/health")
