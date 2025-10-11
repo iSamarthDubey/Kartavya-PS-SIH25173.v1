@@ -63,9 +63,14 @@ if __name__ == "__main__":
             "src.api.main:app",
             host=host,
             port=final_port,
-            reload=True,
+            reload=False,
+            workers=1,
+            lifespan="on",
             log_level=os.getenv("UVICORN_LOG_LEVEL", os.getenv("LOG_LEVEL", "info")).lower(),
         )
+    except KeyboardInterrupt:
+        log.info("🛑 Server stopped by user (Ctrl+C)")
+        sys.exit(0)
     except Exception as e:
-        log.exception(f"Failed to start server: {e}")
+        log.exception(f"❌ Failed to start server: {e}")
         sys.exit(1)
