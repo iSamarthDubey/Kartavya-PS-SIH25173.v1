@@ -33,7 +33,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   const { user, token } = useAppStore()
 
   // Get WebSocket URL from environment or default
-  const wsUrl = options.url || `ws://localhost:8001/ws`
+  const wsUrl = options.url || 
+    import.meta.env.VITE_WS_BASE_URL || 
+    'ws://localhost:8000/ws/chat'
 
   const updateConnectionState = useCallback(() => {
     const service = wsServiceRef.current
@@ -66,10 +68,16 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
 
   const connect = useCallback(async () => {
     try {
+      // Generate or use existing session ID
+      const sessionId = crypto.randomUUID()
+      const fullWsUrl = wsUrl.includes('/ws/chat') ? 
+        `${wsUrl}/${sessionId}` : 
+        `${wsUrl}/chat/${sessionId}`
+      
       // Create or get existing service
       if (!wsServiceRef.current) {
         wsServiceRef.current = createWebSocketService({
-          url: wsUrl,
+          url: fullWsUrl,
           token: token || undefined,
           autoReconnect: true,
           maxReconnectAttempts: 5,

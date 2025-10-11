@@ -155,33 +155,84 @@ export const dashboardApi = {
 
 // ===== Query APIs =====
 export const queryApi = {
+  // Execute natural language query
   execute: async (data: {
-    dsl: Record<string, any>
-    size?: number
-    execute?: boolean
+    query: string
+    params?: Record<string, any>
+    context?: Record<string, any>
   }) => {
-    const response = await api.post<ApiResponse<{
-      hits: any
-      aggregations?: any
-      took: number
-      warnings?: string[]
-    }>>('/query/run', data)
+    const response = await api.post<{
+      success: boolean
+      data?: {
+        query: string
+        intent: string
+        entities: any[]
+        summary: string
+        results: any[]
+        visualizations: any[]
+        suggestions: string[]
+        total_count: number
+        query_performance: {
+          execution_time_ms: number
+          data_sources: string[]
+        }
+      }
+      error?: string
+      metadata?: any
+    }>('/query/execute', data)
     return response.data
   },
 
-  validate: async (dsl: Record<string, any>) => {
-    const response = await api.post<ApiResponse<{
-      valid: boolean
-      errors?: string[]
-      warnings?: string[]
-    }>>('/query/validate', { dsl })
+  // Translate natural language to SIEM query
+  translate: async (data: {
+    query: string
+    params?: Record<string, any>
+  }) => {
+    const response = await api.post<{
+      success: boolean
+      data?: {
+        original_query: string
+        intent: string
+        entities: any[]
+        siem_query: any
+        confidence: number
+      }
+      error?: string
+    }>('/query/translate', data)
     return response.data
   },
 
-  suggest: async (partialQuery: string) => {
-    const response = await api.post<ApiResponse<string[]>>('/query/suggest', { 
-      text: partialQuery 
-    })
+  // Get query suggestions
+  getSuggestions: async () => {
+    const response = await api.get<{
+      success: boolean
+      data?: {
+        security_events: string[]
+        user_activity: string[]
+        network_analysis: string[]
+        system_monitoring: string[]
+      }
+      error?: string
+    }>('/query/suggestions')
+    return response.data
+  },
+
+  // Optimize query for better performance
+  optimize: async (data: {
+    query: string
+    params?: Record<string, any>
+  }) => {
+    const response = await api.post<{
+      success: boolean
+      data?: {
+        original_query: string
+        optimized_query: string
+        suggestions: string[]
+        performance_tips: string[]
+        estimated_improvement: string
+      }
+      error?: string
+    }>('/query/optimize', data)
     return response.data
   }
 }
