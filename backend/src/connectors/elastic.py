@@ -781,3 +781,16 @@ class ElasticConnector:
         except Exception as e:
             logger.error(f"Failed to get cluster health: {e}")
             return {'status': 'unknown', 'error': str(e)}
+    
+    async def disconnect(self) -> None:
+        """Disconnect from Elasticsearch (shutdown gracefully)."""
+        try:
+            if self.client:
+                # Elasticsearch client doesn't require explicit disconnect
+                # Just set client to None and log the disconnection
+                logger.info("Disconnecting from Elasticsearch")
+                self.client = None
+                self._available = False
+                logger.info("Successfully disconnected from Elasticsearch")
+        except Exception as e:
+            logger.warning(f"Error during Elasticsearch disconnect: {e}")
