@@ -92,8 +92,7 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
     const config = card.config || {}
     const xField = config.x_field || 'x'
     const yField = config.y_field || 'y'
-    const colorField = config.color_field
-    const sizeField = config.size_field
+    // Dynamic field mapping configuration available for future use
     
     // Process data with dynamic field mapping
     const processedData = card.data.map((item: any) => ({
@@ -369,11 +368,11 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
         
         {/* Data-driven network content */}
         <div className="space-y-4">
-          {card.data?.nodes && (
+          {card.data && typeof card.data === 'object' && (card.data as any).nodes && (
             <div>
               <div className="text-sm font-medium text-synrgy-text mb-2">Network Nodes</div>
               <div className="grid grid-cols-2 gap-2">
-                {card.data.nodes.slice(0, 8).map((node: any, idx: number) => (
+                {((card.data as any).nodes as any[]).slice(0, 8).map((node: any, idx: number) => (
                   <div key={idx} className="flex items-center gap-2 p-2 bg-synrgy-surface/50 rounded">
                     <div className={`w-3 h-3 rounded-full ${node.type === 'source' ? 'bg-synrgy-primary' : 'bg-synrgy-accent'}`} />
                     <div className="text-xs text-synrgy-text truncate">
@@ -385,11 +384,11 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
             </div>
           )}
           
-          {card.data?.edges && (
+          {card.data && typeof card.data === 'object' && (card.data as any).edges && (
             <div>
               <div className="text-sm font-medium text-synrgy-text mb-2">Network Connections</div>
               <div className="space-y-1">
-                {card.data.edges.slice(0, 5).map((edge: any, idx: number) => (
+                {((card.data as any).edges as any[]).slice(0, 5).map((edge: any, idx: number) => (
                   <div key={idx} className="text-xs text-synrgy-muted flex items-center gap-2">
                     <span>{edge.source}</span>
                     <span>→</span>
@@ -429,7 +428,7 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
           <div className="text-synrgy-text leading-relaxed">
             {typeof card.value === 'string' ? card.value : 
              typeof card.data === 'string' ? card.data :
-             card.data?.narrative || card.data?.content || 'No narrative content available'}
+             (card.data && typeof card.data === 'object' ? (card.data as any).narrative || (card.data as any).content : null) || 'No narrative content available'}
           </div>
         </div>
       </motion.div>

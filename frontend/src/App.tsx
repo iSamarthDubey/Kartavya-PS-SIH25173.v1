@@ -59,11 +59,11 @@ function App() {
 
   // Show loading screen during initial app load
   if (loading) {
-    return <LoadingScreen message="Initializing SYNRGY..." />
+    return <LoadingScreen message="Initializing ＳＹＮＲＧＹ..." />
   }
 
   return (
-    <div className="h-screen bg-synrgy-bg-900 text-synrgy-text overflow-hidden">
+    <div className="min-h-screen bg-synrgy-bg-900 text-synrgy-text">
       <Routes>
         {/* Public routes */}
         <Route 

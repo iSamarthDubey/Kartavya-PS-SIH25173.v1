@@ -26,7 +26,7 @@ import { useQuery } from '@tanstack/react-query'
 
 import SummaryCardComponent from './SummaryCard'
 import DashboardGrid from './DashboardGrid'
-import { dashboardApi } from '@/services/api'
+import { dashboardApi, windowsApi } from '@/services/api'
 import { useAppStore } from '@/stores/appStore'
 import { useHybridStore } from '@/stores/hybridStore'
 import type { SummaryCard } from '@/types'
@@ -38,60 +38,8 @@ interface DashboardMainProps {
   className?: string
 }
 
-// Mock data for demo (in production, this comes from your backend)
-const MOCK_SUMMARY_CARDS: SummaryCard[] = [
-  {
-    title: "Active Alerts",
-    value: 42,
-    change: { value: -12, trend: 'down', period: 'last hour' },
-    status: 'warning',
-    color: 'accent'
-  },
-  {
-    title: "Critical Events", 
-    value: 8,
-    change: { value: 25, trend: 'up', period: 'today' },
-    status: 'critical',
-    color: 'danger'
-  },
-  {
-    title: "Response Time",
-    value: "2.3m",
-    change: { value: -8, trend: 'down', period: 'this week' },
-    status: 'normal',
-    color: 'primary'
-  },
-  {
-    title: "Connected SIEMs",
-    value: 3,
-    change: { value: 0, trend: 'stable', period: 'today' },
-    status: 'normal',
-    color: 'primary'
-  }
-]
-
-const MOCK_THREAT_DATA = [
-  { name: '00:00', threats: 12, blocked: 10 },
-  { name: '04:00', threats: 19, blocked: 15 },
-  { name: '08:00', threats: 25, blocked: 22 },
-  { name: '12:00', threats: 31, blocked: 28 },
-  { name: '16:00', threats: 18, blocked: 16 },
-  { name: '20:00', threats: 14, blocked: 12 },
-]
-
-const MOCK_TOP_THREATS = [
-  { name: 'Brute Force', value: 45, color: '#FF7A00' },
-  { name: 'Malware', value: 23, color: '#00EFFF' },
-  { name: 'Phishing', value: 18, color: '#22D3EE' },
-  { name: 'DDoS', value: 14, color: '#F97316' }
-]
-
-const MOCK_GEO_DATA = [
-  { country: 'United States', threats: 45, lat: 39.8283, lng: -98.5795 },
-  { country: 'China', threats: 32, lat: 35.8617, lng: 104.1954 },
-  { country: 'Russia', threats: 28, lat: 61.5240, lng: 105.3188 },
-  { country: 'Brazil', threats: 19, lat: -14.2350, lng: -51.9253 },
-]
+// Dynamic data colors for charts
+const CHART_COLORS = ['#FF7A00', '#00EFFF', '#22D3EE', '#F97316', '#06B6D4', '#EA580C']
 
 export default function DashboardMain({ 
   onAskSynrgy, 
@@ -103,16 +51,33 @@ export default function DashboardMain({
   const { systemHealth } = useAppStore()
   const { pinnedWidgets, setHybridMode } = useHybridStore()
 
-  // Fetch dashboard data
+  // Fetch real Windows dashboard data
   const { data: dashboardData, refetch } = useQuery({
-    queryKey: ['dashboard-overview'],
-    queryFn: dashboardApi.getOverview,
+    queryKey: ['windows-dashboard-summary'],
+    queryFn: windowsApi.getDashboardSummary,
     refetchInterval: 30000, // Refresh every 30 seconds
+    retry: 2,
     meta: {
       onError: (error: any) => {
-        console.warn('Dashboard data fetch failed, using mock data:', error)
+        console.warn('Windows dashboard data fetch failed:', error)
       }
     }
+  })
+
+  // Fetch recent Windows events for activity section
+  const { data: eventsData } = useQuery({
+    queryKey: ['windows-recent-events'],
+    queryFn: () => windowsApi.getRecentEvents(5),
+    refetchInterval: 60000, // Refresh every minute
+    retry: 1
+  })
+
+  // Fetch system metrics for charts
+  const { data: metricsData } = useQuery({
+    queryKey: ['windows-system-metrics'],
+    queryFn: () => windowsApi.getSystemMetrics('6h'),
+    refetchInterval: 60000,
+    retry: 1
   })
 
   const handleRefresh = async () => {
@@ -124,7 +89,14 @@ export default function DashboardMain({
     }
   }
 
-  const summaryCards = (dashboardData as any)?.data?.summary_cards || MOCK_SUMMARY_CARDS
+  // Use real data from APIs
+  const summaryCards = dashboardData?.data?.summary_cards || []
+  const recentEvents = eventsData?.data?.events || []
+  const systemMetrics = metricsData?.data?.metrics || []
+  const threatData = systemMetrics?.threat_timeline || []
+  const topThreats = systemMetrics?.top_threats || []
+  const geoData = systemMetrics?.geo_distribution || []
+  const currentSystemHealth = dashboardData?.data?.system_health || systemHealth
 
   // If widgets are pinned and we're in hybrid mode, show the widget grid
   if (hybridMode && pinnedWidgets.length > 0) {
@@ -152,13 +124,13 @@ export default function DashboardMain({
           {/* System Health */}
           <div className="flex items-center gap-2 text-sm">
             <div className={`w-2 h-2 rounded-full ${
-              systemHealth?.health_score === 'excellent' ? 'bg-green-500' :
-              systemHealth?.health_score === 'good' ? 'bg-synrgy-accent' :
-              systemHealth?.health_score === 'degraded' ? 'bg-yellow-500' :
+              currentSystemHealth?.health_score === 'excellent' ? 'bg-green-500' :
+              currentSystemHealth?.health_score === 'good' ? 'bg-synrgy-accent' :
+              currentSystemHealth?.health_score === 'degraded' ? 'bg-yellow-500' :
               'bg-red-500'
             }`} />
             <span className="text-synrgy-muted">
-              System {systemHealth?.health_score || 'Unknown'}
+              System {currentSystemHealth?.health_score || 'Unknown'}
             </span>
           </div>
 
@@ -216,7 +188,7 @@ export default function DashboardMain({
 
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={MOCK_THREAT_DATA}>
+              <AreaChart data={threatData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" opacity={0.2} />
                 <XAxis 
                   dataKey="name" 
@@ -290,7 +262,7 @@ export default function DashboardMain({
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={MOCK_TOP_THREATS}
+                  data={topThreats}
                   cx="50%"
                   cy="50%"
                   innerRadius={40}
@@ -298,8 +270,8 @@ export default function DashboardMain({
                   paddingAngle={2}
                   dataKey="value"
                 >
-                  {MOCK_TOP_THREATS.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {topThreats.map((entry: any, index: number) => (
+                    <Cell key={`cell-${index}`} fill={entry.color || CHART_COLORS[index % CHART_COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip
@@ -316,15 +288,19 @@ export default function DashboardMain({
 
           {/* Legend */}
           <div className="space-y-2">
-            {MOCK_TOP_THREATS.map((threat) => (
+            {topThreats.length > 0 ? topThreats.map((threat: any, index: number) => (
               <div key={threat.name} className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: threat.color }} />
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: threat.color || CHART_COLORS[index % CHART_COLORS.length] }} />
                   <span className="text-synrgy-text">{threat.name}</span>
                 </div>
                 <span className="text-synrgy-muted">{threat.value}%</span>
               </div>
-            ))}
+            )) : (
+              <div className="text-center text-synrgy-muted py-4">
+                <p className="text-sm">No threat data available</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -352,29 +328,36 @@ export default function DashboardMain({
           </div>
 
           <div className="space-y-3">
-            {MOCK_GEO_DATA.map((country, index) => (
-              <motion.div
-                key={country.country}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-synrgy-accent rounded-full" />
-                  <span className="text-sm text-synrgy-text">{country.country}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-16 bg-synrgy-surface rounded-full h-2">
-                    <div 
-                      className="h-2 bg-synrgy-accent rounded-full transition-all duration-500"
-                      style={{ width: `${(country.threats / 50) * 100}%` }}
-                    />
+            {geoData.length > 0 ? geoData.map((country: any, index: number) => {
+              const maxThreats = Math.max(...geoData.map((c: any) => c.threats || 0))
+              return (
+                <motion.div
+                  key={country.country || country.name}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-synrgy-accent rounded-full" />
+                    <span className="text-sm text-synrgy-text">{country.country || country.name}</span>
                   </div>
-                  <span className="text-sm text-synrgy-muted w-8 text-right">{country.threats}</span>
-                </div>
-              </motion.div>
-            ))}
+                  <div className="flex items-center gap-2">
+                    <div className="w-16 bg-synrgy-surface rounded-full h-2">
+                      <div 
+                        className="h-2 bg-synrgy-accent rounded-full transition-all duration-500"
+                        style={{ width: `${maxThreats > 0 ? ((country.threats || 0) / maxThreats) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <span className="text-sm text-synrgy-muted w-8 text-right">{country.threats || 0}</span>
+                  </div>
+                </motion.div>
+              )
+            }) : (
+              <div className="text-center text-synrgy-muted py-4">
+                <p className="text-sm">No geographic data available</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -399,37 +382,34 @@ export default function DashboardMain({
           </div>
 
           <div className="space-y-4">
-            {[
-              { type: 'alert', message: 'Brute force attack blocked', time: '2 min ago', status: 'resolved' },
-              { type: 'warning', message: 'Unusual login pattern detected', time: '15 min ago', status: 'investigating' },
-              { type: 'info', message: 'System scan completed', time: '1 hour ago', status: 'completed' },
-              { type: 'alert', message: 'Malware signature updated', time: '2 hours ago', status: 'completed' },
-            ].map((activity, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="flex items-center gap-3 p-3 bg-synrgy-bg-900/30 rounded-lg"
-              >
-                <div className={`w-2 h-2 rounded-full ${
-                  activity.type === 'alert' ? 'bg-red-500' :
-                  activity.type === 'warning' ? 'bg-synrgy-accent' :
-                  'bg-synrgy-primary'
-                }`} />
-                <div className="flex-1">
-                  <p className="text-sm text-synrgy-text">{activity.message}</p>
-                  <p className="text-xs text-synrgy-muted">{activity.time}</p>
-                </div>
-                <div className={`text-xs px-2 py-1 rounded-full ${
-                  activity.status === 'resolved' ? 'bg-green-500/20 text-green-400' :
-                  activity.status === 'investigating' ? 'bg-synrgy-accent/20 text-synrgy-accent' :
-                  'bg-synrgy-primary/20 text-synrgy-primary'
-                }`}>
-                  {activity.status}
-                </div>
-              </motion.div>
-            ))}
+            {recentEvents.length > 0 ? recentEvents.map((event: any, index: number) => {
+              const eventTime = new Date(event.timestamp)
+              const timeAgo = `${Math.floor((Date.now() - eventTime.getTime()) / (1000 * 60))} min ago`
+              
+              return (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="flex items-center gap-3 p-3 bg-synrgy-bg-900/30 rounded-lg"
+                >
+                  <div className="w-2 h-2 rounded-full bg-synrgy-primary" />
+                  <div className="flex-1">
+                    <p className="text-sm text-synrgy-text">{event.message}</p>
+                    <p className="text-xs text-synrgy-muted">{timeAgo} • {event.host}</p>
+                  </div>
+                  <div className="text-xs px-2 py-1 rounded-full bg-synrgy-primary/20 text-synrgy-primary">
+                    Event {event.event_id}
+                  </div>
+                </motion.div>
+              )
+            }) : (
+              <div className="text-center text-synrgy-muted py-4">
+                <p>No recent Windows events found</p>
+                <p className="text-xs">Events from the last hour will appear here</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -439,40 +419,43 @@ export default function DashboardMain({
             <div className="w-8 h-8 bg-synrgy-primary/20 rounded-lg flex items-center justify-center">
               <Zap className="w-4 h-4 text-synrgy-primary" />
             </div>
-            <h3 className="text-lg font-semibold text-synrgy-text">SYNRGY Insights</h3>
+            <h3 className="text-lg font-semibold text-synrgy-text">ＳＹＮＲＧＹ Insights</h3>
           </div>
 
           <div className="space-y-4">
-            <div className="bg-synrgy-surface/50 border border-synrgy-primary/10 rounded-lg p-4">
-              <p className="text-sm text-synrgy-text mb-3">
-                I've detected unusual authentication patterns from 3 IP addresses. 
-                Would you like me to investigate?
-              </p>
-              
-              {onAskSynrgy && (
-                <button
-                  onClick={() => onAskSynrgy("Investigate the unusual authentication patterns you detected")}
-                  className="w-full btn-primary text-sm"
-                >
-                  Investigate Now
-                </button>
-              )}
-            </div>
-
-            <div className="bg-synrgy-surface/50 border border-synrgy-primary/10 rounded-lg p-4">
-              <p className="text-sm text-synrgy-text mb-3">
-                Your threat response time has improved by 23% this week.
-              </p>
-              
-              {onAskSynrgy && (
-                <button
-                  onClick={() => onAskSynrgy("Show me details about threat response time improvements")}
-                  className="w-full btn-secondary text-sm"
-                >
-                  View Details
-                </button>
-              )}
-            </div>
+            {dashboardData?.data?.insights?.length > 0 ? (
+              dashboardData.data.insights.map((insight: any, index: number) => (
+                <div key={index} className="bg-synrgy-surface/50 border border-synrgy-primary/10 rounded-lg p-4">
+                  <p className="text-sm text-synrgy-text mb-3">
+                    {insight.message}
+                  </p>
+                  
+                  {onAskSynrgy && insight.action && (
+                    <button
+                      onClick={() => onAskSynrgy(insight.action)}
+                      className="w-full btn-primary text-sm"
+                    >
+                      {insight.button_text || 'Investigate'}
+                    </button>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="bg-synrgy-surface/50 border border-synrgy-primary/10 rounded-lg p-4 text-center">
+                <p className="text-sm text-synrgy-muted mb-3">
+                  ＳＹＮＲＧＹ is analyzing your security data...
+                </p>
+                
+                {onAskSynrgy && (
+                  <button
+                    onClick={() => onAskSynrgy("Generate security insights from current data")}
+                    className="btn-secondary text-sm"
+                  >
+                    Ask for Insights
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

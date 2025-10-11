@@ -45,7 +45,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           {/* Logo */}
           <div className="p-6">
             <div className="text-gradient text-xl font-heading font-bold">
-              SYNRGY
+              ＳＹＮＲＧＹ
             </div>
             <p className="text-xs text-synrgy-muted mt-1">SIEM Assistant</p>
           </div>

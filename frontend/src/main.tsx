@@ -77,7 +77,7 @@ class ErrorBoundary extends React.Component<
             </h1>
             
             <p className="text-synrgy-muted mb-4">
-              SYNRGY encountered an unexpected error. Please refresh the page to continue.
+              ＳＹＮＲＧＹ encountered an unexpected error. Please refresh the page to continue.
             </p>
             
             {this.state.error && (

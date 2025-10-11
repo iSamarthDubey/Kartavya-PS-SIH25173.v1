@@ -1,18 +1,15 @@
 /**
- * Chat Store - Manages conversation state and chat history
+ * SYNRGY Chat Store - Clean SIEM Assistant implementation
  */
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { ChatMessage, ChatRequest, ConversationContext } from '@/types'
 import { chatApi } from '@/services/api'
-// Simple UUID generator for now
+
+// Simple UUID generator
 const uuidv4 = () => {
-  return 'xxxx-xxxx-xxxx-xxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0
-    const v = c == 'x' ? r : (r & 0x3 | 0x8)
-    return v.toString(16)
-  })
+  return Math.random().toString(36).substring(2) + Date.now().toString(36)
 }
 
 interface ChatState {
@@ -81,26 +78,6 @@ export const useChatStore = create<ChatState>()(
         // Generate conversation ID if not provided
         const conversationId = request.conversation_id || state.currentConversationId || uuidv4()
         
-        // Create user message
-        const userMessage: ChatMessage = {
-          id: uuidv4(),
-          conversation_id: conversationId,
-          role: 'user',
-          content: request.query,
-          timestamp: new Date().toISOString(),
-          status: 'success'
-        }
-
-        // Create pending assistant message
-        const assistantMessage: ChatMessage = {
-          id: uuidv4(),
-          conversation_id: conversationId,
-          role: 'assistant',
-          content: '',
-          timestamp: new Date().toISOString(),
-          status: 'pending'
-        }
-
         try {
           set({
             currentConversationId: conversationId,
@@ -109,55 +86,48 @@ export const useChatStore = create<ChatState>()(
             typing: true
           })
 
-          // Add user message and pending assistant message
+          // Add user message immediately
+          const userMessage: ChatMessage = {
+            id: uuidv4(),
+            conversation_id: conversationId,
+            role: 'user',
+            content: request.query,
+            timestamp: new Date().toISOString(),
+            status: 'success'
+          }
           get().addMessage(userMessage)
-          get().addMessage(assistantMessage)
 
-          // Send request to API
+          // Send request to SIEM backend (auto-detects platform)
           const response = await chatApi.sendMessage({
             ...request,
             conversation_id: conversationId
           })
 
-          // Update assistant message with response
-          get().updateMessage(assistantMessage.id, {
-            content: response.summary,
-            status: response.status as any,
+          // Add assistant response message
+          const assistantMessage: ChatMessage = {
+            id: uuidv4(),
+            conversation_id: conversationId,
+            role: 'assistant',
+            content: response.summary || 'I processed your security query.',
+            timestamp: new Date().toISOString(),
+            status: response.status === 'success' ? 'success' : 'error',
             error: response.error,
             metadata: {
               intent: response.intent,
               confidence: response.confidence,
-              processing_time: response.metadata?.processing_time,
               query_type: response.intent,
-              total_results: response.results?.length || 0
-            },
-            visual_payload: response.visualizations ? {
-              type: 'composite',
-              cards: response.visualizations.map(viz => ({
-                type: viz.type === 'time_series' ? 'chart' : viz.type as any,
-                title: viz.title,
-                data: viz.data,
-                config: viz.config,
-                chart_type: viz.config?.chart_type as any
-              }))
-            } : undefined
-          })
+              results_count: Object.keys(response.results || {}).length
+            }
+          }
+          get().addMessage(assistantMessage)
 
-          // Update context
+          // Update context (simplified)
           const newContext: ConversationContext = {
             conversation_id: conversationId,
-            history: [...state.messages, userMessage, {
-              ...assistantMessage,
-              content: response.summary,
-              status: response.status as any
-            }].slice(-10), // Keep last 10 messages
-            entities: response.entities.reduce((acc, entity) => {
-              acc[entity.type] = acc[entity.type] || []
-              acc[entity.type].push(entity.value)
-              return acc
-            }, {} as Record<string, any>),
+            history: [userMessage, assistantMessage],
+            entities: {},
             filters: [],
-            metadata: response.metadata
+            metadata: response.metadata || {}
           }
 
           set({
@@ -170,12 +140,17 @@ export const useChatStore = create<ChatState>()(
         } catch (error: any) {
           console.error('Failed to send message:', error)
           
-          // Update assistant message with error
-          get().updateMessage(assistantMessage.id, {
-            content: 'I apologize, but I encountered an error processing your request. Please try again.',
+          // Add error message
+          const errorMessage: ChatMessage = {
+            id: uuidv4(),
+            conversation_id: conversationId,
+            role: 'assistant',
+            content: 'I encountered an error processing your security query. Please try again.',
+            timestamp: new Date().toISOString(),
             status: 'error',
             error: error.message || 'Unknown error occurred'
-          })
+          }
+          get().addMessage(errorMessage)
 
           set({
             error: error.message || 'Failed to send message',

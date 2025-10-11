@@ -51,7 +51,7 @@ export default function LandingPage() {
               <span className="text-synrgy-bg-900 font-bold text-lg">S</span>
             </div>
             <span className="text-2xl font-heading font-bold text-gradient">
-              SYNRGY
+              ＳＹＮＲＧＹ
             </span>
           </motion.div>
 
@@ -88,18 +88,17 @@ export default function LandingPage() {
           >
             <h1 className="heading-xl mb-6">
               Human + AI. In Perfect{' '}
-              <span className="text-synrgy-primary">SYNRGY</span>
+              <span className="text-synrgy-primary">ＳＹＮＲＧＹ</span>
             </h1>
             
             <p className="text-xl text-synrgy-muted max-w-3xl mx-auto mb-12 leading-relaxed">
               Investigate, visualize and report security threats using natural conversation. 
-              SYNRGY transforms your SIEM into an intelligent conversational partner for 
-              cybersecurity investigations.
+              Transform your SIEM into an intelligent conversational partner for investigations.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/login" className="btn-primary text-lg px-8 py-4">
-                Try SYNRGY Now
+                Try ＳＹＮＲＧＹ Now
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Link>
               
@@ -179,7 +178,7 @@ export default function LandingPage() {
               </h2>
               
               <p className="text-lg text-synrgy-muted mb-8">
-                Join security teams using SYNRGY to investigate threats faster 
+                Join security teams using ＳＹＮＲＧＹ to investigate threats faster
                 and generate reports effortlessly.
               </p>
               
@@ -204,12 +203,12 @@ export default function LandingPage() {
                 <span className="text-synrgy-bg-900 font-bold">S</span>
               </div>
               <span className="text-xl font-heading font-bold text-gradient">
-                SYNRGY
+                ＳＹＮＲＧＹ
               </span>
             </div>
             
             <div className="text-synrgy-muted text-sm">
-              <p>Team Kartavya | ISRO Smart India Hackathon 2025</p>
+              <p>Team Kartavya | Smart India Hackathon 2025</p>
             </div>
           </div>
         </div>

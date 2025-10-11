@@ -83,8 +83,34 @@ export const authApi = {
 // ===== Chat & Assistant APIs =====
 export const chatApi = {
   sendMessage: async (request: ChatRequest): Promise<ChatResponse> => {
-    const response = await api.post<ChatResponse>('/assistant/chat', request)
-    return response.data
+    try {
+      // Try the standard assistant endpoint first
+      const response = await api.post<ChatResponse>('/assistant/chat', request)
+      return response.data
+    } catch (error: any) {
+      // If standard endpoint fails, try Windows-specific endpoint as fallback
+      if (error.response?.status === 400 || error.response?.status === 503) {
+        console.log('Standard endpoint failed, trying Windows-specific endpoint')
+        const windowsResponse = await windowsApi.simpleChat(request.query)
+        // Convert Windows response to standard ChatResponse format
+        return {
+          conversation_id: 'fallback',
+          query: request.query,
+          intent: windowsResponse.intent,
+          confidence: windowsResponse.confidence,
+          entities: windowsResponse.entities || [],
+          siem_query: windowsResponse.siem_query,
+          results: windowsResponse.results,
+          summary: windowsResponse.summary,
+          visualizations: windowsResponse.visualizations || [],
+          suggestions: windowsResponse.suggestions || [],
+          metadata: windowsResponse.metadata,
+          status: windowsResponse.status,
+          error: windowsResponse.error
+        }
+      }
+      throw error
+    }
   },
 
   clarify: async (data: {
@@ -124,6 +150,7 @@ export const chatApi = {
 // ===== Dashboard APIs =====
 export const dashboardApi = {
   getOverview: async () => {
+    // Use our new Windows data endpoint instead of static data
     const response = await api.get<ApiResponse<{
       summary_cards: Array<{
         title: string
@@ -133,7 +160,7 @@ export const dashboardApi = {
       }>
       recent_alerts: any[]
       system_health: any
-    }>>('/dashboard')
+    }>>('/windows/dashboard-summary')
     return response.data
   },
 
@@ -233,6 +260,81 @@ export const queryApi = {
       }
       error?: string
     }>('/query/optimize', data)
+    return response.data
+  }
+}
+
+// ===== Windows Data APIs =====
+export const windowsApi = {
+  getDashboardSummary: async () => {
+    const response = await api.get<{
+      success: boolean
+      data: {
+        summary_cards: Array<{
+          title: string
+          value: string | number
+          change: { value: number; trend: 'up' | 'down' | 'stable'; period: string }
+          status: 'normal' | 'warning' | 'critical'
+          color: string
+        }>
+        system_health: {
+          health_score: string
+          services: Record<string, boolean>
+        }
+      }
+    }>('/windows/dashboard-summary')
+    return response.data
+  },
+
+  getRecentEvents: async (limit: number = 10) => {
+    const response = await api.get<{
+      success: boolean
+      data: {
+        events: Array<{
+          timestamp: string
+          event_id: string
+          message: string
+          host: string
+          source: any
+        }>
+        total: number
+      }
+    }>(`/windows/recent-events?limit=${limit}`)
+    return response.data
+  },
+
+  getSystemMetrics: async (timeRange: string = '1h') => {
+    const response = await api.get<{
+      success: boolean
+      data: {
+        metrics: Array<{
+          timestamp: string
+          cpu_percent: number
+          memory_percent: number
+          host: string
+        }>
+        total: number
+      }
+    }>(`/windows/system-metrics?time_range=${timeRange}`)
+    return response.data
+  },
+
+  simpleChat: async (query: string) => {
+    const response = await api.post<{
+      conversation_id: string
+      query: string
+      intent: string
+      confidence: number
+      entities: any[]
+      siem_query: any
+      results: any
+      summary: string
+      visualizations: any[]
+      suggestions: string[]
+      metadata: any
+      status: string
+      error?: string
+    }>('/windows/simple-chat', { query })
     return response.data
   }
 }
@@ -380,6 +482,7 @@ export default {
   auth: authApi,
   chat: chatApi,
   dashboard: dashboardApi,
+  windows: windowsApi,
   query: queryApi,
   reports: reportsApi,
   investigations: investigationsApi,

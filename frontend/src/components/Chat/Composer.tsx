@@ -14,7 +14,7 @@ import {
 import { useChatStore } from '@/stores/chatStore'
 import { useQuery } from '@tanstack/react-query'
 import { chatApi } from '@/services/api'
-import { useWebSocket, useStreamingChat } from '../../hooks/useWebSocket'
+import { useWebSocket, useStreamingChat } from '@/hooks/useWebSocket'
 
 interface ComposerProps {
   className?: string
@@ -45,16 +45,22 @@ const QUICK_SUGGESTIONS = [
   }
 ]
 
-export default function Composer({ className = '', disabled = false, placeholder = "Ask SYNRGY anything..." }: ComposerProps) {
+export default function Composer({ className = '', disabled = false, placeholder = "Ask ＳＹＮＲＧＹ anything..." }: ComposerProps) {
   const [message, setMessage] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const { sendMessage, isLoading, context, suggestions, addMessage } = useChatStore()
+  const { sendMessage, isLoading, context, suggestions } = useChatStore()
   
-  // WebSocket streaming integration
-  const { isConnected, sendChatMessage } = useWebSocket()
-  const { sendStreamingQuery, isStreaming } = useStreamingChat()
+  // WebSocket for real-time features (but keep it simple)
+  const { isConnected } = useWebSocket({
+    autoConnect: true,
+    onConnect: () => console.log('WebSocket connected for real-time updates'),
+    onDisconnect: () => console.log('WebSocket disconnected, using HTTP mode')
+  })
+  
+  // Streaming chat capabilities
+  const { } = useStreamingChat()
 
   // Auto-resize textarea
   useEffect(() => {
@@ -80,20 +86,11 @@ export default function Composer({ className = '', disabled = false, placeholder
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!message.trim() || (isLoading || isStreaming) || disabled) return
+    if (!message.trim() || isLoading || disabled) return
 
-    const userMessage = {
-      id: `user_${Date.now()}`,
-      conversation_id: context?.conversation_id || 'new_conversation',
-      role: 'user' as const,
-      content: message.trim(),
-      timestamp: new Date().toISOString()
-    }
-
-    // Add user message to chat immediately
-    addMessage(userMessage)
+    const queryText = message.trim()
     
-    // Clear input
+    // Clear input immediately
     setMessage('')
     setShowSuggestions(false)
     
@@ -103,39 +100,11 @@ export default function Composer({ className = '', disabled = false, placeholder
     }
 
     try {
-      // Try WebSocket streaming first
-      if (isConnected) {
-        const success = sendStreamingQuery(
-          userMessage.content,
-          userMessage.conversation_id,
-          {
-            user_context: {},
-            filters: {},
-            limit: 100
-          }
-        )
-        
-        if (!success) {
-          console.warn('WebSocket send failed, falling back to HTTP')
-          // Fallback to HTTP API
-          await sendMessage({
-            query: userMessage.content,
-            conversation_id: userMessage.conversation_id,
-            user_context: {},
-            filters: {},
-            limit: 100
-          })
-        }
-      } else {
-        // Use HTTP API when WebSocket is not available
-        await sendMessage({
-          query: userMessage.content,
-          conversation_id: userMessage.conversation_id,
-          user_context: {},
-          filters: {},
-          limit: 100
-        })
-      }
+      // Let sendMessage handle everything - don't add user message here
+      await sendMessage({
+        query: queryText,
+        conversation_id: context?.conversation_id || 'new_conversation'
+      })
     } catch (error) {
       console.error('Failed to send message:', error)
     }
@@ -280,7 +249,7 @@ export default function Composer({ className = '', disabled = false, placeholder
                 onFocus={() => setShowSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                 placeholder={placeholder}
-                disabled={disabled || isLoading || isStreaming}
+                disabled={disabled || isLoading}
                 className="w-full bg-transparent text-synrgy-text placeholder:text-synrgy-muted resize-none outline-none min-h-[24px] max-h-32 overflow-y-auto scrollbar-hide"
                 rows={1}
               />
@@ -316,15 +285,15 @@ export default function Composer({ className = '', disabled = false, placeholder
               {/* Send Button */}
               <button
                 type="submit"
-                disabled={!message.trim() || isLoading || isStreaming || disabled}
+                disabled={!message.trim() || isLoading || disabled}
                 className={`p-2 rounded-lg transition-all ${
-                  !message.trim() || isLoading || isStreaming || disabled
+                  !message.trim() || isLoading || disabled
                     ? 'bg-synrgy-muted/20 text-synrgy-muted cursor-not-allowed'
                     : 'bg-synrgy-primary text-synrgy-bg-900 hover:bg-synrgy-primary/90 hover:scale-105 active:scale-95'
                 }`}
                 title="Send message"
               >
-                {(isLoading || isStreaming) ? (
+                {isLoading ? (
                   <div className="w-5 h-5 border-2 border-synrgy-bg-900 border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <Send className="w-5 h-5" />
@@ -339,21 +308,21 @@ export default function Composer({ className = '', disabled = false, placeholder
               {isLoading && (
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-synrgy-primary rounded-full animate-pulse" />
-                  <span>SYNRGY is processing...</span>
-                </div>
-              )}
-              
-              {isStreaming && (
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-synrgy-accent rounded-full animate-pulse" />
-                  <span>Streaming response...</span>
+                  <span>ＳＹＮＲＧＹ is processing...</span>
                 </div>
               )}
               
               {!isConnected && (
                 <div className="flex items-center gap-2 text-yellow-500">
                   <div className="w-2 h-2 bg-yellow-500 rounded-full" />
-                  <span>Offline mode</span>
+                  <span>Real-time features offline</span>
+                </div>
+              )}
+              
+              {isConnected && (
+                <div className="flex items-center gap-2 text-green-500">
+                  <div className="w-2 h-2 bg-green-500 rounded-full" />
+                  <span>Real-time connected</span>
                 </div>
               )}
               

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, MoreHorizontal, Trash2, Download, Eye, Wifi, WifiOff, ArrowDown } from 'lucide-react'
+import { Settings, MoreHorizontal, Trash2, Download, Eye, ArrowDown } from 'lucide-react'
 
 import MessageBubble from './MessageBubble'
 import Composer from './Composer'
@@ -40,7 +40,7 @@ export default function ChatWindow({
   const messages = useCurrentMessages()
 
   // WebSocket integration
-  const { isConnected, isReconnecting, reconnectAttempts, connectionState } = useWebSocket({
+  const { } = useWebSocket({
     autoConnect: true,
     onChatMessage: (message: ChatMessage) => {
       // Add received message to chat store
@@ -57,7 +57,7 @@ export default function ChatWindow({
     }
   })
 
-  const { streamingMessage, isStreaming } = useStreamingChat()
+  const { } = useStreamingChat()
 
   // Smart auto-scroll: only scroll if user is near bottom or it's a new message
   useEffect(() => {
