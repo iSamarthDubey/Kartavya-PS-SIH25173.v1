@@ -270,12 +270,12 @@ def setup_secure_logging(log_level: str = "INFO") -> None:
 def test_security_filter():
     """Test the security filter with sample sensitive data"""
     test_messages = [
-        "API key: AIzaSyATdeO9G6hjt9S4VD81y-kVWpq6OLSO2TU",
-        "OpenAI key: sk-proj-7McbuKGmgHXLXHzo6EoQy_HS-X8MityMOazVWDKw1SL",
+        "API key: AIzaSyAT#####6hjt......y-k........LS**TU",
+        "OpenAI key: sk-proj-_HS-X8Mit.................Kw1SL",
         "MongoDB URI: mongodb+srv://user:password123@cluster.mongodb.net/db",
-        "JWT token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
+        "JWT token: eyJkpXVCJ9.eyJzdWIiO***********ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
         "Login attempt for admin@kartavya.demo with password Admin!2025",
-        "Supabase key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSJ9.test"
+        "Supabase key: eyJhbGcI1NiIdfnegfdndd.bbbbfejrb##dfdny*****..iJzdXBhYmFzZSJ9.test"
     ]
     
     filter_instance = SecurityLoggingFilter()
