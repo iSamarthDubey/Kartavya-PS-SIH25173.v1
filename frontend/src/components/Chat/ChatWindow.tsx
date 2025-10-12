@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Settings, MoreHorizontal, Trash2, Download, Eye, ArrowDown } from 'lucide-react'
 
 import MessageBubble from './MessageBubble'
+import StreamingMessage from './StreamingMessage'
 import Composer from './Composer'
 import { useChatStore, useCurrentMessages } from '@/stores/chatStore'
-import { useWebSocket, useStreamingChat } from '../../hooks/useWebSocket'
-import { ChatMessage } from '../../types'
+import { useWebSocketStream } from '@/hooks/useWebSocketStream'
+import type { ChatMessage } from '@/types'
 
 interface ChatWindowProps {
   className?: string
@@ -39,25 +40,38 @@ export default function ChatWindow({
   
   const messages = useCurrentMessages()
 
-  // WebSocket integration
-  const { } = useWebSocket({
+  // WebSocket streaming integration
+  const { 
+    isConnected,
+    isStreaming,
+    currentStream,
+    error: streamError 
+  } = useWebSocketStream({
     autoConnect: true,
-    onChatMessage: (message: ChatMessage) => {
-      // Add received message to chat store
-      addMessage(message)
+    onStreamStart: (stream) => {
+      console.log('🚀 Stream started in ChatWindow:', stream)
     },
-    onConnect: () => {
-      console.log('WebSocket connected in ChatWindow')
+    onStreamComplete: (stream) => {
+      console.log('✅ Stream completed in ChatWindow')
+      
+      // Add final message to chat store
+      const finalMessage: ChatMessage = {
+        id: stream.conversation_id || Date.now().toString(),
+        conversation_id: stream.conversation_id || currentConversationId || 'unknown',
+        role: 'assistant',
+        content: stream.accumulated_text || '',
+        timestamp: stream.timestamp || new Date().toISOString(),
+        status: 'success',
+        metadata: {
+          visual_payloads: stream.visual_payloads || []
+        }
+      }
+      addMessage(finalMessage)
     },
-    onDisconnect: () => {
-      console.log('WebSocket disconnected in ChatWindow')
-    },
-    onError: (error) => {
-      console.error('WebSocket error in ChatWindow:', error)
+    onStreamError: (error) => {
+      console.error('❌ Stream error in ChatWindow:', error)
     }
   })
-
-  const { } = useStreamingChat()
 
   // Smart auto-scroll: only scroll if user is near bottom or it's a new message
   useEffect(() => {
@@ -78,6 +92,19 @@ export default function ChatWindow({
     }
     lastMessageCountRef.current = messages.length
   }, [messages])
+  
+  // Auto-scroll during streaming
+  useEffect(() => {
+    if (isStreaming) {
+      const container = messagesContainerRef.current
+      if (container) {
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
+        if (isNearBottom) {
+          scrollToBottom('smooth')
+        }
+      }
+    }
+  }, [isStreaming, currentStream])
 
   const scrollToBottom = (behavior: ScrollBehavior = 'instant') => {
     messagesEndRef.current?.scrollIntoView({ behavior })
@@ -90,7 +117,7 @@ export default function ChatWindow({
 
     const handleScroll = () => {
       const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
-      setShowScrollButton(!isNearBottom && messages.length > 0)
+      setShowScrollButton(!isNearBottom && (messages.length > 0 || isStreaming))
     }
 
     container.addEventListener('scroll', handleScroll)
@@ -276,15 +303,26 @@ export default function ChatWindow({
               </motion.div>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-6">
               <AnimatePresence>
+                {/* Existing messages */}
                 {messages.map((message, index) => (
-                  <MessageBubble
+                  <StreamingMessage
                     key={message.id}
                     message={message}
-                    isLatest={index === messages.length - 1}
+                    className={index === messages.length - 1 ? 'mb-4' : ''}
                   />
                 ))}
+                
+                {/* Active streaming message */}
+                {isStreaming && currentStream && (
+                  <StreamingMessage
+                    key="streaming"
+                    stream={currentStream}
+                    isStreaming={true}
+                    className="mb-4"
+                  />
+                )}
               </AnimatePresence>
               
               {/* Scroll anchor */}
@@ -320,11 +358,13 @@ export default function ChatWindow({
       <div className="sticky bottom-0 border-t border-synrgy-primary/10 bg-synrgy-bg-900/90 backdrop-blur-xs">
         <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 md:px-8 py-4">
           <Composer
-            disabled={false}
+            disabled={isStreaming}
             placeholder={
-              messages.length === 0 
-                ? "Ask SYNRGY anything about your security data..." 
-                : "Continue the conversation..."
+              isStreaming 
+                ? "SYNRGY is streaming response..."
+                : messages.length === 0 
+                  ? "Ask SYNRGY anything about your security data..." 
+                  : "Continue the conversation..."
             }
           />
           <div className="mt-2 flex items-center justify-between text-[11px] text-synrgy-muted">

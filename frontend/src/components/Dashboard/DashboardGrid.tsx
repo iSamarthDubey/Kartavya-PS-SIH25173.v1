@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 
 import { useHybridStore, useWidgetManagement } from '../../stores/hybridStore'
+import VisualRenderer from '@/components/Visuals/VisualRenderer'
 import ChartWidget from '../widgets/ChartWidget'
 import SummaryCardWidget from '../widgets/SummaryCardWidget'
 import BaseWidget from '../widgets/BaseWidget'
@@ -87,67 +88,49 @@ export default function DashboardGrid({
     onWidgetAction?.(widgetId, 'settings')
   }, [onWidgetAction])
 
-  // Render appropriate widget component based on type
+  // Render widget using VisualRenderer for consistency
   const renderWidget = (widget: DashboardWidget) => {
-    const commonProps = {
-      widget,
-      key: widget.id,
-      isExpanded: expandedWidget === widget.id,
-      isPinned: true,
-      onExpand: () => handleExpand(widget.id),
-      onPin: () => handlePin(widget),
-      onUnpin: () => handleUnpin(widget.id),
-      onRefresh: () => handleRefresh(widget.id),
-      onSettings: () => handleSettings(widget.id),
-      onRemove: () => handleRemove(widget.id),
-      onAskSynrgy: (query: string) => handleAskSynrgy(widget.id, query)
-    }
-
-    switch (widget.type) {
-      case 'chart':
-        if (widget.data && typeof widget.data === 'object' && 'type' in widget.data) {
-          return <ChartWidget {...commonProps} widget={widget as DashboardWidget & { data: VisualPayload }} />
+    // Convert widget data to visual payload if needed
+    const payload = widget.data && typeof widget.data === 'object' && 'type' in widget.data 
+      ? widget.data as VisualPayload
+      : {
+          type: widget.type,
+          title: widget.title,
+          description: widget.description || `${widget.type} widget`,
+          data: widget.data
         }
-        break
-      case 'summary_card':
-        if (widget.data && typeof widget.data === 'object' && 'value' in widget.data) {
-          return <SummaryCardWidget {...commonProps} widget={widget as DashboardWidget & { data: SummaryCard }} />
-        }
-        break
-      case 'table':
-      case 'insight_feed':
-      default:
-        // Generic widget rendering using VisualRenderer
-        return (
-          <BaseWidget {...commonProps}>
-            <div className="p-4">
-              {widget.data && typeof widget.data === 'object' && 'type' in widget.data ? (
-                <div className="h-64">
-                  {/* This would render table, narrative, or other widget types */}
-                  <div className="flex items-center justify-center h-full text-synrgy-muted">
-                    <div className="text-center">
-                      <LayoutDashboard className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <div className="text-sm">Widget content loading...</div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="h-32 flex items-center justify-center text-synrgy-muted">
-                  <div className="text-sm">No data available</div>
-                </div>
-              )}
-            </div>
-          </BaseWidget>
-        )
-    }
 
-    // Fallback generic widget
     return (
-      <BaseWidget {...commonProps}>
-        <div className="p-4 h-32 flex items-center justify-center text-synrgy-muted">
-          <div className="text-sm">Unknown widget type: {widget.type}</div>
-        </div>
-      </BaseWidget>
+      <VisualRenderer
+        payload={payload}
+        messageId={widget.id}
+        conversationId="dashboard"
+        onAskSynrgy={onWidgetAction ? (query: string) => handleAskSynrgy(widget.id, query) : undefined}
+        showActions={true}
+        compact={expandedWidget !== widget.id}
+        actions={[
+          {
+            label: expandedWidget === widget.id ? 'Collapse' : 'Expand',
+            icon: 'maximize',
+            action: () => handleExpand(widget.id)
+          },
+          {
+            label: 'Refresh',
+            icon: 'refresh',
+            action: () => handleRefresh(widget.id)
+          },
+          {
+            label: 'Settings',
+            icon: 'settings',
+            action: () => handleSettings(widget.id)
+          },
+          {
+            label: 'Remove',
+            icon: 'trash',
+            action: () => handleRemove(widget.id)
+          }
+        ]}
+      />
     )
   }
 

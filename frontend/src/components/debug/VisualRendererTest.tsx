@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { RefreshCw, Eye, EyeOff } from 'lucide-react'
-import VisualRenderer from '../Chat/VisualRenderer'
+import VisualRenderer from '../Visuals/VisualRenderer'
 import { VisualPayload, VisualCard } from '../../types'
 
 interface VisualTestCase {

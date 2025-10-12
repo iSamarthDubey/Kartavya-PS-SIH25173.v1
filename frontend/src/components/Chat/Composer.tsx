@@ -14,7 +14,7 @@ import {
 import { useChatStore } from '@/stores/chatStore'
 import { useQuery } from '@tanstack/react-query'
 import { chatApi } from '@/services/api'
-import { useWebSocket, useStreamingChat } from '@/hooks/useWebSocket'
+import { useWebSocketStream } from '@/hooks/useWebSocketStream'
 
 interface ComposerProps {
   className?: string
@@ -52,15 +52,25 @@ export default function Composer({ className = '', disabled = false, placeholder
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { sendMessage, isLoading, context, suggestions } = useChatStore()
   
-  // WebSocket for real-time features (but keep it simple)
-  const { isConnected } = useWebSocket({
+  // WebSocket streaming integration
+  const { 
+    isConnected, 
+    isConnecting, 
+    isStreaming,
+    sendMessage: sendStreamingMessage,
+    error: wsError 
+  } = useWebSocketStream({
     autoConnect: true,
-    onConnect: () => console.log('WebSocket connected for real-time updates'),
-    onDisconnect: () => console.log('WebSocket disconnected, using HTTP mode')
+    onStreamStart: () => {
+      console.log('🚀 Stream started')
+    },
+    onStreamComplete: () => {
+      console.log('✅ Stream completed')
+    },
+    onStreamError: (error) => {
+      console.error('❌ Stream error:', error)
+    }
   })
-  
-  // Streaming chat capabilities
-  const { } = useStreamingChat()
 
   // Auto-resize textarea
   useEffect(() => {
@@ -86,7 +96,7 @@ export default function Composer({ className = '', disabled = false, placeholder
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!message.trim() || isLoading || disabled) return
+    if (!message.trim() || isLoading || isStreaming || disabled) return
 
     const queryText = message.trim()
     
@@ -100,11 +110,21 @@ export default function Composer({ className = '', disabled = false, placeholder
     }
 
     try {
-      // Let sendMessage handle everything - don't add user message here
-      await sendMessage({
-        query: queryText,
-        conversation_id: context?.conversation_id || 'new_conversation'
-      })
+      // Use streaming WebSocket if connected, fallback to HTTP
+      if (isConnected) {
+        // Send via WebSocket streaming
+        sendStreamingMessage(
+          queryText,
+          context?.conversation_id || 'new_conversation',
+          { timestamp: new Date().toISOString() }
+        )
+      } else {
+        // Fallback to HTTP API
+        await sendMessage({
+          query: queryText,
+          conversation_id: context?.conversation_id || 'new_conversation'
+        })
+      }
     } catch (error) {
       console.error('Failed to send message:', error)
     }
@@ -249,7 +269,7 @@ export default function Composer({ className = '', disabled = false, placeholder
                 onFocus={() => setShowSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                 placeholder={placeholder}
-                disabled={disabled || isLoading}
+                disabled={disabled || isLoading || isStreaming}
                 className="w-full bg-transparent text-synrgy-text placeholder:text-synrgy-muted resize-none outline-none min-h-[24px] max-h-32 overflow-y-auto scrollbar-hide"
                 rows={1}
               />
@@ -285,15 +305,15 @@ export default function Composer({ className = '', disabled = false, placeholder
               {/* Send Button */}
               <button
                 type="submit"
-                disabled={!message.trim() || isLoading || disabled}
+                disabled={!message.trim() || isLoading || isStreaming || disabled}
                 className={`p-2 rounded-lg transition-all ${
-                  !message.trim() || isLoading || disabled
+                  !message.trim() || isLoading || isStreaming || disabled
                     ? 'bg-synrgy-muted/20 text-synrgy-muted cursor-not-allowed'
                     : 'bg-synrgy-primary text-synrgy-bg-900 hover:bg-synrgy-primary/90 hover:scale-105 active:scale-95'
                 }`}
-                title="Send message"
+                title={isStreaming ? "Streaming..." : "Send message"}
               >
-                {isLoading ? (
+                {(isLoading || isStreaming) ? (
                   <div className="w-5 h-5 border-2 border-synrgy-bg-900 border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <Send className="w-5 h-5" />
@@ -304,27 +324,48 @@ export default function Composer({ className = '', disabled = false, placeholder
 
           {/* Character count / status */}
           <div className="flex items-center justify-between mt-2 text-xs text-synrgy-muted">
-            <div className="flex items-center gap-4">
-              {isLoading && (
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-synrgy-primary rounded-full animate-pulse" />
-                  <span>ＳＹＮＲＧＹ is processing...</span>
-                </div>
-              )}
-              
-              {!isConnected && (
-                <div className="flex items-center gap-2 text-yellow-500">
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full" />
-                  <span>Real-time features offline</span>
-                </div>
-              )}
-              
-              {isConnected && (
-                <div className="flex items-center gap-2 text-green-500">
-                  <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  <span>Real-time connected</span>
-                </div>
-              )}
+          <div className="flex items-center gap-4">
+            {isStreaming && (
+              <div className="flex items-center gap-2 text-synrgy-primary">
+                <div className="w-2 h-2 bg-synrgy-primary rounded-full animate-pulse" />
+                <span>ＳＹＮＲＧＹ is streaming...</span>
+              </div>
+            )}
+            
+            {isLoading && !isStreaming && (
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-synrgy-primary rounded-full animate-pulse" />
+                <span>ＳＹＮＲＧＹ is processing...</span>
+              </div>
+            )}
+            
+            {isConnecting && (
+              <div className="flex items-center gap-2 text-synrgy-accent">
+                <div className="w-2 h-2 bg-synrgy-accent rounded-full animate-pulse" />
+                <span>Connecting...</span>
+              </div>
+            )}
+            
+            {!isConnected && !isConnecting && (
+              <div className="flex items-center gap-2 text-yellow-500">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full" />
+                <span>Streaming offline</span>
+              </div>
+            )}
+            
+            {isConnected && !isStreaming && !isLoading && (
+              <div className="flex items-center gap-2 text-green-500">
+                <div className="w-2 h-2 bg-green-500 rounded-full" />
+                <span>Streaming ready</span>
+              </div>
+            )}
+            
+            {wsError && (
+              <div className="flex items-center gap-2 text-red-500">
+                <div className="w-2 h-2 bg-red-500 rounded-full" />
+                <span>Connection error</span>
+              </div>
+            )}
               
               {isRecording && (
                 <div className="flex items-center gap-2 text-red-500">
