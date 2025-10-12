@@ -1,5 +1,21 @@
-import { WebSocketMessage, ChatMessage } from '../types'
+import { WebSocketMessage, ChatMessage, VisualPayload } from '../types'
 import { useAppStore } from '../stores/appStore'
+
+// SYNRGY Streaming Response Interface
+export interface StreamingChatResponse {
+  message_id: string
+  conversation_id: string
+  text_chunk?: string
+  text_complete?: string
+  visual_payload?: VisualPayload
+  status: 'streaming' | 'complete' | 'error'
+  metadata?: {
+    confidence?: number
+    dsl?: any
+    kql?: string
+    execution_time?: number
+  }
+}
 
 export interface WebSocketConfig {
   url: string
@@ -12,6 +28,9 @@ export interface WebSocketConfig {
 export interface WebSocketCallbacks {
   onMessage?: (message: WebSocketMessage) => void
   onChatMessage?: (message: ChatMessage) => void
+  onChatStream?: (response: StreamingChatResponse) => void
+  onChatComplete?: (response: StreamingChatResponse) => void
+  onChatError?: (response: StreamingChatResponse) => void
   onConnect?: () => void
   onDisconnect?: () => void
   onError?: (error: Event) => void
@@ -99,19 +118,37 @@ class WebSocketService {
     // Handle specific message types
     switch (message.type) {
       case 'chat_response':
-        if (message.data && this.callbacks.onChatMessage) {
-          // Convert WebSocket message data to ChatMessage format
-          const chatMessage: ChatMessage = {
-            id: message.data.id || `ws_${Date.now()}`,
-            conversation_id: message.data.conversation_id || '',
-            role: message.data.role || 'assistant',
-            content: message.data.content || '',
-            timestamp: message.timestamp,
-            metadata: message.data.metadata,
-            visual_payload: message.data.visual_payload,
-            status: message.data.status || 'success'
+        if (message.data) {
+          // Handle streaming responses
+          const streamingResponse = message.data as StreamingChatResponse
+          
+          // Call streaming callback
+          this.callbacks.onChatStream?.(streamingResponse)
+          
+          // Handle completion
+          if (streamingResponse.status === 'complete') {
+            this.callbacks.onChatComplete?.(streamingResponse)
+            
+            // Also create a complete ChatMessage for compatibility
+            if (this.callbacks.onChatMessage) {
+              const chatMessage: ChatMessage = {
+                id: streamingResponse.message_id,
+                conversation_id: streamingResponse.conversation_id,
+                role: 'assistant',
+                content: streamingResponse.text_complete || streamingResponse.text_chunk || '',
+                timestamp: message.timestamp,
+                metadata: streamingResponse.metadata,
+                visual_payload: streamingResponse.visual_payload,
+                status: 'success'
+              }
+              this.callbacks.onChatMessage(chatMessage)
+            }
           }
-          this.callbacks.onChatMessage(chatMessage)
+          
+          // Handle errors
+          if (streamingResponse.status === 'error') {
+            this.callbacks.onChatError?.(streamingResponse)
+          }
         }
         break
 
