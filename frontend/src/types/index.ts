@@ -43,32 +43,8 @@ export interface ChatResponse {
   error?: string
 }
 
-// ===== Visual Payload Types (from SYNRGY blueprint) =====
-export interface VisualPayload {
-  type: 'composite' | 'chart' | 'table' | 'map' | 'narrative'
-  cards?: VisualCard[]
-  data?: any
-  config?: Record<string, any>
-}
-
-export interface VisualCard {
-  type: 'summary_card' | 'chart' | 'table' | 'map' | 'network_graph' | 'narrative'
-  title?: string
-  value?: string | number
-  chart_type?: 'timeseries' | 'bar' | 'pie' | 'line' | 'area'
-  data?: any[]
-  columns?: TableColumn[]
-  rows?: any[][]
-  config?: Record<string, any>
-}
-
-export interface TableColumn {
-  key: string
-  label: string
-  type?: 'string' | 'number' | 'date' | 'boolean'
-  sortable?: boolean
-  width?: string
-}
+// ===== Visual Payload Types (SYNRGY Enterprise System) =====
+export * from './visual'
 
 // ===== Entity & Query Types =====
 export interface Entity {
