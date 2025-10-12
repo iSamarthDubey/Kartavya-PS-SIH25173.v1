@@ -12,6 +12,7 @@ import ReportsPage from '@/pages/Reports'
 import InvestigationsPage from '@/pages/Investigations'
 import AdminPage from '@/pages/Admin'
 import SettingsPage from '@/pages/Settings'
+import DebugPage from '@/pages/Debug' // Debug page for testing components
 
 // Layout components
 import AppLayout from '@/components/Layout/AppLayout'
@@ -180,6 +181,12 @@ function App() {
               </AppLayout>
             )
           } 
+        />
+
+        {/* Debug route - no authentication required */}
+        <Route 
+          path="/debug" 
+          element={<DebugPage />} 
         />
 
         {/* 404 fallback */}

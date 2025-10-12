@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* SYNRGY Design System - Simplified */
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+/* Visual components */
+.synrgy-visual-renderer {
+  @apply space-y-4;
+}
+
 /* SYNRGY Global Styles */
 
 @layer base {
@@ -145,12 +155,12 @@
   }
   
   .card-hover {
-    @apply card hover:border-synrgy-primary/20 hover:shadow-synrgy-glow transition-all duration-300;
+    @apply card hover:border-synrgy-primary/20 transition-all duration-300;
     @apply hover:-translate-y-1;
   }
   
   .card-glow {
-    @apply card border-synrgy-primary/30 shadow-synrgy-glow;
+    @apply card border-synrgy-primary/30;
   }
   
   /* SYNRGY Input Styles */
@@ -200,11 +210,11 @@
   
   /* Animation utilities */
   .animate-pulse-glow {
-    @apply animate-pulse-glow;
+    animation: pulse 2s infinite;
   }
   
   .animate-fade-in {
-    @apply animate-fade-in;
+    animation: fadeIn 0.3s ease-out;
   }
   
   /* Loading states */
@@ -218,6 +228,11 @@
     40% { content: '.'; }
     60% { content: '..'; }
     80%, 100% { content: '...'; }
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
   
   /* Glassmorphism effect */
