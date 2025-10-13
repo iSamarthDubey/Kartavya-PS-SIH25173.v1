@@ -23,7 +23,7 @@
 
 - **Frontend**: React 18 + TypeScript + Tailwind CSS + Zustand
 - **Backend**: FastAPI + Python + Advanced NLP Pipeline
-- **SIEM Integration**: Elasticsearch, Wazuh, with extensible connectors
+- **Smart Data Sources**: AUTO-detection of available sources (Elasticsearch, Wazuh, Splunk, Dataset)
 - **Security**: End-to-end encryption, JWT auth, comprehensive audit logging
 - **Deployment**: Docker Compose with one-click setup scripts
 
@@ -32,6 +32,7 @@
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Docker 20.10+ & Docker Compose 2.0+
 - Git 2.30+
 - 8GB RAM minimum (32GB recommended for production)
@@ -51,7 +52,46 @@ chmod +x scripts/deploy.sh
 # Frontend: http://localhost:3000
 # Backend API: http://localhost:8000
 # API Docs: http://localhost:8000/docs
+# Data Source Status: http://localhost:8000/api/dashboard/data-source/status
 ```
+
+### 🤖 Intelligent Multi-Source Architecture
+
+Kartavya automatically detects and uses ALL available **REAL** data sources:
+
+```bash
+# 🏢 PRODUCTION MODE (Real sources only)
+ENVIRONMENT=production
+DATA_SOURCE_MODE=auto             # Uses ALL real sources found
+DEFAULT_DATA_SOURCE=auto          # Elasticsearch + Wazuh + Splunk
+
+# 🎭 DEMO MODE (Real sources + dataset fallback)
+ENVIRONMENT=demo  
+DATA_SOURCE_MODE=auto             # Uses real sources if available
+DEFAULT_DATA_SOURCE=auto          # Falls back to dataset if no real sources
+```
+
+**🏢 PRODUCTION Behavior:**
+
+- ✅ **Real Sources Only**: Elasticsearch, Wazuh, Splunk
+- ❌ **No Dataset Fallback**: Security/reliability requirement
+- 🔥 **Fail Fast**: Startup fails if no real sources available
+- 🔗 **Multi-Source**: Queries ALL available real sources simultaneously
+
+**🎭 DEMO Behavior:**
+
+- 🎯 **Real Sources Preferred**: Uses Elasticsearch/Wazuh/Splunk if available  
+- 📁 **Dataset Fallback**: Uses demo dataset if no real sources found
+- ✨ **Perfect for Hackathons**: No external dependencies required
+
+**📊 Multi-Source Benefits:**
+
+- **Complete Coverage**: Query Elasticsearch + Wazuh + Splunk simultaneously
+- **Smart Deduplication**: Correlate and merge results across sources
+- **High Availability**: Automatic failover between sources
+- **Load Distribution**: Parallel query execution
+
+**Real Source Priority**: Elasticsearch → Wazuh → Splunk
 
 ### Example Queries to Try
 
@@ -81,6 +121,7 @@ chmod +x scripts/deploy.sh
 **Challenge**: Traditional SIEM systems are complex and require specialized knowledge, creating barriers for effective cybersecurity monitoring in critical infrastructure organizations like ISRO.
 
 **Solution**: Kartavya transforms SIEM complexity into natural conversations, enabling:
+
 - **Faster Threat Detection** - Natural language queries vs complex query languages
 - **Improved Accessibility** - Non-experts can perform advanced security analysis  
 - **Enhanced Productivity** - Automated report generation and contextual follow-ups
@@ -100,6 +141,7 @@ chmod +x scripts/deploy.sh
 ✅ **Air-Gapped Deployment** - Offline production mode for sensitive environments  
 
 ### Compliance Standards
+
 - **Indian Government IT Standards**
 - **ISRO Cybersecurity Guidelines**  
 - **ISO 27001 Information Security**
@@ -110,15 +152,19 @@ chmod +x scripts/deploy.sh
 ## 🎭 Deployment Modes
 
 ### Demo Mode (Cloud-Connected)
+
 Perfect for hackathon demonstrations and development:
+
 - ☁️ Cloud database integrations (Supabase, MongoDB Atlas)
-- 🤖 AI-powered features (Gemini/OpenAI APIs) 
+- 🤖 AI-powered features (Gemini/OpenAI APIs)
 - 📊 HuggingFace dataset integration
 - 🔄 Real-time log simulation
 - 🗺️ Interactive dashboards
 
 ### Production Mode (Air-Gapped)
+
 Enterprise deployment for ISRO operations:
+
 - 🔒 Local database instances (PostgreSQL, Redis)
 - 🛡️ Enterprise authentication & authorization
 - 📋 Comprehensive audit logging  
@@ -132,6 +178,7 @@ Enterprise deployment for ISRO operations:
 **Developed by Team Kartavya for Smart India Hackathon 2025**
 
 ### Team Members
+
 - **Samarth Dubey** - Project Lead & Full-Stack Developer
 - **[Team Member 2]** - Backend Developer & Security Engineer  
 - **[Team Member 3]** - Frontend Developer & UI/UX Designer
@@ -140,6 +187,7 @@ Enterprise deployment for ISRO operations:
 - **[Team Member 6]** - QA Engineer & Documentation Specialist
 
 ### Special Thanks
+
 - **ISRO** for the challenging and impactful problem statement
 - **Smart India Hackathon** for fostering innovation in critical sectors
 - **Open Source Community** for the amazing tools and libraries
@@ -149,13 +197,15 @@ Enterprise deployment for ISRO operations:
 ## 📠 Support & Contact
 
 ### Technical Support
-- **📧 Email**: tech-support@kartavya-siem.org
+
+- **📧 Email**: <tech-support@kartavya-siem.org>
 - **🐛 Issues**: [GitHub Issues](https://github.com/your-org/kartavya-siem-assistant/issues)
 - **📖 Docs**: [Project Wiki](https://github.com/your-org/kartavya-siem-assistant/wiki)
 
 ### Demo & Presentation
+
 - **🎥 Demo Video**: [YouTube Link](#)
-- **📊 Presentation**: [Slides Link](#) 
+- **📊 Presentation**: [Slides Link](#)
 - **🔗 Live Demo**: [Demo Environment](#)
 
 ---

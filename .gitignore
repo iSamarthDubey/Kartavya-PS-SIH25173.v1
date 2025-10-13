@@ -553,3 +553,8 @@ frontend/BLUEPRINTv2.TXT
 SYNRGY.TXT
 backend/data/users.json
 backend/test_elasticsearch_windows.py
+test_api_simple.py
+test_complete_backend.py
+test_multi_source.py
+test_production_vs_demo.py
+backend/environment_validation_report.json
