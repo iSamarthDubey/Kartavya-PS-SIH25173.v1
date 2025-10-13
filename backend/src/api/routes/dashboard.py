@@ -298,7 +298,7 @@ async def get_user_activity(
             "success": True,
             "data": activity_data,
             "limit": limit,
-            "source": "real_user_logs"
+            "source": get_dynamic_source_name()
         }
         
     except Exception as e:
