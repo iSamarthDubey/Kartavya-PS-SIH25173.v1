@@ -597,3 +597,10 @@ backend/test_final_functionality.py
 backend/test_platform_aware_api.py
 backend/validate_environment.py
 backend/tests/test_results/chat_test_results.json
+backend/create_demo_user.py
+backend/create_simple_demo_user.py
+backend/diagnose_databases.py
+backend/diagnose_mongodb.py
+backend/test_db_connectivity.py
+backend/setup_auth_database.py
+backend/test_mongodb_quick.py
