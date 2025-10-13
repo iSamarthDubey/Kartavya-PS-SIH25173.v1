@@ -126,6 +126,18 @@ class WindowsEventGenerator(BaseMockGenerator):
             }
         }
         
+        # Add severity and status fields for dashboard calculations
+        event_data["severity"] = event_info["severity"].value  # Add severity to data
+        event_data["status"] = random.choice(["active", "resolved", "investigating"])  # Add status
+        
+        # Add security classification
+        if event_info["severity"] in [SeverityLevel.HIGH, SeverityLevel.CRITICAL]:
+            event_data["threat_level"] = "high"
+            event_data["alert_type"] = "security_incident"
+        else:
+            event_data["threat_level"] = "normal"
+            event_data["alert_type"] = "informational"
+        
         # Add event-specific fields
         self._add_event_specific_fields(event_id, event_data)
         
