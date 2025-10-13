@@ -184,6 +184,18 @@ class FilebeatEventGenerator(BaseMockGenerator):
         # Add log-specific fields
         self._add_log_specific_fields(log_type, event_data, log_info)
         
+        # Add status and classification fields for dashboard metrics
+        event_data["severity"] = log_info["severity"].value  # Root level for dashboard
+        event_data["status"] = random.choice(["active", "resolved", "investigating"])
+        
+        # Add additional classification fields based on severity
+        if log_info["severity"].value >= 3:  # HIGH or CRITICAL
+            event_data["alert_type"] = "log_alert"
+            event_data["threat_level"] = "log_security"
+        elif log_info["severity"].value >= 2:  # MEDIUM
+            event_data["alert_type"] = "log_warning"
+            event_data["threat_level"] = "log_security"
+        
         return MockEvent(
             id=self._generate_id(),
             timestamp=datetime.fromisoformat(event_data["@timestamp"].replace("Z", "+00:00")).replace(tzinfo=None),

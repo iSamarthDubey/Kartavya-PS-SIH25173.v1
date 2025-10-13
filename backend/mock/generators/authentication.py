@@ -119,6 +119,18 @@ class AuthenticationEventGenerator(BaseMockGenerator):
         elif event_type == "suspicious_login":
             self._add_suspicious_login_data(event_data)
         
+        # Add severity and status fields for dashboard calculations
+        event_data["severity"] = event_info["severity"].value
+        event_data["status"] = random.choice(["active", "resolved", "investigating"])
+        
+        # Add security classification
+        if event_info["severity"] in [SeverityLevel.HIGH, SeverityLevel.CRITICAL]:
+            event_data["threat_level"] = "high"
+            event_data["alert_type"] = "authentication_threat"
+        else:
+            event_data["threat_level"] = "normal"
+            event_data["alert_type"] = "auth_informational"
+        
         return MockEvent(
             id=self._generate_id(),
             timestamp=timestamp,

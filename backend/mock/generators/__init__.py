@@ -8,6 +8,9 @@ from .authentication import AuthenticationEventGenerator
 from .auditbeat_events import AuditbeatEventGenerator
 from .packetbeat_events import PacketbeatEventGenerator
 from .filebeat_events import FilebeatEventGenerator
+from .network_logs import NetworkLogsGenerator
+from .security_alerts import SecurityAlertsGenerator
+from .process_logs import ProcessLogsGenerator
 
 __all__ = [
     "WindowsEventGenerator",
@@ -15,5 +18,8 @@ __all__ = [
     "AuthenticationEventGenerator",
     "AuditbeatEventGenerator",
     "PacketbeatEventGenerator",
-    "FilebeatEventGenerator"
+    "FilebeatEventGenerator",
+    "NetworkLogsGenerator",
+    "SecurityAlertsGenerator", 
+    "ProcessLogsGenerator"
 ]

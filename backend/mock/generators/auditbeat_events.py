@@ -137,6 +137,18 @@ class AuditbeatEventGenerator(BaseMockGenerator):
         # Add event-specific fields
         self._add_event_specific_fields(event_type, event_data, event_info)
         
+        # Add status and classification fields for dashboard metrics
+        event_data["severity"] = event_info["severity"].value  # Root level for dashboard
+        event_data["status"] = random.choice(["active", "resolved", "investigating"])
+        
+        # Add additional classification fields based on severity
+        if event_info["severity"].value >= 3:  # HIGH or CRITICAL
+            event_data["alert_type"] = "security_alert"
+            event_data["threat_level"] = "system_security"
+        elif event_info["severity"].value >= 2:  # MEDIUM
+            event_data["alert_type"] = "security_warning"
+            event_data["threat_level"] = "system_security"
+        
         return MockEvent(
             id=self._generate_id(),
             timestamp=datetime.fromisoformat(event_data["@timestamp"].replace("Z", "+00:00")).replace(tzinfo=None),

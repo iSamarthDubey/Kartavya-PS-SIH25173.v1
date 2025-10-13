@@ -197,6 +197,18 @@ class PacketbeatEventGenerator(BaseMockGenerator):
             event_data["network"]["direction"] == "inbound"):
             self._add_threat_intelligence(event_data, protocol)
         
+        # Add status and classification fields for dashboard metrics
+        event_data["severity"] = protocol_info["severity"].value  # Root level for dashboard
+        event_data["status"] = random.choice(["active", "resolved", "investigating"])
+        
+        # Add additional classification fields based on severity
+        if protocol_info["severity"].value >= 3:  # HIGH or CRITICAL
+            event_data["alert_type"] = "network_alert"
+            event_data["threat_level"] = "network_security"
+        elif protocol_info["severity"].value >= 2:  # MEDIUM
+            event_data["alert_type"] = "network_warning"
+            event_data["threat_level"] = "network_security"
+        
         return MockEvent(
             id=self._generate_id(),
             timestamp=datetime.fromisoformat(event_data["@timestamp"].replace("Z", "+00:00")).replace(tzinfo=None),

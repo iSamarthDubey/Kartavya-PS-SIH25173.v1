@@ -10,7 +10,17 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Union
 
 from ..utils import MockDataScheduler, MockDataType
-from ..generators import WindowsEventGenerator, SystemMetricsGenerator, AuthenticationEventGenerator
+from ..generators import (
+    WindowsEventGenerator, 
+    SystemMetricsGenerator, 
+    AuthenticationEventGenerator,
+    AuditbeatEventGenerator,
+    PacketbeatEventGenerator,
+    FilebeatEventGenerator,
+    NetworkLogsGenerator,
+    SecurityAlertsGenerator,
+    ProcessLogsGenerator
+)
 
 
 class MockElasticsearchConnector:
@@ -21,20 +31,32 @@ class MockElasticsearchConnector:
         self.port = port
         self.url = f"http://{host}:{port}"
         
-        # Initialize data generators
+        # Initialize data generators - comprehensive security coverage
         self.generators = [
             WindowsEventGenerator(),
             SystemMetricsGenerator(),
-            AuthenticationEventGenerator()
+            AuthenticationEventGenerator(),
+            AuditbeatEventGenerator(),
+            PacketbeatEventGenerator(),
+            FilebeatEventGenerator(),
+            NetworkLogsGenerator(),
+            SecurityAlertsGenerator(),
+            ProcessLogsGenerator()
         ]
         
         # Initialize scheduler for continuous data generation
         self.scheduler = MockDataScheduler(self.generators, interval_seconds=3)
         
-        # Mock indices with realistic names
+        # Mock indices with realistic names for comprehensive security data
         self.mock_indices = {
-            "winlogbeat-2025.10.12": {"settings": {"number_of_shards": 1, "number_of_replicas": 1}},
-            "metricbeat-2025.10.12": {"settings": {"number_of_shards": 1, "number_of_replicas": 1}},
+            "winlogbeat-2025.10.13": {"settings": {"number_of_shards": 1, "number_of_replicas": 1}},
+            "metricbeat-2025.10.13": {"settings": {"number_of_shards": 1, "number_of_replicas": 1}},
+            "auditbeat-2025.10.13": {"settings": {"number_of_shards": 1, "number_of_replicas": 1}},
+            "packetbeat-2025.10.13": {"settings": {"number_of_shards": 1, "number_of_replicas": 1}},
+            "filebeat-2025.10.13": {"settings": {"number_of_shards": 1, "number_of_replicas": 1}},
+            "network-logs-2025.10.13": {"settings": {"number_of_shards": 1, "number_of_replicas": 1}},
+            "security-alerts-2025.10.13": {"settings": {"number_of_shards": 1, "number_of_replicas": 1}},
+            "process-logs-2025.10.13": {"settings": {"number_of_shards": 1, "number_of_replicas": 1}},
             "security-logs-demo": {"settings": {"number_of_shards": 1, "number_of_replicas": 1}}
         }
         
@@ -139,17 +161,37 @@ class MockElasticsearchConnector:
         """Get appropriate mock data based on index name"""
         
         # Determine data type from index name
-        if "winlog" in index.lower() or "security" in index.lower():
+        if "winlog" in index.lower():
             data_types = [MockDataType.WINDOWS_EVENT, MockDataType.AUTHENTICATION]
         elif "metric" in index.lower():
             data_types = [MockDataType.SYSTEM_METRIC]
+        elif "audit" in index.lower():
+            data_types = [MockDataType.AUDITBEAT_EVENT]
+        elif "packet" in index.lower():
+            data_types = [MockDataType.PACKETBEAT_EVENT]
+        elif "filebeat" in index.lower():
+            data_types = [MockDataType.FILEBEAT_EVENT]
+        elif "network-logs" in index.lower():
+            data_types = [MockDataType.NETWORK_LOG]
+        elif "security-alerts" in index.lower():
+            data_types = [MockDataType.SECURITY_ALERT]
+        elif "process-logs" in index.lower():
+            data_types = [MockDataType.PROCESS_LOG]
+        elif "security" in index.lower():
+            # Mixed comprehensive security data for demo index
+            data_types = [MockDataType.WINDOWS_EVENT, MockDataType.AUTHENTICATION, 
+                         MockDataType.AUDITBEAT_EVENT, MockDataType.PACKETBEAT_EVENT, MockDataType.FILEBEAT_EVENT,
+                         MockDataType.NETWORK_LOG, MockDataType.SECURITY_ALERT, MockDataType.PROCESS_LOG]
         else:
-            data_types = [MockDataType.WINDOWS_EVENT, MockDataType.SYSTEM_METRIC, MockDataType.AUTHENTICATION]
+            # Default: all available event types for comprehensive coverage
+            data_types = [MockDataType.WINDOWS_EVENT, MockDataType.SYSTEM_METRIC, MockDataType.AUTHENTICATION,
+                         MockDataType.AUDITBEAT_EVENT, MockDataType.PACKETBEAT_EVENT, MockDataType.FILEBEAT_EVENT,
+                         MockDataType.NETWORK_LOG, MockDataType.SECURITY_ALERT, MockDataType.PROCESS_LOG]
         
         # Get latest data from scheduler
         all_events = []
         for data_type in data_types:
-            events = self.scheduler.get_latest_data(data_type, limit)
+            events = self.scheduler.get_latest_data(data_type, limit // len(data_types) + 1)
             all_events.extend(events)
         
         # If no data available, generate some on the fly
@@ -157,5 +199,6 @@ class MockElasticsearchConnector:
             generator = random.choice(self.generators)
             all_events = generator.generate_batch(limit)
         
-        # Return requested number of events
+        # Shuffle to mix event types and return requested number
+        random.shuffle(all_events)
         return all_events[:limit]
