@@ -604,3 +604,9 @@ backend/diagnose_mongodb.py
 backend/test_db_connectivity.py
 backend/setup_auth_database.py
 backend/test_mongodb_quick.py
+backend/final_verification_test.py
+backend/test_ai_enhancements.py
+backend/tests/test_complete_backend_integration.py
+backend/tests/ULTIMATE_BACKEND_VERIFICATION.py
+tests/FINAL_VERIFICATION_RESULTS.json
+backend/tests/FINAL_VERIFICATION_RESULTS.json
