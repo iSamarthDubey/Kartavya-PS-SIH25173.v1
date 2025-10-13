@@ -1,6 +1,6 @@
 """
 Dashboard API Routes
-Real SIEM data from actual datasets - NO MOCK DATA
+Real security data from available data sources - NO MOCK DATA
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Query
@@ -12,6 +12,7 @@ import asyncio
 from ...core.config import settings
 from ...core.database.clients import MongoDBClient, SupabaseClient
 from ...connectors.dataset_connector import DatasetConnector
+from ...connectors.factory import get_available_platforms
 from ...security.rbac import RBAC
 from ...security.auth_manager import AuthManager
 
@@ -23,7 +24,7 @@ mongodb_client = MongoDBClient()
 supabase_client = SupabaseClient()
 rbac = RBAC()
 
-# Initialize dataset connector for real SIEM data
+# Initialize dataset connector for real security data
 dataset_connector = DatasetConnector()
 
 @router.get("/metrics")
@@ -31,7 +32,7 @@ async def get_dashboard_metrics(
     time_range: str = Query(default="24h", description="Time range: 1h, 24h, 7d, 30d")
 ):
     """
-    Get real SIEM dashboard metrics from datasets
+    Get real security dashboard metrics from available data sources
     NO MOCK DATA - uses actual security logs and threat intelligence
     """
     try:
@@ -68,7 +69,7 @@ async def get_security_alerts(
     status: Optional[str] = Query(default=None, description="Filter by status: active, investigating, resolved")
 ):
     """
-    Get real security alerts from SIEM datasets
+    Get real security alerts from available data sources
     """
     try:
         logger.info(f"🚨 Fetching {limit} security alerts from datasets")
@@ -133,6 +134,60 @@ async def update_alert(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to update alert: {str(e)}"
+        )
+
+@router.get("/data-source/status")
+async def get_data_source_status():
+    """
+    Get current data source configuration and availability status
+    """
+    try:
+        logger.info("🔍 Fetching data source status")
+        
+        # Get current configuration
+        current_source = settings.get_effective_data_source()
+        current_mode = settings.get_effective_mode()
+        available_platforms = get_available_platforms(settings.environment)
+        
+        # Check if multi-source manager is active
+        from ...api.main import app_state  # Import app_state to check multi-source manager
+        
+        multi_source_status = None
+        if app_state.get("multi_source_manager"):
+            multi_source_manager = app_state["multi_source_manager"]
+            multi_source_status = multi_source_manager.get_source_status()
+        
+        status = {
+            "primary_source": current_source,
+            "operation_mode": current_mode,
+            "is_auto_mode": current_source == "auto",
+            "is_multi_source": settings.should_use_multi_source(),
+            "multi_source_enabled": settings.enable_multi_source,
+            "available_platforms": available_platforms,
+            "environment": settings.environment,
+            "total_available": len(available_platforms),
+            "configuration_source": "DEFAULT_DATA_SOURCE" if not settings.default_siem_platform else "DEFAULT_SIEM_PLATFORM (legacy)",
+            "multi_source_config": {
+                "max_concurrent_sources": settings.max_concurrent_sources,
+                "correlation_fields": settings.get_correlation_fields_list(),
+                "timeout": settings.multi_source_timeout
+            },
+            "multi_source_status": multi_source_status
+        }
+        
+        logger.info(f"✅ Data source status: {current_source} ({current_mode} mode) in {settings.environment}")
+        
+        return {
+            "success": True,
+            "data": status,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get data source status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve data source status: {str(e)}"
         )
 
 @router.get("/system/status")

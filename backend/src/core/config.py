@@ -4,7 +4,7 @@ Handles demo vs production modes and toggleable AI
 """
 
 import os
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from enum import Enum
 import logging
 from pydantic_settings import BaseSettings
@@ -20,10 +20,19 @@ class Environment(str, Enum):
     DEVELOPMENT = "development"
 
 
+class DataSourceMode(str, Enum):
+    """Data source operation modes"""
+    SINGLE = "single"      # Use single best data source
+    MULTI = "multi"        # Use ALL available real data sources (recommended)
+    AUTO = "auto"          # Same as MULTI - auto-detect and use all available
+
+
 class SiemPlatform(str, Enum):
-    """Supported SIEM platforms"""
+    """Supported data source platforms"""
+    AUTO = "auto"
     ELASTICSEARCH = "elasticsearch"
     WAZUH = "wazuh"
+    SPLUNK = "splunk"
     DATASET = "dataset"
 
 
@@ -100,10 +109,48 @@ class Settings(BaseSettings):
     max_context_messages: int = Field(default=50, env="MAX_CONTEXT_MESSAGES")
     
     # =============================================================================
-    # 🎯 SIEM CONFIGURATION
+    # 🎯 DATA SOURCE CONFIGURATION
     # =============================================================================
-    default_siem_platform: SiemPlatform = Field(
-        default=SiemPlatform.DATASET,
+    
+    # Data source operation mode
+    data_source_mode: DataSourceMode = Field(
+        default=DataSourceMode.AUTO,
+        env="DATA_SOURCE_MODE"
+    )
+    
+    # Primary data source selection
+    default_data_source: SiemPlatform = Field(
+        default=SiemPlatform.AUTO,
+        env="DEFAULT_DATA_SOURCE"
+    )
+    
+    # Multi-source configuration
+    enable_multi_source: bool = Field(
+        default=True,
+        env="ENABLE_MULTI_SOURCE"
+    )
+    
+    # Correlation fields for deduplication across sources
+    correlation_fields: str = Field(
+        default="source.ip,destination.ip,user.name,@timestamp",
+        env="CORRELATION_FIELDS"
+    )
+    
+    # Maximum sources to use simultaneously  
+    max_concurrent_sources: int = Field(
+        default=3,
+        env="MAX_CONCURRENT_SOURCES"
+    )
+    
+    # Multi-source query timeout
+    multi_source_timeout: float = Field(
+        default=30.0,
+        env="MULTI_SOURCE_TIMEOUT"
+    )
+    
+    # Legacy support for existing env vars
+    default_siem_platform: Optional[SiemPlatform] = Field(
+        default=None,
         env="DEFAULT_SIEM_PLATFORM"
     )
     
@@ -140,6 +187,35 @@ class Settings(BaseSettings):
         if self.is_production:
             return self.enable_ai and (self.gemini_api_key or self.openai_api_key)
         return self.enable_ai and (self.gemini_api_key or self.openai_api_key)
+    
+    def get_effective_data_source(self) -> SiemPlatform:
+        """Get the effective data source, considering legacy env vars"""
+        # Support legacy DEFAULT_SIEM_PLATFORM for backward compatibility
+        if self.default_siem_platform:
+            return self.default_siem_platform
+        return self.default_data_source
+    
+    def get_effective_mode(self) -> DataSourceMode:
+        """Get the effective data source mode"""
+        # If multi-source is disabled, force single mode
+        if not self.enable_multi_source:
+            return DataSourceMode.SINGLE
+        return self.data_source_mode
+    
+    def get_correlation_fields_list(self) -> List[str]:
+        """Get correlation fields as a list"""
+        return [field.strip() for field in self.correlation_fields.split(",") if field.strip()]
+    
+    def should_use_multi_source(self) -> bool:
+        """Determine if multi-source mode should be used"""
+        mode = self.get_effective_mode()
+        
+        # In production, prefer multi-source for real data sources
+        # In demo, single source (dataset) is fine
+        if mode == DataSourceMode.SINGLE:
+            return False
+        else:  # MULTI or AUTO mode
+            return self.enable_multi_source and self.is_production
     
     @property
     def cors_origins_list(self) -> list[str]:
@@ -220,7 +296,7 @@ if not settings.validate_configuration():
 else:
     logger.info(f"✅ Configuration loaded for {settings.environment.upper()} mode")
     logger.info(f"🤖 AI enabled: {settings.gemini_api_key is not None or settings.openai_api_key is not None}")
-    logger.info(f"🎯 Default SIEM: {settings.default_siem_platform}")
+    logger.info(f"🎯 Default data source: {settings.get_effective_data_source()}")
 
 
 def get_ai_config() -> Dict[str, Any]:
@@ -248,8 +324,9 @@ def get_deployment_info() -> Dict[str, Any]:
     return {
         "environment": settings.environment,
         "ai_enabled": settings.ai_enabled,
-        "siem_platform": settings.default_siem_platform,
+        "data_source": settings.get_effective_data_source(),
         "version": "1.0.0",
         "demo_mode": settings.is_demo,
-        "production_mode": settings.is_production
+        "production_mode": settings.is_production,
+        "auto_detection": settings.get_effective_data_source() == SiemPlatform.AUTO
     }

@@ -20,6 +20,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 # Import routers
 from .routes import assistant, query, reports, auth, admin, dashboard, websocket
 from .routes.windows_data import router as windows_router
+from .routes.platform_events import router as platform_events_router
 from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.logging import LoggingMiddleware
 
@@ -34,8 +35,10 @@ logger = logging.getLogger(__name__)
 app_state = {
     "pipeline": None,
     "siem_connector": None,
+    "multi_source_manager": None,
     "context_manager": None,
-    "schema_mapper": None
+    "schema_mapper": None,
+    "platform_service": None
 }
 
 @asynccontextmanager
@@ -58,49 +61,114 @@ async def lifespan(app: FastAPI):
         await app_state["pipeline"].initialize()
         logger.info("✅ Pipeline initialized")
         
-        # Initialize SIEM connector - Platform agnostic approach
-        siem_platform = os.getenv("DEFAULT_SIEM_PLATFORM", "auto")
-        logger.info(f"🎯 Initializing SIEM platform: {siem_platform}")
+        # Import settings for centralized configuration
+        from src.core.config import settings
+        from src.connectors.multi_source_manager import MultiSourceManager
         
-        # Try to auto-detect or use specified platform
-        try:
-            if siem_platform == "auto":
-                # Try to detect available platforms
-                connector = None
+        # Choose initialization strategy based on environment and available sources
+        if settings.is_production:
+            logger.info("🏢 PRODUCTION MODE: Initializing Multi-Source Manager for real data sources...")
+            
+            # In production, always try multi-source for real data sources
+            multi_source_manager = MultiSourceManager(environment=settings.environment)
+            try:
+                success = await multi_source_manager.initialize()
                 
-                # Try Elasticsearch first
-                try:
-                    from src.connectors.elastic import ElasticConnector
-                    es_connector = ElasticConnector()
-                    if es_connector.is_available():
-                        connector = es_connector
-                        logger.info("✅ Auto-detected: Using Elasticsearch")
-                except Exception:
-                    logger.info("Elasticsearch not available, trying other platforms...")
-                
-                # Try other platforms if Elasticsearch fails
-                if not connector:
-                    try:
-                        connector = create_connector("splunk")
-                        if hasattr(connector, 'is_available') and connector.is_available():
-                            logger.info("✅ Auto-detected: Using Splunk")
-                        else:
-                            connector = None
-                    except Exception:
-                        pass
-                
-                if not connector:
-                    logger.info("⚠️ No live SIEM detected, running in offline mode")
-                    app_state["siem_connector"] = None
+                if success and multi_source_manager.sources:
+                    app_state["multi_source_manager"] = multi_source_manager
+                    
+                    # Set primary connector for backward compatibility
+                    sources = multi_source_manager.sources
+                    primary_sources = [
+                        (sid, conn) for sid, conn in sources.items()
+                        if multi_source_manager.source_configs[sid].priority.value <= 2
+                        and multi_source_manager.source_health[sid]
+                    ]
+                    
+                    if primary_sources:
+                        app_state["siem_connector"] = primary_sources[0][1]
+                        logger.info(f"✅ PRODUCTION: Multi-source ready with {len(sources)} real data sources")
+                    else:
+                        app_state["siem_connector"] = list(sources.values())[0]
+                        logger.info("✅ PRODUCTION: Multi-source ready with available sources")
                 else:
-                    app_state["siem_connector"] = connector
-            else:
-                # Use specified platform
-                app_state["siem_connector"] = create_connector(siem_platform)
-                logger.info(f"✅ Using specified platform: {siem_platform}")
-        except Exception as e:
-            logger.error(f"❌ SIEM initialization failed: {e}, running in offline mode")
-            app_state["siem_connector"] = None
+                    raise RuntimeError("No real data sources available in production")
+                    
+            except Exception as e:
+                logger.error(f"❌ PRODUCTION DEPLOYMENT FAILED: {e}")
+                logger.error("❌ PRODUCTION REQUIREMENT: At least one real data source must be available:")
+                logger.error("   - Elasticsearch (http://localhost:9200)")
+                logger.error("   - Wazuh SIEM (http://localhost:55000)")
+                logger.error("   - Splunk Enterprise")
+                logger.error("❌ NO FALLBACKS ALLOWED IN PRODUCTION MODE")
+                logger.error("❌ Dataset/demo data is DISABLED for security reasons")
+                raise RuntimeError(f"PRODUCTION DEPLOYMENT BLOCKED: {e}")
+                
+        else:
+            logger.info("🎭 DEMO MODE: Checking for real sources, fallback to dataset if needed...")
+            
+            # In demo mode, try multi-source first, fallback to single dataset
+            multi_source_manager = MultiSourceManager(environment=settings.environment)
+            
+            try:
+                success = await multi_source_manager.initialize()
+                
+                if success and multi_source_manager.sources:
+                    # Check if we have real sources or just dataset
+                    real_sources = [
+                        sid for sid, config in multi_source_manager.source_configs.items()
+                        if config.connector_type != "dataset"
+                    ]
+                    
+                    if real_sources:
+                        logger.info(f"✅ DEMO: Found real sources, using multi-source mode")
+                        app_state["multi_source_manager"] = multi_source_manager
+                        
+                        # Set primary connector
+                        sources = multi_source_manager.sources
+                        primary_sources = [
+                            (sid, conn) for sid, conn in sources.items()
+                            if multi_source_manager.source_configs[sid].priority.value <= 2
+                            and multi_source_manager.source_health[sid]
+                        ]
+                        
+                        if primary_sources:
+                            app_state["siem_connector"] = primary_sources[0][1]
+                        else:
+                            app_state["siem_connector"] = list(sources.values())[0]
+                    else:
+                        logger.info("✅ DEMO: Only dataset available, using single-source mode")
+                        # Use single dataset connector
+                        app_state["multi_source_manager"] = None
+                        app_state["siem_connector"] = list(multi_source_manager.sources.values())[0]
+                        await multi_source_manager.cleanup()  # Don't need multi-source for just dataset
+                        
+            except Exception as e:
+                logger.warning(f"⚠️ DEMO: Multi-source failed: {e}, using single dataset fallback")
+                app_state["multi_source_manager"] = None
+        
+        # Single source mode or fallback
+        if not app_state.get("multi_source_manager"):
+            logger.info("🎯 Initializing single data source...")
+            
+            data_source = settings.get_effective_data_source()
+            logger.info(f"Using data source: {data_source}")
+            
+            # Create connector using factory with proper configuration
+            try:
+                app_state["siem_connector"] = create_connector(
+                    platform=data_source,
+                    environment=settings.environment,
+                )
+                logger.info(f"✅ Successfully initialized single data source: {data_source}")
+            except Exception as e:
+                logger.error(f"❌ Data source initialization failed: {e}")
+                # Always fall back to dataset connector for reliability
+                logger.info("📊 Falling back to dataset connector")
+                app_state["siem_connector"] = create_connector(
+                    platform="dataset",
+                    environment=settings.environment
+                )
         
         # Initialize context manager
         app_state["context_manager"] = ContextManager()
@@ -110,6 +178,31 @@ async def lifespan(app: FastAPI):
         app_state["schema_mapper"] = SchemaMapper()
         await app_state["schema_mapper"].initialize(app_state["siem_connector"])
         logger.info("✅ Schema mapper initialized")
+        
+        # Initialize platform-aware API service
+        logger.info("🔧 Initializing Platform-Aware API Service...")
+        from src.core.services.platform_aware_api import PlatformAwareAPIService
+        
+        # Use multi-source manager if available, otherwise create a dummy one for single source
+        if app_state["multi_source_manager"]:
+            app_state["platform_service"] = PlatformAwareAPIService(app_state["multi_source_manager"])
+        else:
+            # Create a wrapper for single source connector
+            from src.connectors.multi_source_manager import MultiSourceManager
+            single_source_wrapper = MultiSourceManager(environment=settings.environment)
+            # Add the single source to the wrapper
+            single_source_wrapper.sources = {"primary": app_state["siem_connector"]}
+            single_source_wrapper.source_health = {"primary": True}
+            single_source_wrapper.source_configs = {"primary": type('Config', (), {'priority': type('Priority', (), {'value': 1})()})()}
+            app_state["platform_service"] = PlatformAwareAPIService(single_source_wrapper)
+        
+        # Initialize platform service
+        await app_state["platform_service"].initialize()
+        logger.info("✅ Platform-Aware API Service initialized")
+        
+        # Set the platform service in the route module
+        from .routes.platform_events import set_platform_service
+        set_platform_service(app_state["platform_service"])
         
         logger.info("✅ All services initialized successfully!")
         
@@ -123,8 +216,11 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down services...")
     if app_state["pipeline"]:
         await app_state["pipeline"].cleanup()
-    if app_state["siem_connector"]:
-        await app_state["siem_connector"].disconnect()
+    if app_state["multi_source_manager"]:
+        await app_state["multi_source_manager"].cleanup()
+    elif app_state["siem_connector"]:
+        if hasattr(app_state["siem_connector"], 'disconnect'):
+            await app_state["siem_connector"].disconnect()
 
 # Create FastAPI app
 app = FastAPI(
@@ -162,6 +258,7 @@ app.add_middleware(LoggingMiddleware)
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(platform_events_router, prefix="/api", tags=["Platform Events"])
 app.include_router(windows_router, prefix="/api", tags=["Windows Data"])
 app.include_router(assistant.router, prefix="/api/assistant", tags=["Assistant"])
 app.include_router(query.router, prefix="/api/query", tags=["Query"])
@@ -195,8 +292,10 @@ async def health_check():
         "services": {
             "pipeline": app_state["pipeline"] is not None,
             "siem_connector": app_state["siem_connector"] is not None,
+            "multi_source_manager": app_state["multi_source_manager"] is not None,
             "context_manager": app_state["context_manager"] is not None,
-            "schema_mapper": app_state["schema_mapper"] is not None
+            "schema_mapper": app_state["schema_mapper"] is not None,
+            "platform_service": app_state["platform_service"] is not None
         }
     }
     

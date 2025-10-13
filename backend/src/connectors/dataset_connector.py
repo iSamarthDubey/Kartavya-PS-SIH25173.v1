@@ -30,10 +30,10 @@ class DatasetConnector(BaseSIEMConnector):
         
         # Dataset configuration
         self.datasets = {
-            "advanced_siem": {
+            "security_logs": {
                 "local_path": self.data_dir / "Advanced_SIEM_Dataset" / "advanced_siem_dataset.jsonl",
                 "hf_name": "darkknight25/Advanced_SIEM_Dataset",
-                "description": "Advanced SIEM Dataset with comprehensive security logs"
+                "description": "Advanced Security Dataset with comprehensive security logs"
             }
         }
     
@@ -44,7 +44,7 @@ class DatasetConnector(BaseSIEMConnector):
     async def connect(self) -> bool:
         """Load datasets: local file first, then HuggingFace download"""
         try:
-            logger.info("🔄 Loading SIEM datasets...")
+            logger.info("🔄 Loading security datasets...")
             
             for dataset_key, dataset_info in self.datasets.items():
                 local_path = dataset_info["local_path"]
@@ -169,7 +169,7 @@ class DatasetConnector(BaseSIEMConnector):
                 "network": {},
                 "user": {},
                 "host": {},
-                "metadata": {"dataset": "advanced_siem"}
+                "metadata": {"dataset": "security_logs"}
             }
             
             # Map fields from the record
@@ -258,6 +258,52 @@ class DatasetConnector(BaseSIEMConnector):
     async def test_connection(self) -> bool:
         """Test if dataset is loaded and ready"""
         return self.connected and len(self.dataset_cache) > 0
+    
+    def is_available(self) -> bool:
+        """Check if dataset connector is available"""
+        return self.connected and len(self.dataset_cache) > 0
+    
+    async def search(self, query: str, limit: int = 100) -> List[Dict]:
+        """Search the dataset with a text query"""
+        try:
+            if not self.connected or not self.dataset_cache:
+                logger.warning("Dataset not loaded, attempting to initialize...")
+                await self.initialize()
+            
+            # Get the dataset
+            if not self.dataset_cache:
+                return []
+                
+            dataset_key = list(self.dataset_cache.keys())[0]
+            dataset = self.dataset_cache[dataset_key]
+            
+            # Simple text search
+            query_text = query.lower()
+            results = []
+            
+            if query_text == "*" or not query_text or "security events" in query_text:
+                # Return random sample for generic queries
+                import random
+                results = random.sample(dataset, min(limit, len(dataset)))
+            else:
+                # Search in record content
+                for record in dataset:
+                    record_text = json.dumps(record).lower()
+                    if query_text in record_text:
+                        results.append(record)
+                        if len(results) >= limit:
+                            break
+                
+                # If no matches, return sample
+                if not results:
+                    results = random.sample(dataset, min(limit, len(dataset)))
+            
+            logger.info(f"🔍 Search completed: {len(results)} results for query: {query}")
+            return results
+            
+        except Exception as e:
+            logger.error(f"❌ Search failed: {e}")
+            return []
     
     async def get_field_mappings(self) -> Dict[str, str]:
         """Get field mappings for this connector"""
