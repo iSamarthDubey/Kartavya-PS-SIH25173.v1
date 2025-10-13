@@ -166,19 +166,40 @@ async def lifespan(app: FastAPI):
             
             # Create connector using factory with proper configuration
             try:
-                app_state["siem_connector"] = create_connector(
+                connector = create_connector(
                     platform=data_source,
                     environment=settings.environment,
                 )
+                
+                # Ensure connector is connected
+                if hasattr(connector, 'connect'):
+                    try:
+                        await connector.connect()
+                        logger.info(f"🔗 Successfully connected to {data_source}")
+                    except Exception as connect_error:
+                        logger.warning(f"⚠️ Connection failed for {data_source}: {connect_error}")
+                        # Continue anyway - some connectors work without explicit connection
+                
+                app_state["siem_connector"] = connector
                 logger.info(f"✅ Successfully initialized single data source: {data_source}")
             except Exception as e:
                 logger.error(f"❌ Data source initialization failed: {e}")
                 # Always fall back to dataset connector for reliability
                 logger.info("📊 Falling back to dataset connector")
-                app_state["siem_connector"] = create_connector(
+                fallback_connector = create_connector(
                     platform="dataset",
                     environment=settings.environment
                 )
+                
+                # Ensure fallback connector is connected
+                if hasattr(fallback_connector, 'connect'):
+                    try:
+                        await fallback_connector.connect()
+                        logger.info("🔗 Fallback connector connected successfully")
+                    except Exception:
+                        logger.info("📊 Dataset connector ready (no explicit connection needed)")
+                
+                app_state["siem_connector"] = fallback_connector
         
         # Initialize context manager
         app_state["context_manager"] = ContextManager()

@@ -219,6 +219,7 @@ async def get_data_source_status():
         )
 
 @router.get("/system/status")
+@router.get("/system-status")  # Alias for frontend compatibility
 async def get_system_status():
     """
     Get real system status from monitoring datasets

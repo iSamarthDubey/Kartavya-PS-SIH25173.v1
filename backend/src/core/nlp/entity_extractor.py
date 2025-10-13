@@ -112,6 +112,10 @@ class EntityExtractor:
                 r'\bfrom\s+(\d{1,2}/\d{1,2}/\d{2,4})\s+to\s+(\d{1,2}/\d{1,2}/\d{2,4})\b',
                 r'\bsince\s+(\d{1,2}/\d{1,2}/\d{2,4})\b',
                 r'\bbetween\s+(.+?)\s+and\s+(.+?)\b',
+                # Enhanced patterns for smart defaults
+                r'\b(recent|recently|latest|current|now)\b',
+                r'\b(immediate|urgent|asap)\b',
+                r'\b(in the (last|past))\s*(\w+)\b'
             ],
             
             'severity': [
@@ -123,6 +127,13 @@ class EntityExtractor:
                 r'\bfrom\s+(windows|linux|apache|nginx|iis|firewall|router|switch)\b',
                 r'\bsource[:\s]+(windows|linux|apache|nginx|iis|firewall|router|switch)\b',
                 r'\b(syslog|eventlog|audit|firewall)\s+(?:logs?|events?)\b',
+            ],
+            
+            'security_context': [
+                r'\b(incident|breach|attack|compromise|threat)\b',
+                r'\b(urgent|immediate|critical|emergency)\b',
+                r'\b(investigate|hunt|analyze|review)\b',
+                r'\b(compliance|audit|policy|regulation)\b'
             ]
         }
         

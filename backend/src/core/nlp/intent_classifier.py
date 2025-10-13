@@ -42,7 +42,10 @@ class IntentClassifier:
                 r'\bbrute\s?force\b',
                 r'\b(bad|wrong|incorrect|invalid)\s+(password|credential)\b',
                 r'\baccount\s+(lock|disabled|expired)\b',
-                r'\b(winlogbeat|windows)\s+.*\s+(fail|error)\b'
+                r'\b(winlogbeat|windows)\s+.*\s+(fail|error)\b',
+                # Enhanced patterns for time-sensitive authentication queries
+                r'\b(recent|latest|current)\s+(failed|unsuccessful)\s+(login|authentication)\b',
+                r'\b(urgent|immediate)\s+(login|auth)\s+(fail|error)\b'
             ],
             
             QueryIntent.SHOW_SUCCESSFUL_LOGINS: [
@@ -73,7 +76,12 @@ class IntentClassifier:
                 r'\b(malware|virus|trojan|ransomware)\b',
                 r'\bintrusion\s+(detect|attempt)\b',
                 r'\b(suspicious|malicious)\s+(activity|behavior)\b',
-                r'\b(ids|ips)\s+(alert|trigger)\b'
+                r'\b(ids|ips)\s+(alert|trigger)\b',
+                # Enhanced patterns for recent/urgent security events
+                r'\b(recent|latest|current)\s+(security|threat|alert)\b',
+                r'\b(urgent|immediate|critical)\s+(security|alert)\b',
+                r'\bsecurity\s+(events?|incidents?)\b',
+                r'\balert\s+(from|in|during)\b'
             ],
             
             QueryIntent.USER_ACTIVITY: [

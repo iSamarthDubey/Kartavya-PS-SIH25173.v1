@@ -6,6 +6,7 @@ import logging
 from datetime import datetime, timedelta
 import jwt
 import asyncio
+import hashlib
 
 from ...core.config import settings
 from ...core.database.clients import SupabaseClient, MongoDBClient, RedisClient
@@ -20,8 +21,21 @@ security = HTTPBearer()
 supabase_client = SupabaseClient()
 mongodb_client = MongoDBClient()
 redis_client = RedisClient()
-auth_manager = AuthManager(user_store_path="data/users.json")
+auth_manager = AuthManager()  # No local file storage
 rbac = RBAC()
+
+def verify_password(password: str, stored_hash: str, salt: str) -> bool:
+    """Verify password against stored hash using same method as auth_manager"""
+    if not password or not stored_hash or not salt:
+        return False
+    
+    try:
+        # Use same hashing method as create_demo_user.py
+        password_hash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), bytes.fromhex(salt), 120000).hex()
+        return password_hash == stored_hash
+    except Exception as e:
+        logger.error(f"Password verification error: {e}")
+        return False
 
 # Pydantic models
 class LoginRequest(BaseModel):
@@ -62,10 +76,10 @@ async def login(login_data: LoginRequest):
                 detail="Invalid credentials"
             )
         
-        # Step 2: Verify password using auth manager
+        # Step 2: Verify password using stored hash
         username = user_profile['username']
         
-        if not auth_manager.authenticate(username, login_data.password):
+        if not verify_password(login_data.password, user_profile.get('password_hash'), user_profile.get('salt')):
             logger.warning(f"Invalid password for user: {username}")
             
             # Log failed attempt
@@ -107,16 +121,16 @@ async def login(login_data: LoginRequest):
             message="Login successful",
             token=token,
             user={
-                "id": user_profile.get('_id'),
+                "id": user_profile.get('_id') or user_profile.get('id'),
                 "username": user_profile['username'],
                 "email": user_profile['email'],
                 "full_name": user_profile['full_name'],
                 "role": user_profile['role'],
-                "department": user_profile['department'],
-                "location": user_profile['location'],
+                "department": user_profile.get('department', 'Default'),
+                "location": user_profile.get('location', 'HQ'),
                 "preferences": user_profile.get('preferences', {}),
                 "last_login": user_profile.get('last_login'),
-                "security_clearance": user_profile.get('security_clearance')
+                "security_clearance": user_profile.get('security_clearance', 'standard')
             },
             permissions=permissions
         )
@@ -131,104 +145,35 @@ async def login(login_data: LoginRequest):
         )
 
 async def get_user_by_identifier(identifier: str) -> Optional[Dict[str, Any]]:
-    """Get user by email, username, or user_id from MongoDB"""
-    if not mongodb_client.enabled:
-        logger.warning("MongoDB not enabled, using auth manager fallback")
-        
-        # Create mapping from email/username to actual username for demo users
-        demo_user_mapping = {
-            # Email mappings
-            "admin@kartavya.demo": "security_admin",
-            "analyst@kartavya.demo": "security_analyst", 
-            "viewer@kartavya.demo": "security_viewer",
-            # Username mappings (direct)
-            "security_admin": "security_admin",
-            "security_analyst": "security_analyst",
-            "security_viewer": "security_viewer"
-        }
-        
-        # Try to find the actual username
-        actual_username = demo_user_mapping.get(identifier)
-        if not actual_username:
-            logger.warning(f"No mapping found for identifier: {identifier}")
-            return None
-            
-        # Get role from auth manager using actual username
-        role = auth_manager.get_role(actual_username)
-        if not role:
-            logger.warning(f"No role found for username: {actual_username}")
-            return None
-            
-        # Create user profile from demo data
-        demo_profiles = {
-            "security_admin": {
-                'username': 'security_admin',
-                'email': 'admin@kartavya.demo',
-                'full_name': 'Security Administrator',
-                'role': 'admin',
-                'department': 'IT Security',
-                'location': 'Mumbai, India',
-                'security_clearance': 'Level 5'
-            },
-            "security_analyst": {
-                'username': 'security_analyst',
-                'email': 'analyst@kartavya.demo',
-                'full_name': 'Security Analyst',
-                'role': 'analyst',
-                'department': 'SOC Team',
-                'location': 'Delhi, India',
-                'security_clearance': 'Level 3'
-            },
-            "security_viewer": {
-                'username': 'security_viewer',
-                'email': 'viewer@kartavya.demo',
-                'full_name': 'Security Viewer',
-                'role': 'viewer',
-                'department': 'Management',
-                'location': 'Bangalore, India',
-                'security_clearance': 'Level 2'
-            }
-        }
-        
-        profile = demo_profiles.get(actual_username, {
-            'username': actual_username,
-            'email': f"{actual_username}@kartavya.demo",
-            'full_name': actual_username.replace('_', ' ').title(),
-            'role': role,
-            'department': 'Demo',
-            'location': 'Demo Location',
-            'security_clearance': 'Level 1'
-        })
-        
-        profile.update({
-            'preferences': {},
-            'account_locked': False
-        })
-        
-        return profile
+    """Get user by email, username, or user_id from Supabase"""
+    if not supabase_client.enabled:
+        logger.error("Supabase is not enabled. User authentication requires Supabase setup.")
+        return None
     
     try:
-        collection = mongodb_client.database["user_profiles"]
+        # Try to find user by username first
+        response = supabase_client.client.table('user_profiles').select('*').eq('username', identifier).execute()
+        if response.data and len(response.data) > 0:
+            return response.data[0]
         
-        # Try multiple fields to find user
-        query_conditions = [
-            {"email": identifier},
-            {"username": identifier},
-            {"_id": identifier}
-        ]
+        # Try to find user by email
+        response = supabase_client.client.table('user_profiles').select('*').eq('email', identifier).execute()
+        if response.data and len(response.data) > 0:
+            return response.data[0]
         
-        for condition in query_conditions:
-            user = await asyncio.get_event_loop().run_in_executor(
-                None, 
-                lambda: collection.find_one(condition)
-            )
-            if user:
-                return user
+        # Try to find user by ID (UUID)
+        try:
+            response = supabase_client.client.table('user_profiles').select('*').eq('id', identifier).execute()
+            if response.data and len(response.data) > 0:
+                return response.data[0]
+        except:
+            # Invalid UUID format, ignore
+            pass
         
         return None
     
     except Exception as e:
-        logger.error(f"Error querying user: {e}")
+        logger.error(f"Error querying user from Supabase: {e}")
         return None
 
 def generate_jwt_token(user_profile: Dict[str, Any]) -> str:
@@ -345,8 +290,8 @@ async def get_user_profile(credentials: HTTPAuthorizationCredentials = Depends(s
             email=user_profile['email'],
             full_name=user_profile['full_name'],
             role=user_profile['role'],
-            department=user_profile['department'],
-            location=user_profile['location'],
+            department=user_profile.get('department', 'Default'),
+            location=user_profile.get('location', 'HQ'),
             preferences=user_profile.get('preferences', {}),
             last_login=user_profile.get('last_login'),
             permissions=permissions

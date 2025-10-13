@@ -28,11 +28,26 @@ router = APIRouter()
 # Request/Response Models
 class ChatRequest(BaseModel):
     """Chat request model"""
-    query: str = Field(..., description="Natural language query", min_length=1)
+    query: Optional[str] = Field(None, description="Natural language query", min_length=1)
+    message: Optional[str] = Field(None, description="Natural language message (alias for query)", min_length=1)
     conversation_id: Optional[str] = Field(None, description="Conversation ID for context")
+    user_id: Optional[str] = Field(None, description="User ID for tracking")
     user_context: Optional[Dict[str, Any]] = Field(None, description="Additional user context")
     filters: Optional[Dict[str, Any]] = Field(None, description="Optional filters")
     limit: Optional[int] = Field(100, description="Max results to return", ge=1, le=1000)
+    
+    def __init__(self, **data):
+        # Handle backward compatibility: if message is provided but query is not, use message as query
+        if data.get('message') and not data.get('query'):
+            data['query'] = data['message']
+        elif data.get('query') and not data.get('message'):
+            data['message'] = data['query']
+        
+        # Ensure at least one is provided
+        if not data.get('query') and not data.get('message'):
+            raise ValueError("Either 'query' or 'message' field must be provided")
+        
+        super().__init__(**data)
     
     class Config:
         json_schema_extra = {
@@ -119,11 +134,32 @@ async def chat(
         if not context:
             context = await context_manager.get_context(conversation_id)
         
-        # Process the query through the pipeline
+        # Prepare enhanced user context for AI improvements
+        enhanced_user_context = {
+            "user_id": request.user_id,
+            "conversation_id": conversation_id,
+            "role": "security_analyst",  # Default role - could be from auth/session
+            "urgency": "normal",  # Could be detected from query keywords
+            "preferences": {
+                "default_time_window": "24h",
+                "preferred_severity": ["high", "critical"]
+            }
+        }
+        
+        # Merge with provided user context
+        if request.user_context:
+            enhanced_user_context.update(request.user_context)
+        
+        # Detect urgency from query for smarter defaults
+        urgent_keywords = ["urgent", "immediate", "critical", "alert", "breach", "attack"]
+        if any(keyword in request.query.lower() for keyword in urgent_keywords):
+            enhanced_user_context["urgency"] = "high"
+        
+        # Process the query through the enhanced pipeline
         result = await pipeline.process(
             query=request.query,
             context=context,
-            user_context=request.user_context,
+            user_context=enhanced_user_context,  # Use enhanced context
             filters=request.filters
         )
         
@@ -228,12 +264,21 @@ async def chat(
             query_type=intent
         )
         
-        # Generate summary
-        summary = await pipeline.generate_summary(
+        # Generate summary (include AI enhancement info)
+        base_summary = await pipeline.generate_summary(
             results=formatted_results,
             query=request.query,
             intent=intent
         )
+        
+        # Enhance summary with AI improvements info
+        ai_enhancements = result.get("ai_enhancements", {})
+        if ai_enhancements.get("enhanced"):
+            applied_defaults = ai_enhancements.get("applied_defaults", [])
+            enhancement_info = f" (Applied smart defaults: {', '.join(applied_defaults)})"
+            summary = base_summary + enhancement_info
+        else:
+            summary = base_summary
         
         # Generate standardized visualizations if applicable
         visualizations = None
@@ -280,7 +325,9 @@ async def chat(
                 "processing_time": result.get("processing_time", 0),
                 "total_results": len(formatted_results),
                 "returned_results": min(len(formatted_results), request.limit),
-                "cache_hit": False
+                "cache_hit": False,
+                "ai_enhancements": result.get("ai_enhancements", {}),  # Include AI improvements
+                "processed_query": result.get("processed_query", request.query)  # Show enhanced query
             },
             "status": "success",
             "error": None

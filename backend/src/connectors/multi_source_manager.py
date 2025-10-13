@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 import hashlib
 import json
+import time
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 
 from .base import BaseSIEMConnector
 from .factory import create_connector, get_available_platforms
@@ -36,6 +38,18 @@ class LoadBalanceStrategy(Enum):
 
 
 @dataclass
+class CircuitBreakerState:
+    """Circuit breaker state for a data source"""
+    state: str = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
+    failure_count: int = 0
+    last_failure_time: Optional[float] = None
+    next_attempt_time: Optional[float] = None
+    success_count_in_half_open: int = 0
+    failure_threshold: int = 5
+    recovery_timeout: int = 60  # seconds
+    success_threshold: int = 3  # successful calls to close circuit
+
+@dataclass
 class SourceConfig:
     """Configuration for a single data source"""
     connector_type: str
@@ -48,6 +62,7 @@ class SourceConfig:
     weight: float = 1.0  # Load balancing weight
     tags: Set[str] = field(default_factory=set)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    circuit_breaker: CircuitBreakerState = field(default_factory=CircuitBreakerState)
 
 
 @dataclass
@@ -94,11 +109,20 @@ class MultiSourceManager:
         self.source_stats: Dict[str, Dict[str, Any]] = {}
         self.load_balance_strategy = LoadBalanceStrategy.PRIORITY_BASED
         
-        # Query tracking
+        # Enhanced query tracking and caching
         self.active_queries: Dict[str, Set[str]] = {}  # source_id -> query_ids
         self.query_history: List[Dict[str, Any]] = []
+        self.query_cache: Dict[str, Tuple[List[Dict], float]] = {}  # query_hash -> (results, timestamp)
+        self.cache_ttl = 300  # 5 minutes
         
-        logger.info("🔗 MultiSourceManager initialized")
+        # Load balancing and performance tracking
+        self.source_response_times: Dict[str, List[float]] = {}
+        self.source_load_scores: Dict[str, float] = {}
+        
+        # Circuit breaker management
+        self.circuit_breakers: Dict[str, CircuitBreakerState] = {}
+        
+        logger.info("🔗 MultiSourceManager initialized with enhanced features")
     
     async def initialize(self) -> bool:
         """Initialize the multi-source manager"""
@@ -174,6 +198,11 @@ class MultiSourceManager:
                     "error_count": 0
                 }
                 
+                # Initialize circuit breaker and performance tracking
+                self.circuit_breakers[source_id] = CircuitBreakerState()
+                self.source_response_times[source_id] = []
+                self.source_load_scores[source_id] = 1.0
+                
                 logger.info(f"✅ Added source: {source_id} ({platform}) - Priority: {config.priority.name}")
                 
             except Exception as e:
@@ -226,6 +255,11 @@ class MultiSourceManager:
                 "error_count": 0
             }
             
+            # Initialize circuit breaker and performance tracking  
+            self.circuit_breakers[source_id] = CircuitBreakerState()
+            self.source_response_times[source_id] = []
+            self.source_load_scores[source_id] = 1.0
+            
             logger.info("✅ Added fallback dataset source")
             
         except Exception as e:
@@ -269,6 +303,8 @@ class MultiSourceManager:
                 self.source_health[source_id] = False
                 self.source_stats[source_id]["error_count"] += 1
                 logger.error(f"❌ Health check failed for {source_id}: {e}")
+                # Update circuit breaker on health check failure
+                self._record_failure(source_id)
     
     async def query_all_sources(
         self,
@@ -296,15 +332,21 @@ class MultiSourceManager:
         
         logger.info(f"🔍 Multi-source query [{query_id}]: {query}")
         
-        # Get healthy sources
-        healthy_sources = [
-            source_id for source_id, is_healthy 
-            in self.source_health.items() 
-            if is_healthy and self.source_configs[source_id].enabled
-        ]
+        # Check query cache first
+        query_cache_key = self._generate_cache_key(query, filters, limit)
+        cached_result = self._get_cached_result(query_cache_key)
+        if cached_result:
+            logger.info(f"⚡ Cache HIT for query [{query_id}]")
+            return cached_result
         
-        if not healthy_sources:
-            logger.warning("⚠️ No healthy sources available")
+        # Get available sources (healthy + circuit breaker check)
+        available_sources = self._get_available_sources()
+        
+        # Apply load balancing to select optimal sources
+        selected_sources = self._select_sources_with_load_balancing(available_sources, limit)
+        
+        if not selected_sources:
+            logger.warning("⚠️ No available sources for query execution")
             return AggregatedResult(
                 data=[],
                 source_contributions={},
@@ -312,36 +354,50 @@ class MultiSourceManager:
                 execution_time=0.0,
                 successful_sources=[],
                 failed_sources=list(self.sources.keys()),
-                metadata={"error": "No healthy sources available"}
+                metadata={"error": "No available sources (health/circuit breaker)"}
             )
         
-        # Execute queries in parallel
+        # Execute queries in parallel with enhanced error handling
         tasks = []
-        for source_id in healthy_sources:
+        for source_id in selected_sources:
             task = asyncio.create_task(
-                self._query_single_source(
+                self._query_single_source_with_circuit_breaker(
                     source_id, query, filters, limit, timeout
                 )
             )
             tasks.append(task)
         
-        # Wait for all queries to complete
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # Wait for all queries to complete with timeout
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=timeout + 5.0  # Add buffer to main timeout
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"⏱️ Multi-source query [{query_id}] timed out")
+            # Cancel remaining tasks
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            results = [Exception("Query timeout") for _ in selected_sources]
         
-        # Process results
+        # Process results with circuit breaker updates
         successful_results = []
         failed_sources = []
         
         for i, result in enumerate(results):
-            source_id = healthy_sources[i]
+            source_id = selected_sources[i]
             
             if isinstance(result, Exception):
                 logger.error(f"❌ Query failed for {source_id}: {result}")
                 failed_sources.append(source_id)
+                self._record_failure(source_id)
             elif result and result.success:
                 successful_results.append(result)
+                self._record_success(source_id, result.execution_time)
             else:
                 failed_sources.append(source_id)
+                self._record_failure(source_id)
         
         # Aggregate results
         aggregated = await self._aggregate_results(
@@ -351,15 +407,20 @@ class MultiSourceManager:
         # Update statistics
         execution_time = (datetime.now() - start_time).total_seconds()
         
+        # Cache successful results
+        if successful_results:
+            self._cache_result(query_cache_key, aggregated)
+        
         # Store query in history
         self.query_history.append({
             "query_id": query_id,
             "query": query,
             "execution_time": execution_time,
-            "sources_queried": len(healthy_sources),
+            "sources_queried": len(selected_sources),
             "sources_successful": len(successful_results),
             "total_records": aggregated.total_records,
-            "timestamp": start_time.isoformat()
+            "timestamp": start_time.isoformat(),
+            "cache_hit": False
         })
         
         # Limit history size
@@ -373,6 +434,174 @@ class MultiSourceManager:
         )
         
         return aggregated
+    
+    def _generate_cache_key(self, query: str, filters: Optional[Dict[str, Any]], limit: int) -> str:
+        """Generate cache key for query result caching"""
+        cache_data = {
+            "query": query,
+            "filters": filters or {},
+            "limit": limit
+        }
+        cache_str = json.dumps(cache_data, sort_keys=True)
+        return hashlib.md5(cache_str.encode()).hexdigest()[:12]
+    
+    def _get_cached_result(self, cache_key: str) -> Optional[AggregatedResult]:
+        """Get cached query result if still valid"""
+        if cache_key not in self.query_cache:
+            return None
+            
+        result, timestamp = self.query_cache[cache_key]
+        if time.time() - timestamp > self.cache_ttl:
+            # Cache expired
+            del self.query_cache[cache_key]
+            return None
+            
+        # Convert cached data back to AggregatedResult
+        return result
+    
+    def _cache_result(self, cache_key: str, result: AggregatedResult):
+        """Cache query result"""
+        self.query_cache[cache_key] = (result, time.time())
+        
+        # Limit cache size
+        if len(self.query_cache) > 100:
+            # Remove oldest entries
+            oldest_keys = sorted(self.query_cache.keys(), 
+                               key=lambda k: self.query_cache[k][1])[:20]
+            for key in oldest_keys:
+                del self.query_cache[key]
+    
+    def _get_available_sources(self) -> List[str]:
+        """Get sources that are healthy and pass circuit breaker check"""
+        available = []
+        current_time = time.time()
+        
+        for source_id in self.sources.keys():
+            if not self.source_configs[source_id].enabled:
+                continue
+                
+            if not self.source_health[source_id]:
+                continue
+                
+            # Check circuit breaker
+            cb = self.circuit_breakers[source_id]
+            
+            if cb.state == "OPEN":
+                if cb.next_attempt_time and current_time >= cb.next_attempt_time:
+                    # Transition to HALF_OPEN
+                    cb.state = "HALF_OPEN"
+                    cb.success_count_in_half_open = 0
+                    logger.info(f"🔄 Circuit breaker HALF_OPEN for {source_id}")
+                    available.append(source_id)
+                # else: circuit still open, skip source
+            else:
+                # CLOSED or HALF_OPEN
+                available.append(source_id)
+                
+        return available
+    
+    def _select_sources_with_load_balancing(self, available_sources: List[str], limit: int) -> List[str]:
+        """Select sources using load balancing strategy"""
+        if not available_sources:
+            return []
+            
+        if self.load_balance_strategy == LoadBalanceStrategy.PRIORITY_BASED:
+            # Sort by priority and load score
+            return sorted(available_sources, 
+                         key=lambda s: (self.source_configs[s].priority.value, 
+                                       self.source_load_scores[s]))
+                                       
+        elif self.load_balance_strategy == LoadBalanceStrategy.RESPONSE_TIME:
+            # Sort by average response time
+            return sorted(available_sources, 
+                         key=lambda s: self._get_avg_response_time(s))
+                         
+        elif self.load_balance_strategy == LoadBalanceStrategy.ROUND_ROBIN:
+            # Simple round robin (could be enhanced with state tracking)
+            return available_sources
+            
+        else:
+            # Default to all available sources
+            return available_sources
+    
+    def _get_avg_response_time(self, source_id: str) -> float:
+        """Get average response time for a source"""
+        times = self.source_response_times[source_id]
+        if not times:
+            return 0.0
+        return sum(times[-10:]) / len(times[-10:])  # Last 10 queries
+    
+    def _record_success(self, source_id: str, execution_time: float):
+        """Record successful query execution"""
+        cb = self.circuit_breakers[source_id]
+        
+        # Update response times
+        self.source_response_times[source_id].append(execution_time)
+        if len(self.source_response_times[source_id]) > 50:
+            self.source_response_times[source_id] = self.source_response_times[source_id][-50:]
+        
+        # Update load score based on performance
+        avg_time = self._get_avg_response_time(source_id)
+        self.source_load_scores[source_id] = max(0.1, 1.0 / (avg_time + 0.1))
+        
+        if cb.state == "HALF_OPEN":
+            cb.success_count_in_half_open += 1
+            if cb.success_count_in_half_open >= cb.success_threshold:
+                # Close circuit
+                cb.state = "CLOSED"
+                cb.failure_count = 0
+                cb.next_attempt_time = None
+                logger.info(f"✅ Circuit breaker CLOSED for {source_id}")
+        elif cb.state == "CLOSED":
+            # Reset failure count on success
+            cb.failure_count = 0
+    
+    def _record_failure(self, source_id: str):
+        """Record failed query execution"""
+        cb = self.circuit_breakers[source_id]
+        cb.failure_count += 1
+        cb.last_failure_time = time.time()
+        
+        # Decrease load score on failure
+        self.source_load_scores[source_id] *= 0.8
+        
+        if cb.state == "CLOSED" and cb.failure_count >= cb.failure_threshold:
+            # Open circuit
+            cb.state = "OPEN"
+            cb.next_attempt_time = time.time() + cb.recovery_timeout
+            logger.warning(f"⚠️ Circuit breaker OPEN for {source_id} (failures: {cb.failure_count})")
+        elif cb.state == "HALF_OPEN":
+            # Return to OPEN on any failure in HALF_OPEN
+            cb.state = "OPEN"
+            cb.next_attempt_time = time.time() + cb.recovery_timeout
+            logger.warning(f"⚠️ Circuit breaker OPEN again for {source_id}")
+    
+    async def _query_single_source_with_circuit_breaker(
+        self,
+        source_id: str,
+        query: str,
+        filters: Optional[Dict[str, Any]],
+        limit: int,
+        timeout: float
+    ) -> QueryResult:
+        """Query single source with circuit breaker protection"""
+        cb = self.circuit_breakers[source_id]
+        
+        if cb.state == "OPEN":
+            # Circuit is open, return failure immediately
+            return QueryResult(
+                source_id=source_id,
+                connector_type=self.source_configs[source_id].connector_type,
+                data=[],
+                execution_time=0.0,
+                success=False,
+                error="Circuit breaker is OPEN"
+            )
+        
+        # Proceed with normal query execution
+        return await self._query_single_source(
+            source_id, query, filters, limit, timeout
+        )
     
     async def _query_single_source(
         self,
@@ -511,10 +740,18 @@ class MultiSourceManager:
         return unique_records
     
     def get_source_status(self) -> Dict[str, Any]:
-        """Get status of all configured sources"""
+        """Get comprehensive status of all configured sources"""
+        available_sources = self._get_available_sources()
+        
         return {
             "total_sources": len(self.sources),
             "healthy_sources": sum(self.source_health.values()),
+            "available_sources": len(available_sources),
+            "cache_stats": {
+                "cache_size": len(self.query_cache),
+                "cache_ttl": self.cache_ttl,
+                "recent_queries": len(self.query_history)
+            },
             "sources": {
                 source_id: {
                     "type": config.connector_type,
@@ -522,6 +759,13 @@ class MultiSourceManager:
                     "healthy": self.source_health[source_id],
                     "enabled": config.enabled,
                     "weight": config.weight,
+                    "load_score": self.source_load_scores.get(source_id, 1.0),
+                    "avg_response_time": self._get_avg_response_time(source_id),
+                    "circuit_breaker": {
+                        "state": self.circuit_breakers[source_id].state,
+                        "failure_count": self.circuit_breakers[source_id].failure_count,
+                        "last_failure": self.circuit_breakers[source_id].last_failure_time
+                    },
                     "stats": self.source_stats[source_id],
                     "tags": list(config.tags)
                 }

@@ -32,6 +32,7 @@ class ConversationalPipeline:
             from .nlp.intent_classifier import IntentClassifier
             from .nlp.entity_extractor import EntityExtractor
             from .nlp.schema_mapper import SchemaMapper
+            from .nlp.smart_defaults import AdvancedQueryPreprocessor
             from .query.builder import QueryBuilder
             from .query.validator import QueryValidator
             from .query.advanced_builder import AdvancedQueryBuilder, QueryValidator as AdvancedValidator
@@ -41,6 +42,7 @@ class ConversationalPipeline:
             self.intent_classifier = IntentClassifier()
             self.entity_extractor = EntityExtractor()
             self.schema_mapper = SchemaMapper()
+            self.query_preprocessor = AdvancedQueryPreprocessor()  # NEW: Smart defaults engine
             self.query_builder = QueryBuilder()
             self.advanced_query_builder = AdvancedQueryBuilder()
             self.query_validator = QueryValidator()
@@ -99,31 +101,51 @@ class ConversationalPipeline:
             entities = [entity.to_dict() for entity in raw_entities]
             result["entities"] = entities
             
-            # Step 3: Check for ambiguities
-            if await self._has_ambiguities(query, entities):
+            # Step 3: SMART DEFAULTS - Apply AI intelligence before clarification
+            processed_query = self.query_preprocessor.preprocess_query(
+                query=query,
+                intent=result["intent"],
+                entities=entities,
+                user_context=user_context
+            )
+            
+            # Update result with AI enhancements
+            result["processed_query"] = processed_query["processed_query"]
+            result["ai_enhancements"] = processed_query["enhancements"]
+            result["confidence"] += processed_query["confidence_boost"]  # Boost confidence with smart defaults
+            
+            # Step 4: Check for ambiguities (ONLY if smart defaults couldn't resolve them)
+            if processed_query["needs_clarification"] and await self._has_ambiguities(query, entities):
                 clarifications = await self._get_clarifications(query, entities)
                 result["needs_clarification"] = True
                 result["clarifications"] = clarifications
                 return result
             
-            # Step 4: Apply context if available
+            # Step 5: Apply context if available
             if context and context.get("history"):
                 entities = await self._apply_context(entities, context)
             
-            # Step 5: Schema mapping
-            field_mappings = await self.schema_mapper.map_entities(entities)
+            # Step 6: Schema mapping (using enhanced entities if available)
+            enhanced_entities = entities.copy()
+            if result["ai_enhancements"].get("suggested_fields"):
+                # Add suggested fields as potential entities for better mapping
+                for field in result["ai_enhancements"]["suggested_fields"]:
+                    enhanced_entities.append({"type": field, "value": "*", "confidence": 0.5})
+            
+            field_mappings = await self.schema_mapper.map_entities(enhanced_entities)
             result["field_mappings"] = field_mappings
             
-            # Step 6: Build query
+            # Step 7: Build query (with AI enhancements)
             siem_query = await self.build_query(
                 intent=result["intent"],
-                entities=entities,
+                entities=enhanced_entities,
                 field_mappings=field_mappings,
-                context=context
+                context=context,
+                ai_enhancements=result["ai_enhancements"]  # Pass AI enhancements to query builder
             )
             result["siem_query"] = siem_query
             
-            # Step 7: Validate query
+            # Step 8: Validate query
             is_valid, validation_error = await self.validate_query(siem_query)
             result["query_valid"] = is_valid
             if not is_valid:
@@ -145,7 +167,8 @@ class ConversationalPipeline:
         intent: str,
         entities: List[Dict[str, Any]],
         field_mappings: Dict[str, List[str]],
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
+        ai_enhancements: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Build SIEM query from processed components

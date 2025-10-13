@@ -68,7 +68,12 @@ class SchemaMapper:
             
             # User entities
             "user": {
-                "elastic": ["user.name", "source.user.name", "destination.user.name"],
+                "elastic": ["user.name", "source.user.name", "destination.user.name", "winlog.event_data.TargetUserName"],
+                "wazuh": ["data.win.eventdata.targetUserName", "data.srcuser"],
+                "fields": ["user.name", "user.id", "user.email"]
+            },
+            "username": {
+                "elastic": ["user.name", "source.user.name", "destination.user.name", "winlog.event_data.TargetUserName"],
                 "wazuh": ["data.win.eventdata.targetUserName", "data.srcuser"],
                 "fields": ["user.name", "user.id", "user.email"]
             },
@@ -155,9 +160,21 @@ class SchemaMapper:
         """
         try:
             if hasattr(connector, 'get_field_mappings'):
-                # get_field_mappings() is not async, so don't await it
-                self.discovered_fields = connector.get_field_mappings()
-                logger.info(f"Discovered {len(self.discovered_fields)} field mappings from SIEM")
+                # Check if get_field_mappings is async
+                import inspect
+                if inspect.iscoroutinefunction(connector.get_field_mappings):
+                    # It's async, so await it
+                    self.discovered_fields = await connector.get_field_mappings()
+                else:
+                    # It's sync, call it directly
+                    self.discovered_fields = connector.get_field_mappings()
+                
+                # Safely get the length of discovered fields
+                if isinstance(self.discovered_fields, dict):
+                    field_count = len(self.discovered_fields.get('properties', {}))
+                    logger.info(f"Discovered {field_count} field mappings from SIEM")
+                else:
+                    logger.info("Schema discovery completed")
         except Exception as e:
             logger.warning(f"Could not discover schema from SIEM: {e}")
     

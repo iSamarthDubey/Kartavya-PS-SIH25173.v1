@@ -528,7 +528,8 @@ class AdvancedSchemaMapper:
         return {
             "elasticsearch": {
                 "ip_address": ["source.ip", "destination.ip", "host.ip", "client.ip", "server.ip"],
-                "username": ["user.name", "user.id", "source.user.name", "destination.user.name"],
+                "username": ["user.name", "user.id", "source.user.name", "destination.user.name", "winlog.event_data.TargetUserName", "winlog.event_data.SubjectUserName"],
+                "user": ["user.name", "user.id", "source.user.name", "destination.user.name", "winlog.event_data.TargetUserName", "winlog.event_data.SubjectUserName"],
                 "port": ["source.port", "destination.port", "network.port", "client.port", "server.port"],
                 "process_name": ["process.name", "process.executable", "process.title"],
                 "event_id": ["event.code", "winlog.event_id", "event.id", "log.event.code"],
