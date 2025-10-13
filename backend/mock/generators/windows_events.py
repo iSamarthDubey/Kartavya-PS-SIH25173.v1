@@ -141,6 +141,13 @@ class WindowsEventGenerator(BaseMockGenerator):
         # Add event-specific fields
         self._add_event_specific_fields(event_id, event_data)
         
+        # Ensure all events have user field for consistency (if not already added by specific handler)
+        if "user" not in event_data:
+            event_data["user"] = {
+                "name": self._get_random_username(),
+                "domain": random.choice(["WORKGROUP", "DOMAIN", "CORP"])
+            }
+        
         return MockEvent(
             id=self._generate_id(),
             timestamp=datetime.fromisoformat(event_data["@timestamp"].replace("Z", "+00:00")).replace(tzinfo=None),
@@ -202,6 +209,12 @@ class WindowsEventGenerator(BaseMockGenerator):
                 "CreatorProcessId": f"0x{random.randint(1000, 9999):x}"
             }
             
+            # Add user information for consistency
+            event_data["user"] = {
+                "name": event_data["winlog"]["event_data"]["SubjectUserName"],
+                "domain": event_data["winlog"]["event_data"]["SubjectDomainName"]
+            }
+            
             # Add process information
             event_data["process"] = {
                 "name": process_info["name"],
@@ -241,6 +254,12 @@ class WindowsEventGenerator(BaseMockGenerator):
                 "DestPort": random.randint(80, 65535),
                 "Protocol": random.choice([6, 17]),  # TCP or UDP
                 "FilterRTID": random.randint(100000, 999999)
+            }
+            
+            # Add user information for network activity
+            event_data["user"] = {
+                "name": self._get_random_username(),
+                "domain": random.choice(["WORKGROUP", "DOMAIN", "CORP"])
             }
             
             # Add network information
