@@ -579,3 +579,11 @@ debug_passwords.py
 setup_demo_users.py
 backend/debug_mock_fields.py
 backend/start_backend.py
+debug_auth_complete.py
+test_passwords.py
+backend/debug_comprehensive_mock.py
+backend/seed_cloud_users.py
+backend/seed_supabase_direct.py
+backend/setup_supabase_tables.py
+backend/test_ai_chat_performance.py
+backend/test_comprehensive_security_mock.py
