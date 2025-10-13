@@ -577,3 +577,5 @@ backend/verify_fixes.py
 debug_passwords.py
 .editorconfig
 setup_demo_users.py
+backend/debug_mock_fields.py
+backend/start_backend.py
