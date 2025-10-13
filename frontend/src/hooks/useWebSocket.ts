@@ -73,11 +73,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
 
   const connect = useCallback(async () => {
     try {
-      // Generate or use existing session ID
-      const sessionId = crypto.randomUUID()
+      // Use the simple WebSocket endpoint without session_id
       const fullWsUrl = wsUrl.includes('/ws/chat')
-        ? `${wsUrl}/${sessionId}`
-        : `${wsUrl}/chat/${sessionId}`
+        ? wsUrl
+        : `${wsUrl}/chat`
 
       // Create or get existing service
       if (!wsServiceRef.current) {

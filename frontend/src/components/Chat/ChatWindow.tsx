@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Settings, MoreHorizontal, Trash2, Download, Eye, ArrowDown } from 'lucide-react'
 
@@ -106,27 +106,42 @@ export default function ChatWindow({
     }
   }, [isStreaming, currentStream])
 
-  const scrollToBottom = (behavior: ScrollBehavior = 'instant') => {
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'instant') => {
     messagesEndRef.current?.scrollIntoView({ behavior })
-  }
+  }, [])
+
+  // Throttled scroll handler for performance
+  const throttledScrollHandler = useMemo(() => {
+    let ticking = false
+    
+    const handleScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const container = messagesContainerRef.current
+          if (container) {
+            const isNearBottom =
+              container.scrollHeight - container.scrollTop - container.clientHeight < 100
+            setShowScrollButton(!isNearBottom && (messages.length > 0 || isStreaming))
+          }
+          ticking = false
+        })
+        ticking = true
+      }
+    }
+    
+    return handleScroll
+  }, [messages.length, isStreaming])
 
   // Handle scroll events to show/hide scroll button
   useEffect(() => {
     const container = messagesContainerRef.current
     if (!container) return
 
-    const handleScroll = () => {
-      const isNearBottom =
-        container.scrollHeight - container.scrollTop - container.clientHeight < 100
-      setShowScrollButton(!isNearBottom && (messages.length > 0 || isStreaming))
-    }
+    container.addEventListener('scroll', throttledScrollHandler, { passive: true })
+    return () => container.removeEventListener('scroll', throttledScrollHandler)
+  }, [throttledScrollHandler])
 
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-  }, [messages.length])
-
-  const handleExportChat = () => {
-    // TODO: Implement chat export functionality
+  const handleExportChat = useCallback(() => {
     const chatData = {
       conversation_id: currentConversationId,
       messages: messages.map(msg => ({
@@ -148,7 +163,7 @@ export default function ChatWindow({
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-  }
+  }, [currentConversationId, messages, context])
 
   return (
     <div className={`flex flex-col h-full bg-synrgy-bg-900 overflow-hidden ${className}`}>

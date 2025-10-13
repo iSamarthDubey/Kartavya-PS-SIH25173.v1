@@ -13,6 +13,7 @@ import {
 import EnhancedVisualRenderer from '../Chat/EnhancedVisualRenderer'
 import type { DashboardWidget, VisualPayload, SummaryCard } from '../../types'
 import { sampleWidgets } from '@/data/sampleWidgets'
+import { useHybridStore } from '../../stores/hybridStore'
 
 interface DashboardGridProps {
   hybridMode?: boolean
@@ -32,8 +33,11 @@ export default function DashboardGrid({
   const [expandedWidget, setExpandedWidget] = useState<string | null>(null)
   const [draggedWidget, setDraggedWidget] = useState<string | null>(null)
 
-  // Use sample widgets for demo
-  const pinnedWidgets = sampleWidgets
+  // Get hybrid store functions
+  const { pinnedWidgets, pinWidget, unpinWidget } = useHybridStore()
+  
+  // Use sample widgets as fallback if no pinned widgets
+  const displayWidgets = pinnedWidgets.length > 0 ? pinnedWidgets : sampleWidgets
 
   // Handle widget expansion
   const handleExpand = useCallback(
@@ -66,7 +70,7 @@ export default function DashboardGrid({
   const handleRefresh = useCallback(
     async (widgetId: string) => {
       // Simulate refresh - in real app, this would call API
-      const widget = pinnedWidgets.find(w => w.id === widgetId)
+      const widget = displayWidgets.find(w => w.id === widgetId)
       if (widget) {
         const updatedWidget = {
           ...widget,
@@ -76,7 +80,7 @@ export default function DashboardGrid({
         onWidgetAction?.(widgetId, 'refresh', { widget: updatedWidget })
       }
     },
-    [pinnedWidgets, pinWidget, onWidgetAction]
+    [displayWidgets, pinWidget, onWidgetAction]
   )
 
   // Handle Ask SYNRGY from widget
@@ -149,7 +153,7 @@ export default function DashboardGrid({
 
   // Get grid layout classes based on number of widgets
   const getGridLayout = () => {
-    const count = pinnedWidgets.length
+    const count = displayWidgets.length
 
     if (count === 0) return 'grid-cols-1'
     if (count === 1) return 'grid-cols-1'
@@ -159,7 +163,7 @@ export default function DashboardGrid({
     return 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'
   }
 
-  if (pinnedWidgets.length === 0) {
+  if (displayWidgets.length === 0) {
     return (
       <div className={`flex items-center justify-center h-full ${className}`}>
         <motion.div
@@ -211,7 +215,7 @@ export default function DashboardGrid({
           <div>
             <h2 className="text-lg font-semibold text-synrgy-text">Dashboard</h2>
             <div className="text-sm text-synrgy-muted">
-              {pinnedWidgets.length} widget{pinnedWidgets.length !== 1 ? 's' : ''} pinned
+              {displayWidgets.length} widget{displayWidgets.length !== 1 ? 's' : ''} {pinnedWidgets.length > 0 ? 'pinned' : 'displayed'}
             </div>
           </div>
         </div>
@@ -239,7 +243,7 @@ export default function DashboardGrid({
       <div className="p-6">
         <div className={`grid ${getGridLayout()} gap-6`}>
           <AnimatePresence mode="popLayout">
-            {pinnedWidgets.map(widget => (
+            {displayWidgets.map(widget => (
               <motion.div
                 key={widget.id}
                 layout

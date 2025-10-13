@@ -4,7 +4,7 @@
  * Based on SYNRGY.TXT specification
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, memo, useMemo, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   TrendingUp,
@@ -20,6 +20,7 @@ import {
   Download,
   Code,
   Eye,
+  Loader2,
 } from 'lucide-react'
 import {
   BarChart,
@@ -38,6 +39,7 @@ import {
   Area,
 } from 'recharts'
 
+import { useVisualPerformance } from '@/hooks/useVisualPerformance'
 import type { VisualPayload, VisualCard } from '@/types'
 
 interface VisualRendererProps {
@@ -63,7 +65,7 @@ const CHART_COLORS = [
 /**
  * Enhanced table renderer for backend table data
  */
-const TableRenderer = ({ card }: { card: VisualCard }) => {
+const TableRenderer = memo(({ card }: { card: VisualCard }) => {
   if (!card.columns || !card.rows) return null
 
   return (
@@ -114,12 +116,12 @@ const TableRenderer = ({ card }: { card: VisualCard }) => {
       )}
     </motion.div>
   )
-}
+})
 
 /**
  * Narrative/Summary renderer for AI-generated text
  */
-const NarrativeRenderer = ({ card }: { card: VisualCard }) => {
+const NarrativeRenderer = memo(({ card }: { card: VisualCard }) => {
   if (!card.data && !card.title && !card.value) return null
 
   const content =
@@ -146,7 +148,108 @@ const NarrativeRenderer = ({ card }: { card: VisualCard }) => {
       </div>
     </motion.div>
   )
-}
+})
+
+// Memoized chart components for better performance
+const MemoizedBarChart = memo(({ data, config }: { data: any[], config: any }) => (
+  <BarChart data={data}>
+    <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" opacity={0.2} />
+    <XAxis dataKey="x" stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
+    <YAxis stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
+    <Tooltip
+      contentStyle={{
+        backgroundColor: '#0F1724',
+        border: '1px solid #00EFFF',
+        borderRadius: '8px',
+        color: '#E6EEF8',
+      }}
+    />
+    <Bar dataKey="y" fill={config.color || '#00EFFF'} radius={[4, 4, 0, 0]} />
+  </BarChart>
+))
+
+const MemoizedLineChart = memo(({ data, config }: { data: any[], config: any }) => (
+  <LineChart data={data}>
+    <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" opacity={0.2} />
+    <XAxis
+      dataKey="x"
+      stroke="#94A3B8"
+      fontSize={12}
+      tick={{ fill: '#94A3B8' }}
+    />
+    <YAxis stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
+    <Tooltip
+      contentStyle={{
+        backgroundColor: '#0F1724',
+        border: '1px solid #00EFFF',
+        borderRadius: '8px',
+        color: '#E6EEF8',
+      }}
+    />
+    <Line
+      type="monotone"
+      dataKey="y"
+      stroke={config.color || '#00EFFF'}
+      strokeWidth={config.strokeWidth || 3}
+      dot={{ fill: config.color || '#00EFFF', strokeWidth: 2, r: 4 }}
+      activeDot={{ r: 6, fill: '#FF7A00' }}
+    />
+  </LineChart>
+))
+
+const MemoizedAreaChart = memo(({ data, config, gradientId }: { data: any[], config: any, gradientId: string }) => (
+  <AreaChart data={data}>
+    <defs>
+      <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="5%" stopColor={config.color || '#00EFFF'} stopOpacity={0.8} />
+        <stop offset="95%" stopColor={config.color || '#00EFFF'} stopOpacity={0.1} />
+      </linearGradient>
+    </defs>
+    <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" opacity={0.2} />
+    <XAxis dataKey="x" stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
+    <YAxis stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
+    <Tooltip
+      contentStyle={{
+        backgroundColor: '#0F1724',
+        border: '1px solid #00EFFF',
+        borderRadius: '8px',
+        color: '#E6EEF8',
+      }}
+    />
+    <Area
+      dataKey="y"
+      stroke={config.color || '#00EFFF'}
+      fillOpacity={1}
+      fill={`url(#${gradientId})`}
+    />
+  </AreaChart>
+))
+
+const MemoizedPieChart = memo(({ data }: { data: any[] }) => (
+  <RechartsPieChart>
+    <Pie
+      data={data}
+      cx="50%"
+      cy="50%"
+      innerRadius={40}
+      outerRadius={80}
+      paddingAngle={2}
+      dataKey="value"
+    >
+      {data.map((_entry: any, index: number) => (
+        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+      ))}
+    </Pie>
+    <Tooltip
+      contentStyle={{
+        backgroundColor: '#0F1724',
+        border: '1px solid #00EFFF',
+        borderRadius: '8px',
+        color: '#E6EEF8',
+      }}
+    />
+  </RechartsPieChart>
+))
 
 export default function EnhancedVisualRenderer({
   payload,
@@ -157,12 +260,37 @@ export default function EnhancedVisualRenderer({
 }: VisualRendererProps) {
   const [expandedCard, setExpandedCard] = useState<string | null>(null)
   const [showMetadata, setShowMetadata] = useState(false)
+  
+  // Performance optimization hook
+  const {
+    optimizePayload,
+    shouldVirtualize,
+    shouldLazyLoad,
+    startRenderMeasurement,
+    endRenderMeasurement,
+    getMetrics,
+  } = useVisualPerformance({
+    cacheEnabled: true,
+    virtualizationThreshold: 20,
+    performanceTracking: import.meta.env.DEV,
+  })
 
   if (!payload) return null
 
-  // Handle composite payload with multiple cards
-  const cards = payload.cards || [payload as VisualCard]
-  const isComposite = payload.type === 'composite' && payload.cards && payload.cards.length > 0
+  // Optimize payload for performance
+  const optimizedPayload = useMemo(() => {
+    startRenderMeasurement()
+    const optimized = optimizePayload(payload)
+    endRenderMeasurement()
+    return optimized
+  }, [payload, optimizePayload, startRenderMeasurement, endRenderMeasurement])
+
+  // Handle composite payload with multiple cards - memoized for performance
+  const cards = useMemo(() => optimizedPayload.cards || [optimizedPayload as VisualCard], [optimizedPayload])
+  const isComposite = useMemo(() => optimizedPayload.type === 'composite' && optimizedPayload.cards && optimizedPayload.cards.length > 0, [optimizedPayload])
+  
+  // Virtualization configuration
+  const virtualizationConfig = useMemo(() => shouldVirtualize(optimizedPayload), [optimizedPayload, shouldVirtualize])
 
   const handlePin = useCallback(
     (card: VisualCard) => {
@@ -182,7 +310,7 @@ export default function EnhancedVisualRenderer({
     [onExport, interactive]
   )
 
-  const renderSummaryCard = (card: VisualCard, index: number) => (
+  const renderSummaryCard = useMemo(() => (card: VisualCard, index: number) => (
     <motion.div
       key={`summary-${index}`}
       initial={{ opacity: 0, scale: 0.9 }}
@@ -248,9 +376,9 @@ export default function EnhancedVisualRenderer({
         </div>
       )}
     </motion.div>
-  )
+  ), [handlePin, interactive])
 
-  const renderChart = (card: VisualCard, index: number) => {
+  const renderChart = useCallback((card: VisualCard, index: number) => {
     if (!card.data || !Array.isArray(card.data)) return null
 
     const isExpanded = expandedCard === `chart-${index}`
@@ -260,128 +388,35 @@ export default function EnhancedVisualRenderer({
     const xField = config.x_field || 'x'
     const yField = config.y_field || 'y'
 
-    // Process data with dynamic field mapping
-    const processedData = card.data.map((item: any) => ({
+    // Process data with dynamic field mapping - memoized for performance
+    const processedData = useMemo(() => card.data.map((item: any) => ({
       ...item,
       x: item[xField] || item.x,
       y: item[yField] || item.y,
       name: item.name || item[xField] || item.x,
       value: item.value || item[yField] || item.y,
-    }))
+    })), [card.data, xField, yField])
 
     let chartBody: JSX.Element | null = null
 
-    // Enhanced chart type support
+    // Enhanced chart type support with memoized components
     switch (card.chart_type) {
       case 'bar':
-        chartBody = (
-          <BarChart data={processedData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" opacity={0.2} />
-            <XAxis dataKey="x" stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
-            <YAxis stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#0F1724',
-                border: '1px solid #00EFFF',
-                borderRadius: '8px',
-                color: '#E6EEF8',
-              }}
-            />
-            <Bar dataKey="y" fill={config.color || '#00EFFF'} radius={[4, 4, 0, 0]} />
-          </BarChart>
-        )
+        chartBody = <MemoizedBarChart data={processedData} config={config} />
         break
 
       case 'line':
       case 'timeseries':
-        chartBody = (
-          <LineChart data={processedData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" opacity={0.2} />
-            <XAxis
-              dataKey="x"
-              stroke="#94A3B8"
-              fontSize={12}
-              tick={{ fill: '#94A3B8' }}
-              type={card.chart_type === 'timeseries' ? 'category' : 'category'}
-            />
-            <YAxis stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#0F1724',
-                border: '1px solid #00EFFF',
-                borderRadius: '8px',
-                color: '#E6EEF8',
-              }}
-            />
-            <Line
-              type="monotone"
-              dataKey="y"
-              stroke={config.color || '#00EFFF'}
-              strokeWidth={config.strokeWidth || 3}
-              dot={{ fill: config.color || '#00EFFF', strokeWidth: 2, r: 4 }}
-              activeDot={{ r: 6, fill: '#FF7A00' }}
-            />
-          </LineChart>
-        )
+        chartBody = <MemoizedLineChart data={processedData} config={config} />
         break
 
       case 'area':
         const gradientId = `gradient-${index}`
-        chartBody = (
-          <AreaChart data={processedData}>
-            <defs>
-              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={config.color || '#00EFFF'} stopOpacity={0.8} />
-                <stop offset="95%" stopColor={config.color || '#00EFFF'} stopOpacity={0.1} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" opacity={0.2} />
-            <XAxis dataKey="x" stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
-            <YAxis stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#0F1724',
-                border: '1px solid #00EFFF',
-                borderRadius: '8px',
-                color: '#E6EEF8',
-              }}
-            />
-            <Area
-              dataKey="y"
-              stroke={config.color || '#00EFFF'}
-              fillOpacity={1}
-              fill={`url(#${gradientId})`}
-            />
-          </AreaChart>
-        )
+        chartBody = <MemoizedAreaChart data={processedData} config={config} gradientId={gradientId} />
         break
 
       case 'pie':
-        chartBody = (
-          <RechartsPieChart>
-            <Pie
-              data={processedData}
-              cx="50%"
-              cy="50%"
-              innerRadius={40}
-              outerRadius={80}
-              paddingAngle={2}
-              dataKey="value"
-            >
-              {processedData.map((_entry: any, index: number) => (
-                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#0F1724',
-                border: '1px solid #00EFFF',
-                borderRadius: '8px',
-                color: '#E6EEF8',
-              }}
-            />
-          </RechartsPieChart>
-        )
+        chartBody = <MemoizedPieChart data={processedData} />
         break
 
       default:
@@ -450,10 +485,10 @@ export default function EnhancedVisualRenderer({
         )}
       </motion.div>
     )
-  }
+  }, [expandedCard, handlePin, handleExport, interactive])
 
-  // Render individual card based on type
-  const renderCard = (card: VisualCard, index: number) => {
+  // Render individual card based on type with lazy loading support
+  const renderCard = useCallback((card: VisualCard, index: number) => {
     switch (card.type) {
       case 'summary_card':
         return renderSummaryCard(card, index)
@@ -516,7 +551,7 @@ export default function EnhancedVisualRenderer({
           </motion.div>
         )
     }
-  }
+  }, [renderSummaryCard, renderChart])
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -576,19 +611,100 @@ export default function EnhancedVisualRenderer({
         </div>
       )}
 
-      {/* Render cards */}
+      {/* Render cards with performance optimization */}
       {isComposite ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {cards.map((card, index) => renderCard(card, index))}
+          {virtualizationConfig.enabled ? (
+            // Virtual scrolling for large datasets
+            <div className="space-y-4">
+              {cards
+                .slice(0, virtualizationConfig.chunkSize)
+                .map((card, index) => 
+                  shouldLazyLoad(card) ? (
+                    <Suspense 
+                      key={`${card.type}-${index}`}
+                      fallback={
+                        <div className="h-32 bg-synrgy-surface/20 border border-synrgy-primary/10 rounded-xl animate-pulse flex items-center justify-center">
+                          <Loader2 className="w-6 h-6 text-synrgy-primary animate-spin" />
+                        </div>
+                      }
+                    >
+                      {renderCard(card, index)}
+                    </Suspense>
+                  ) : (
+                    renderCard(card, index)
+                  )
+                )}
+              {cards.length > virtualizationConfig.chunkSize && (
+                <div className="text-center py-4">
+                  <span className="text-sm text-synrgy-muted">
+                    Showing {virtualizationConfig.chunkSize} of {cards.length} items
+                    {import.meta.env.DEV && (
+                      <span className="ml-2 text-xs opacity-75">
+                        (Performance optimized)
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            cards.map((card, index) => 
+              shouldLazyLoad(card) ? (
+                <Suspense 
+                  key={`${card.type}-${index}`}
+                  fallback={
+                    <div className="h-32 bg-synrgy-surface/20 border border-synrgy-primary/10 rounded-xl animate-pulse flex items-center justify-center">
+                      <Loader2 className="w-6 h-6 text-synrgy-primary animate-spin" />
+                    </div>
+                  }
+                >
+                  {renderCard(card, index)}
+                </Suspense>
+              ) : (
+                renderCard(card, index)
+              )
+            )
+          )}
         </div>
       ) : (
-        <div className="space-y-4">{cards.map((card, index) => renderCard(card, index))}</div>
+        <div className="space-y-4">
+          {cards.map((card, index) => 
+            shouldLazyLoad(card) ? (
+              <Suspense 
+                key={`${card.type}-${index}`}
+                fallback={
+                  <div className="h-32 bg-synrgy-surface/20 border border-synrgy-primary/10 rounded-xl animate-pulse flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 text-synrgy-primary animate-spin" />
+                  </div>
+                }
+              >
+                {renderCard(card, index)}
+              </Suspense>
+            ) : (
+              renderCard(card, index)
+            )
+          )}
+        </div>
       )}
 
       {cards.length === 0 && (
         <div className="text-center py-8 text-synrgy-muted">
           <Info className="w-8 h-8 mx-auto mb-2 opacity-50" />
           <p>No visualization data available</p>
+        </div>
+      )}
+      
+      {/* Development performance metrics */}
+      {import.meta.env.DEV && (
+        <div className="mt-4 p-3 bg-synrgy-bg-900/10 border border-synrgy-primary/5 rounded-lg text-xs">
+          <div className="flex items-center gap-4 text-synrgy-muted">
+            <span>Performance:</span>
+            <span>Cache: {getMetrics().cacheSize} entries</span>
+            <span>Avg Render: {getMetrics().averageRenderTime.toFixed(2)}ms</span>
+            <span>Cache Hit Rate: {((getMetrics().cacheHits / (getMetrics().cacheHits + getMetrics().cacheMisses)) * 100 || 0).toFixed(1)}%</span>
+            {virtualizationConfig.enabled && <span className="text-synrgy-accent">Virtualized</span>}
+          </div>
         </div>
       )}
     </div>

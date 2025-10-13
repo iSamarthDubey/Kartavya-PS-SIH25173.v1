@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState, useMemo, useCallback, memo } from 'react'
 import { useAuth } from '@/stores/appStore'
 import {
   User,
@@ -14,17 +14,23 @@ import {
   Zap,
 } from 'lucide-react'
 
-export default function SettingsPage() {
+const SettingsPage = memo(function SettingsPage() {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('profile')
 
-  const tabs = [
+  // Memoize tabs configuration to prevent unnecessary re-renders
+  const tabs = useMemo(() => [
     { id: 'profile', name: 'Profile', icon: User },
     { id: 'notifications', name: 'Notifications', icon: Bell },
     { id: 'security', name: 'Security', icon: Shield },
     { id: 'appearance', name: 'Appearance', icon: Palette },
     { id: 'system', name: 'System', icon: Monitor },
-  ]
+  ], [])
+
+  // Memoize tab change handler
+  const handleTabChange = useCallback((tabId: string) => {
+    setActiveTab(tabId)
+  }, [])
 
   return (
     <div className="h-full overflow-y-auto bg-synrgy-bg-900">
@@ -42,7 +48,7 @@ export default function SettingsPage() {
               {tabs.map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabChange(tab.id)}
                   className={`w-full flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
                     activeTab === tab.id
                       ? 'bg-synrgy-primary/10 text-synrgy-primary border border-synrgy-primary/20'
@@ -308,4 +314,6 @@ export default function SettingsPage() {
       </div>
     </div>
   )
-}
+})
+
+export default SettingsPage

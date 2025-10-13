@@ -3,7 +3,7 @@
  * Implements the SYNRGY.TXT hybrid mode with two-way sync
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageCircle,
@@ -44,7 +44,7 @@ interface WidgetContext {
   metadata?: Record<string, any>
 }
 
-export default function EnhancedHybridLayout({ className = '' }: HybridLayoutProps) {
+const EnhancedHybridLayout = memo<HybridLayoutProps>(function EnhancedHybridLayout({ className = '' }) {
   const [chatPanelExpanded, setChatPanelExpanded] = useState(false)
   const [contextMessage, setContextMessage] = useState<string>('')
   const [widgetContext, setWidgetContext] = useState<WidgetContext | null>(null)
@@ -55,36 +55,37 @@ export default function EnhancedHybridLayout({ className = '' }: HybridLayoutPro
   const { sendMessage, isLoading, currentConversationId } = useChatStore()
   const { setChatPanelOpen } = useAppStore()
 
-  // Handle widget click events from dashboard
+  // Memoize widget context creation
+  const createWidgetContext = useMemo(() => (widget: DashboardWidget, clickData?: any): WidgetContext => ({
+    id: widget.id,
+    type: widget.type,
+    title: widget.title,
+    clickedRegion: clickData,
+    metadata: widget.config || {},
+  }), [])
+
+  // Handle widget click events from dashboard - memoized
   const handleWidgetClick = useCallback(
     (widget: DashboardWidget, clickData?: any) => {
-      const context: WidgetContext = {
-        id: widget.id,
-        type: widget.type,
-        title: widget.title,
-        clickedRegion: clickData,
-        metadata: widget.config || {},
-      }
+      const context = createWidgetContext(widget, clickData)
 
       setWidgetContext(context)
 
-      // Generate contextual message based on widget type and click
-      let message = ''
-      switch (widget.type) {
-        case 'chart':
-          message = clickData
-            ? `Investigate the spike in ${widget.title} at ${clickData.x || 'this time period'}. Show me the underlying security events.`
-            : `Analyze the data shown in ${widget.title}. What security patterns do you see?`
-          break
-        case 'summary_card':
-          message = `Explain the ${widget.title} metric and investigate any anomalies. Provide recommendations.`
-          break
-        case 'table':
-          message = `Investigate the security events shown in ${widget.title}. Focus on high-priority items.`
-          break
-        default:
-          message = `Analyze the ${widget.title} widget. What insights can you provide about the security data?`
-      }
+      // Generate contextual message based on widget type and click - memoized logic
+      const message = useMemo(() => {
+        switch (widget.type) {
+          case 'chart':
+            return clickData
+              ? `Investigate the spike in ${widget.title} at ${clickData.x || 'this time period'}. Show me the underlying security events.`
+              : `Analyze the data shown in ${widget.title}. What security patterns do you see?`
+          case 'summary_card':
+            return `Explain the ${widget.title} metric and investigate any anomalies. Provide recommendations.`
+          case 'table':
+            return `Investigate the security events shown in ${widget.title}. Focus on high-priority items.`
+          default:
+            return `Analyze the ${widget.title} widget. What insights can you provide about the security data?`
+        }
+      }, [widget.title, widget.type, clickData])
 
       setContextMessage(message)
       setChatPanelExpanded(true)
@@ -95,7 +96,7 @@ export default function EnhancedHybridLayout({ className = '' }: HybridLayoutPro
         chatInputRef.current?.focus()
       }, 300)
     },
-    [setChatPanelOpen]
+    [createWidgetContext, setChatPanelOpen]
   )
 
   // Handle chat panel expand/collapse
@@ -336,4 +337,6 @@ export default function EnhancedHybridLayout({ className = '' }: HybridLayoutPro
       </AnimatePresence>
     </div>
   )
-}
+})
+
+export default EnhancedHybridLayout

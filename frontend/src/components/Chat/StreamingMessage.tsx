@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react'
 import type { ChatMessage, StreamingChatResponse } from '@/types'
 import { StreamingMessage as StreamingMessageType } from '@/hooks/useWebSocketStream'
 import EnhancedVisualRenderer from './EnhancedVisualRenderer'
+import AdvancedInteractiveRenderer from './AdvancedInteractiveRenderer'
+import { useChatStore } from '@/stores/chatStore'
 
 interface StreamingMessageProps {
   message?: ChatMessage
@@ -13,6 +15,8 @@ interface StreamingMessageProps {
   className?: string
   onPin?: (visual: any) => void
   onExport?: (visual: any) => void
+  onDrilldown?: (context: any) => void
+  onFilter?: (filter: any) => void
 }
 
 export default function StreamingMessage({
@@ -22,7 +26,10 @@ export default function StreamingMessage({
   className = '',
   onPin,
   onExport,
+  onDrilldown,
+  onFilter,
 }: StreamingMessageProps) {
+  const { sendMessage } = useChatStore()
   const [displayText, setDisplayText] = useState('')
   const [visiblePayloads, setVisiblePayloads] = useState<any[]>([])
 
@@ -139,10 +146,12 @@ export default function StreamingMessage({
                   transition={{ delay: index * 0.1 }}
                   className="border border-synrgy-primary/20 rounded-lg overflow-hidden bg-synrgy-surface/30"
                 >
-                  <EnhancedVisualRenderer
+                  <AdvancedInteractiveRenderer
                     payload={payload}
                     onPin={onPin}
                     onExport={onExport}
+                    onDrilldown={onDrilldown}
+                    onFilter={onFilter}
                     interactive={true}
                   />
                 </motion.div>
@@ -157,10 +166,36 @@ export default function StreamingMessage({
                   transition={{ delay: 0.2 }}
                   className="border border-synrgy-primary/20 rounded-lg overflow-hidden bg-synrgy-surface/30"
                 >
-                  <EnhancedVisualRenderer
+                  <AdvancedInteractiveRenderer
                     payload={message.visual_payload}
                     onPin={onPin}
                     onExport={onExport}
+                    onDrilldown={(context) => {
+                      // Handle drill-down by sending a new query
+                      if (onDrilldown) {
+                        onDrilldown(context)
+                      } else {
+                        // Default behavior: send drill-down query
+                        const drilldownQuery = `Drill down into ${context.data.name || context.data.x}: ${context.originalQuery}`
+                        sendMessage({
+                          query: drilldownQuery,
+                          conversation_id: message.conversation_id
+                        })
+                      }
+                    }}
+                    onFilter={(filter) => {
+                      // Handle filter by sending a new query
+                      if (onFilter) {
+                        onFilter(filter)
+                      } else {
+                        // Default behavior: send filtered query
+                        const filterQuery = `Show results where ${filter.displayName} from my previous query`
+                        sendMessage({
+                          query: filterQuery,
+                          conversation_id: message.conversation_id
+                        })
+                      }
+                    }}
                     interactive={true}
                   />
                 </motion.div>

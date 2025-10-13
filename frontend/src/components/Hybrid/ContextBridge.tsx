@@ -2,7 +2,7 @@
  * Context Bridge Component - Manages bidirectional context synchronization
  */
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeftRight,
@@ -28,7 +28,7 @@ interface ContextBridgeProps {
   onContextSelect?: (context: ConversationContext) => void
 }
 
-export const ContextBridge: React.FC<ContextBridgeProps> = ({
+export const ContextBridge: React.FC<ContextBridgeProps> = memo(({
   className = '',
   showCompact = false,
   onContextSelect,
@@ -53,15 +53,21 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
   const [showHistory, setShowHistory] = useState(false)
   const [selectedHistoryEntry, setSelectedHistoryEntry] = useState<string | null>(null)
 
-  // Auto-sync when contexts change
+  // Throttled sync function to prevent excessive syncing
+  const throttledSync = useCallback(() => {
+    const timer = setTimeout(() => syncContexts(), 1000)
+    return () => clearTimeout(timer)
+  }, [syncContexts])
+
+  // Auto-sync when contexts change - throttled
   useEffect(() => {
     if (activeContextSync && (dashboardContext || chatContext)) {
-      const timer = setTimeout(() => syncContexts(), 1000)
-      return () => clearTimeout(timer)
+      return throttledSync()
     }
-  }, [dashboardContext, chatContext, activeContextSync, syncContexts])
+  }, [dashboardContext, chatContext, activeContextSync, throttledSync])
 
-  const formatContextSummary = (context: ConversationContext | null) => {
+  // Memoize context summary formatting
+  const formatContextSummary = useCallback((context: ConversationContext | null) => {
     if (!context) return { entities: 0, filters: 0, messages: 0 }
 
     return {
@@ -69,28 +75,29 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
       filters: (context.filters || []).length,
       messages: (context.history || []).length,
     }
-  }
+  }, [])
 
-  const dashboardSummary = formatContextSummary(dashboardContext)
-  const chatSummary = formatContextSummary(chatContext)
+  const dashboardSummary = useMemo(() => formatContextSummary(dashboardContext), [dashboardContext, formatContextSummary])
+  const chatSummary = useMemo(() => formatContextSummary(chatContext), [chatContext, formatContextSummary])
 
-  const handleManualSync = () => {
+  // Memoize event handlers
+  const handleManualSync = useCallback(() => {
     syncContexts()
-  }
+  }, [syncContexts])
 
-  const handleBridgeFromDashboard = () => {
+  const handleBridgeFromDashboard = useCallback(() => {
     if (dashboardContext) {
       bridgeContext('dashboard', dashboardContext)
     }
-  }
+  }, [dashboardContext, bridgeContext])
 
-  const handleBridgeFromChat = () => {
+  const handleBridgeFromChat = useCallback(() => {
     if (chatContext) {
       bridgeContext('chat', chatContext)
     }
-  }
+  }, [chatContext, bridgeContext])
 
-  const handleSpawnFocusedChat = (widgetId: string) => {
+  const handleSpawnFocusedChat = useCallback((widgetId: string) => {
     const widget = pinnedWidgets.find(w => w.id === widgetId)
     if (!widget) return
 
@@ -107,7 +114,7 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
     }
 
     startFocusedSession('widget', widgetId, focusContext, `Tell me more about ${widget.title}`)
-  }
+  }, [pinnedWidgets, startFocusedSession])
 
   if (showCompact) {
     return (
@@ -386,7 +393,7 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
       </AnimatePresence>
     </div>
   )
-}
+})
 
 // Context History View Component
 interface ContextHistoryViewProps {
@@ -402,7 +409,7 @@ interface ContextHistoryViewProps {
   onClear: () => void
 }
 
-const ContextHistoryView: React.FC<ContextHistoryViewProps> = ({
+const ContextHistoryView: React.FC<ContextHistoryViewProps> = memo(({
   history,
   onEntrySelect,
   onClear,
@@ -461,6 +468,6 @@ const ContextHistoryView: React.FC<ContextHistoryViewProps> = ({
       </div>
     </div>
   )
-}
+})
 
 export default ContextBridge

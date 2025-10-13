@@ -11,16 +11,19 @@ import './index.css'
 // Import main App
 import App from './App.tsx'
 
-// Create React Query client
+// Create React Query client optimized for real-time performance
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      refetchOnWindowFocus: false,
+      staleTime: 0, // Real-time data - always fresh
+      cacheTime: 1000 * 60 * 5, // Keep in memory for 5 minutes
+      refetchOnWindowFocus: true, // Refetch when user returns to tab
+      refetchOnReconnect: true, // Refetch when internet reconnects
+      refetchInterval: false, // Let individual queries control their intervals
     },
     mutations: {
-      retry: 1,
+      retry: 2, // Slightly more retries for mutations
     },
   },
 })

@@ -3,7 +3,7 @@
  * Handles all chart types, tables, and visual data rendering
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo, Suspense } from 'react'
 import { motion } from 'framer-motion'
 import {
   Pin,
@@ -17,6 +17,7 @@ import {
   Globe,
   Table,
   Filter as FilterIcon,
+  Loader2,
 } from 'lucide-react'
 import {
   BarChart,
@@ -33,10 +34,9 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
-  ScatterChart,
-  Scatter,
 } from 'recharts'
 
+import { useVisualPerformance } from '@/hooks/useVisualPerformance'
 import type { VisualPayload, VisualCard } from '@/types'
 
 interface VisualRendererProps {
@@ -59,88 +59,6 @@ const CHART_COLORS = [
   '#C2410C', // orange-700
 ]
 
-/**
- * Enhanced table renderer for backend table data
- */
-const TableRenderer = ({ card }: { card: VisualCard }) => {
-  if (!card.columns || !card.rows) return null
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-synrgy-surface/30 border border-synrgy-primary/20 rounded-xl overflow-hidden"
-    >
-      <div className="px-4 py-3 border-b border-synrgy-primary/10">
-        <h3 className="text-sm font-medium text-synrgy-text">{card.title || 'Data Table'}</h3>
-      </div>
-
-      <div className="overflow-x-auto max-h-64">
-        <table className="w-full text-sm">
-          <thead className="bg-synrgy-bg-900/50">
-            <tr>
-              {card.columns.map((col: any, idx: number) => (
-                <th
-                  key={idx}
-                  className="px-4 py-2 text-left text-synrgy-muted font-medium border-b border-synrgy-primary/10"
-                >
-                  {col.label || col.key}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {card.rows.slice(0, 10).map((row: any[], idx: number) => (
-              <tr key={idx} className="hover:bg-synrgy-primary/5 transition-colors">
-                {row.map((cell: any, cellIdx: number) => (
-                  <td
-                    key={cellIdx}
-                    className="px-4 py-2 text-synrgy-text border-b border-synrgy-primary/5"
-                  >
-                    {typeof cell === 'object' ? JSON.stringify(cell) : String(cell)}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {card.rows.length > 10 && (
-        <div className="px-4 py-2 text-xs text-synrgy-muted bg-synrgy-bg-900/20 border-t border-synrgy-primary/10">
-          Showing 10 of {card.rows.length} results
-        </div>
-      )}
-    </motion.div>
-  )
-}
-
-/**
- * Narrative/Summary renderer for AI-generated text
- */
-const NarrativeRenderer = ({ card }: { card: VisualCard }) => {
-  if (!card.data && !card.title) return null
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-synrgy-surface/20 border border-synrgy-accent/20 rounded-xl p-4"
-    >
-      <div className="flex items-start gap-3">
-        <div className="w-8 h-8 bg-synrgy-accent/20 rounded-full flex items-center justify-center mt-1">
-          <Info className="w-4 h-4 text-synrgy-accent" />
-        </div>
-        <div className="flex-1">
-          {card.title && <h3 className="font-medium text-synrgy-text mb-2">{card.title}</h3>}
-          <div className="text-sm text-synrgy-muted leading-relaxed">
-            {typeof card.data === 'string' ? card.data : card.value || 'No summary available.'}
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  )
-}
 
 export default function VisualRenderer({
   payload,
@@ -150,13 +68,25 @@ export default function VisualRenderer({
   interactive = true,
 }: VisualRendererProps) {
   const [expandedCard, setExpandedCard] = useState<string | null>(null)
-  const [showMetadata, setShowMetadata] = useState(false)
+  
+  // Performance optimization hook
+  const {
+    optimizePayload,
+    shouldLazyLoad,
+    getMetrics,
+  } = useVisualPerformance({
+    cacheEnabled: true,
+    performanceTracking: import.meta.env.DEV,
+  })
 
   if (!payload) return null
 
+  // Optimize payload for performance
+  const optimizedPayload = useMemo(() => optimizePayload(payload), [payload, optimizePayload])
+
   // Handle composite payload with multiple cards
-  const cards = payload.cards || [payload as VisualCard]
-  const isComposite = payload.type === 'composite' && payload.cards && payload.cards.length > 0
+  const cards = optimizedPayload.cards || [optimizedPayload as VisualCard]
+  const isComposite = optimizedPayload.type === 'composite' && optimizedPayload.cards && optimizedPayload.cards.length > 0
 
   const handlePin = useCallback(
     (card: VisualCard) => {
@@ -167,14 +97,6 @@ export default function VisualRenderer({
     [onPin, interactive]
   )
 
-  const handleExport = useCallback(
-    (card: VisualCard) => {
-      if (onExport && interactive) {
-        onExport(card)
-      }
-    },
-    [onExport, interactive]
-  )
 
   const renderSummaryCard = (card: VisualCard, index: number) => (
     <motion.div
@@ -674,27 +596,73 @@ export default function VisualRenderer({
     }
   }
 
+  // Enhanced renderCard with lazy loading support
+  const renderCardWithLazyLoading = (card: VisualCard, index: number) => {
+    if (shouldLazyLoad(card)) {
+      return (
+        <Suspense
+          key={`${card.type}-${index}`}
+          fallback={
+            <div className="h-64 bg-synrgy-surface/20 border border-synrgy-primary/10 rounded-xl animate-pulse flex items-center justify-center">
+              <Loader2 className="w-6 h-6 text-synrgy-primary animate-spin" />
+            </div>
+          }
+        >
+          {renderCard(card, index)}
+        </Suspense>
+      )
+    }
+    return renderCard(card, index)
+  }
+
   // Handle composite payloads (multiple cards)
-  if (payload.type === 'composite' && payload.cards) {
+  if (isComposite) {
     return (
       <div className={`space-y-6 ${className}`}>
         {/* Summary cards in a grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {payload.cards
+          {cards
             .filter(card => card.type === 'summary_card')
-            .map((card, index) => renderCard(card, index))}
+            .map((card, index) => renderCardWithLazyLoading(card, index))}
         </div>
 
         {/* Charts and tables */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {payload.cards
+          {cards
             .filter(card => card.type !== 'summary_card')
-            .map((card, index) => renderCard(card, index))}
+            .map((card, index) => renderCardWithLazyLoading(card, index))}
         </div>
+        
+        {/* Development performance metrics */}
+        {import.meta.env.DEV && (
+          <div className="mt-4 p-3 bg-synrgy-bg-900/10 border border-synrgy-primary/5 rounded-lg text-xs">
+            <div className="flex items-center gap-4 text-synrgy-muted">
+              <span>Performance:</span>
+              <span>Cache: {getMetrics().cacheSize} entries</span>
+              <span>Avg Render: {getMetrics().averageRenderTime.toFixed(2)}ms</span>
+              <span>Cache Hit Rate: {((getMetrics().cacheHits / (getMetrics().cacheHits + getMetrics().cacheMisses)) * 100 || 0).toFixed(1)}%</span>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
 
   // Handle single card payloads
-  return <div className={`${className}`}>{renderCard(payload as any, 0)}</div>
+  return (
+    <div className={`${className}`}>
+      {renderCardWithLazyLoading(cards[0], 0)}
+      {/* Development performance metrics */}
+      {import.meta.env.DEV && (
+        <div className="mt-4 p-3 bg-synrgy-bg-900/10 border border-synrgy-primary/5 rounded-lg text-xs">
+          <div className="flex items-center gap-4 text-synrgy-muted">
+            <span>Performance:</span>
+            <span>Cache: {getMetrics().cacheSize} entries</span>
+            <span>Avg Render: {getMetrics().averageRenderTime.toFixed(2)}ms</span>
+            <span>Cache Hit Rate: {((getMetrics().cacheHits / (getMetrics().cacheHits + getMetrics().cacheMisses)) * 100 || 0).toFixed(1)}%</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }

@@ -673,14 +673,14 @@ export const useHybridStore = create<HybridModeState>()(
   )
 )
 
-// Selectors for optimal performance
+// Selectors for optimal performance with shallow comparison
 export const useHybridMode = () => {
   return useHybridStore(state => ({
     isHybridMode: state.isHybridMode,
     layout: state.layout,
     setHybridMode: state.setHybridMode,
     setLayout: state.setLayout,
-  }))
+  }), (a, b) => a.isHybridMode === b.isHybridMode && a.layout === b.layout)
 }
 
 export const useWidgetManagement = () => {
@@ -692,7 +692,10 @@ export const useWidgetManagement = () => {
     updateWidgetPosition: state.updateWidgetPosition,
     clearAllWidgets: state.clearAllWidgets,
     optimizeLayout: state.optimizeLayout,
-  }))
+  }), (a, b) => 
+    a.pinnedWidgets.length === b.pinnedWidgets.length &&
+    Object.keys(a.widgetLayout).length === Object.keys(b.widgetLayout).length
+  )
 }
 
 export const useContextSync = () => {
@@ -710,5 +713,11 @@ export const useContextSync = () => {
     addContextHistoryEntry: state.addContextHistoryEntry,
     clearContextHistory: state.clearContextHistory,
     getContextHistoryForEntity: state.getContextHistoryForEntity,
-  }))
+  }), (a, b) => 
+    a.activeContextSync === b.activeContextSync &&
+    a.dashboardContext?.conversation_id === b.dashboardContext?.conversation_id &&
+    a.chatContext?.conversation_id === b.chatContext?.conversation_id &&
+    a.focusedSession?.id === b.focusedSession?.id &&
+    a.contextHistory.length === b.contextHistory.length
+  )
 }

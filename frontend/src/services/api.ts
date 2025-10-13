@@ -236,19 +236,8 @@ export const chatApi = {
 // ===== Dashboard APIs =====
 export const dashboardApi = {
   getOverview: async () => {
-    // Use our new Windows data endpoint instead of static data
-    const response = await api.get<
-      ApiResponse<{
-        summary_cards: Array<{
-          title: string
-          value: string | number
-          change?: { value: number; trend: 'up' | 'down' | 'stable' }
-          status?: 'normal' | 'warning' | 'critical'
-        }>
-        recent_alerts: any[]
-        system_health: any
-      }>
-    >('/windows/dashboard-summary')
+    // Direct call to backend metrics endpoint - no transformation here
+    const response = await api.get('/dashboard/metrics')
     return response.data
   },
 
