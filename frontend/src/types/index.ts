@@ -1,5 +1,9 @@
 // Core application types for SYNRGY
 
+// ===== Visual Payload Types (SYNRGY Enterprise System) =====
+export * from './visual'
+import type { VisualPayload } from './visual'
+
 // ===== Chat & Conversation Types =====
 export interface ChatMessage {
   id: string
@@ -42,9 +46,6 @@ export interface ChatResponse {
   status: string
   error?: string
 }
-
-// ===== Visual Payload Types (SYNRGY Enterprise System) =====
-export * from './visual'
 
 // ===== Entity & Query Types =====
 export interface Entity {
@@ -213,6 +214,9 @@ export interface User {
   role: 'admin' | 'analyst' | 'viewer'
   permissions: string[]
   last_login?: string
+  // Additional properties for compatibility
+  full_name?: string
+  username?: string
   preferences: {
     theme: 'dark' | 'light'
     default_time_range: string
@@ -230,7 +234,15 @@ export interface AuthState {
 
 // ===== UI State Types =====
 export interface AppMode {
-  current: 'landing' | 'dashboard' | 'chat' | 'hybrid' | 'reports' | 'investigations' | 'admin'
+  current:
+    | 'landing'
+    | 'dashboard'
+    | 'chat'
+    | 'hybrid'
+    | 'reports'
+    | 'investigations'
+    | 'admin'
+    | 'settings'
 }
 
 export interface UIState {
@@ -261,10 +273,32 @@ export interface PaginatedResponse<T = any> {
 
 // ===== WebSocket Types =====
 export interface WebSocketMessage {
-  type: 'chat_response' | 'notification' | 'system_update' | 'error'
+  type: 'chat_response' | 'notification' | 'system_update' | 'error' | 'ping' | 'chat_message'
   data: any
   session_id?: string
   timestamp: string
+}
+
+// Streaming chat response for WebSocket
+export interface StreamingChatResponse {
+  conversation_id: string
+  role: 'assistant'
+  accumulated_text: string
+  current_chunk?: string
+  is_complete: boolean
+  timestamp: string
+  visual_payloads?: VisualPayload[]
+  metadata?: {
+    processing_step?: string
+    confidence?: number
+    execution_time?: number
+    intent?: string
+    entities?: any[]
+    results_count?: number
+    stage?: 'nlp_processing' | 'query_building' | 'siem_query' | 'complete' | 'error'
+    [key: string]: any
+  }
+  error?: string
 }
 
 // ===== Context Types =====
@@ -275,6 +309,25 @@ export interface ConversationContext {
   filters: Filter[]
   time_range?: TimeRange
   metadata: Record<string, any>
+}
+
+// ===== Streaming Types =====
+export interface StreamingMessage {
+  id?: string
+  conversation_id?: string
+  text?: string
+  timestamp?: string
+  role?: 'assistant'
+}
+
+// ===== Notification Types =====
+export interface Notification {
+  id: string
+  type: 'info' | 'warning' | 'error' | 'success'
+  title: string
+  message: string
+  timestamp: string
+  read?: boolean
 }
 
 // ===== Error Types =====

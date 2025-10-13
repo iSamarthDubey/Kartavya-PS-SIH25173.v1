@@ -1,55 +1,64 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { 
-  User, 
-  Lock, 
-  Eye, 
-  EyeOff, 
+import {
+  User,
+  Lock,
+  Eye,
+  EyeOff,
   Shield,
   Loader2,
   ArrowRight,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
 } from 'lucide-react'
 
 interface LoginFormProps {
-  onLogin: (credentials: { username: string; password: string; remember?: boolean }) => Promise<void>
+  onLogin: (credentials: {
+    identifier: string
+    password: string
+    remember?: boolean
+  }) => Promise<void>
   loading?: boolean
   error?: string
   className?: string
 }
 
-export default function LoginForm({ onLogin, loading = false, error, className = '' }: LoginFormProps) {
+export default function LoginForm({
+  onLogin,
+  loading = false,
+  error,
+  className = '',
+}: LoginFormProps) {
   const [formData, setFormData] = useState({
-    username: '',
+    identifier: '',
     password: '',
-    remember: false
+    remember: false,
   })
   const [showPassword, setShowPassword] = useState(false)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   const validateForm = () => {
     const errors: Record<string, string> = {}
-    
-    if (!formData.username.trim()) {
-      errors.username = 'Username is required'
+
+    if (!formData.identifier.trim()) {
+      errors.identifier = 'Username is required'
     }
-    
+
     if (!formData.password) {
       errors.password = 'Password is required'
     } else if (formData.password.length < 6) {
       errors.password = 'Password must be at least 6 characters'
     }
-    
+
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm()) return
-    
+
     try {
       await onLogin(formData)
     } catch (err) {
@@ -59,7 +68,7 @@ export default function LoginForm({ onLogin, loading = false, error, className =
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }))
-    
+
     // Clear field error when user starts typing
     if (formErrors[field]) {
       setFormErrors(prev => ({ ...prev, [field]: '' }))
@@ -71,20 +80,22 @@ export default function LoginForm({ onLogin, loading = false, error, className =
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Username Field */}
         <div className="space-y-2">
-          <label htmlFor="username" className="block text-sm font-medium text-synrgy-text">
+          <label htmlFor="identifier" className="block text-sm font-medium text-synrgy-text">
             Username
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <User className={`w-5 h-5 ${formErrors.username ? 'text-red-400' : 'text-synrgy-muted'}`} />
+              <User
+                className={`w-5 h-5 ${formErrors.identifier ? 'text-red-400' : 'text-synrgy-muted'}`}
+              />
             </div>
             <input
-              id="username"
+              id="identifier"
               type="text"
-              value={formData.username}
-              onChange={(e) => handleInputChange('username', e.target.value)}
+              value={formData.identifier}
+              onChange={e => handleInputChange('identifier', e.target.value)}
               className={`w-full pl-10 pr-4 py-3 bg-synrgy-surface border rounded-lg focus:outline-none focus:ring-2 transition-all ${
-                formErrors.username
+                formErrors.identifier
                   ? 'border-red-400 focus:ring-red-400/50'
                   : 'border-synrgy-primary/20 focus:border-synrgy-primary focus:ring-synrgy-primary/50'
               } text-synrgy-text placeholder-synrgy-muted`}
@@ -92,14 +103,14 @@ export default function LoginForm({ onLogin, loading = false, error, className =
               disabled={loading}
             />
           </div>
-          {formErrors.username && (
+          {formErrors.identifier && (
             <motion.p
               initial={{ opacity: 0, y: -5 }}
               animate={{ opacity: 1, y: 0 }}
               className="text-sm text-red-400 flex items-center gap-1"
             >
               <AlertCircle className="w-4 h-4" />
-              {formErrors.username}
+              {formErrors.identifier}
             </motion.p>
           )}
         </div>
@@ -111,13 +122,15 @@ export default function LoginForm({ onLogin, loading = false, error, className =
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock className={`w-5 h-5 ${formErrors.password ? 'text-red-400' : 'text-synrgy-muted'}`} />
+              <Lock
+                className={`w-5 h-5 ${formErrors.password ? 'text-red-400' : 'text-synrgy-muted'}`}
+              />
             </div>
             <input
               id="password"
               type={showPassword ? 'text' : 'password'}
               value={formData.password}
-              onChange={(e) => handleInputChange('password', e.target.value)}
+              onChange={e => handleInputChange('password', e.target.value)}
               className={`w-full pl-10 pr-12 py-3 bg-synrgy-surface border rounded-lg focus:outline-none focus:ring-2 transition-all ${
                 formErrors.password
                   ? 'border-red-400 focus:ring-red-400/50'
@@ -154,7 +167,7 @@ export default function LoginForm({ onLogin, loading = false, error, className =
               id="remember"
               type="checkbox"
               checked={formData.remember}
-              onChange={(e) => handleInputChange('remember', e.target.checked)}
+              onChange={e => handleInputChange('remember', e.target.checked)}
               className="w-4 h-4 text-synrgy-primary bg-synrgy-surface border-synrgy-primary/20 rounded focus:ring-synrgy-primary focus:ring-2"
               disabled={loading}
             />
@@ -162,7 +175,7 @@ export default function LoginForm({ onLogin, loading = false, error, className =
               Remember me
             </label>
           </div>
-          
+
           <button
             type="button"
             className="text-sm text-synrgy-primary hover:text-synrgy-accent transition-colors"
@@ -189,11 +202,11 @@ export default function LoginForm({ onLogin, loading = false, error, className =
         {/* Submit Button */}
         <motion.button
           type="submit"
-          disabled={loading || !formData.username || !formData.password}
+          disabled={loading || !formData.identifier || !formData.password}
           whileHover={{ scale: loading ? 1 : 1.02 }}
           whileTap={{ scale: loading ? 1 : 0.98 }}
           className={`w-full py-3 px-4 rounded-lg font-medium text-synrgy-bg-900 transition-all flex items-center justify-center gap-2 ${
-            loading || !formData.username || !formData.password
+            loading || !formData.identifier || !formData.password
               ? 'bg-synrgy-muted cursor-not-allowed'
               : 'bg-synrgy-primary hover:bg-synrgy-accent shadow-synrgy-glow hover:shadow-synrgy-glow-strong'
           }`}
@@ -217,7 +230,7 @@ export default function LoginForm({ onLogin, loading = false, error, className =
       <div className="mt-6 text-center">
         <p className="text-sm text-synrgy-muted">
           Don't have an account?{' '}
-          <button 
+          <button
             type="button"
             className="text-synrgy-primary hover:text-synrgy-accent transition-colors font-medium"
             disabled={loading}

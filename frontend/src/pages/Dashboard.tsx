@@ -5,7 +5,7 @@ import { useAppStore } from '@/stores/appStore'
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { setMode, setChatPanelOpen } = useAppStore()
-  
+
   const handleAskSynrgy = (query: string) => {
     // Switch to hybrid mode and open chat with the query
     setMode('hybrid')

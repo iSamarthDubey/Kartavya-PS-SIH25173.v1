@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { useAuth } from '@/stores/appStore'
-import { 
-  User, 
-  Bell, 
-  Shield, 
-  Palette, 
+import {
+  User,
+  Bell,
+  Shield,
+  Palette,
   Monitor,
   Moon,
   Sun,
   Globe,
   Lock,
   Database,
-  Zap
+  Zap,
 } from 'lucide-react'
 
 export default function SettingsPage() {
@@ -39,7 +39,7 @@ export default function SettingsPage() {
           {/* Sidebar */}
           <div className="w-64 flex-shrink-0">
             <nav className="space-y-1">
-              {tabs.map((tab) => (
+              {tabs.map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
@@ -105,9 +105,7 @@ export default function SettingsPage() {
                         className="w-full px-3 py-2 bg-synrgy-bg-900 border border-synrgy-primary/10 rounded-lg text-synrgy-muted cursor-not-allowed capitalize"
                       />
                     </div>
-                    <button className="btn-primary">
-                      Save Changes
-                    </button>
+                    <button className="btn-primary">Save Changes</button>
                   </div>
                 </div>
               )}
@@ -119,7 +117,9 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-sm font-medium text-synrgy-text">Security Alerts</h3>
-                        <p className="text-sm text-synrgy-muted">Get notified about security incidents</p>
+                        <p className="text-sm text-synrgy-muted">
+                          Get notified about security incidents
+                        </p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" className="sr-only peer" defaultChecked />
@@ -129,7 +129,9 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-sm font-medium text-synrgy-text">System Updates</h3>
-                        <p className="text-sm text-synrgy-muted">Notifications about system maintenance</p>
+                        <p className="text-sm text-synrgy-muted">
+                          Notifications about system maintenance
+                        </p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" className="sr-only peer" defaultChecked />
@@ -139,7 +141,9 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-sm font-medium text-synrgy-text">Report Generation</h3>
-                        <p className="text-sm text-synrgy-muted">Notifications when reports are ready</p>
+                        <p className="text-sm text-synrgy-muted">
+                          Notifications when reports are ready
+                        </p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" className="sr-only peer" />
@@ -172,23 +176,20 @@ export default function SettingsPage() {
                           placeholder="Confirm new password"
                           className="w-full px-3 py-2 bg-synrgy-bg-800 border border-synrgy-primary/20 rounded-lg text-synrgy-text focus:outline-none focus:ring-2 focus:ring-synrgy-primary/50"
                         />
-                        <button className="btn-primary">
-                          Update Password
-                        </button>
+                        <button className="btn-primary">Update Password</button>
                       </div>
                     </div>
-                    
+
                     <div className="pt-6 border-t border-synrgy-primary/10">
                       <div className="flex items-center gap-3 mb-4">
                         <Lock className="w-5 h-5 text-synrgy-primary" />
                         <h3 className="text-sm font-medium text-synrgy-text">Session Management</h3>
                       </div>
                       <p className="text-sm text-synrgy-muted mb-4">
-                        You are currently signed in on this device. You can sign out of all other sessions.
+                        You are currently signed in on this device. You can sign out of all other
+                        sessions.
                       </p>
-                      <button className="btn-secondary">
-                        Sign out all other sessions
-                      </button>
+                      <button className="btn-secondary">Sign out all other sessions</button>
                     </div>
                   </div>
                 </div>
@@ -202,7 +203,13 @@ export default function SettingsPage() {
                       <h3 className="text-sm font-medium text-synrgy-text mb-3">Theme</h3>
                       <div className="grid grid-cols-3 gap-3">
                         <label className="flex items-center p-3 bg-synrgy-bg-800 border border-synrgy-primary/20 rounded-lg cursor-pointer hover:border-synrgy-primary/40 transition-colors">
-                          <input type="radio" name="theme" value="dark" defaultChecked className="sr-only" />
+                          <input
+                            type="radio"
+                            name="theme"
+                            value="dark"
+                            defaultChecked
+                            className="sr-only"
+                          />
                           <Moon className="w-5 h-5 text-synrgy-primary mr-3" />
                           <span className="text-sm text-synrgy-text">Dark</span>
                         </label>
@@ -241,7 +248,9 @@ export default function SettingsPage() {
                         <Database className="w-5 h-5 text-synrgy-primary" />
                         <div>
                           <h3 className="text-sm font-medium text-synrgy-text">Data Retention</h3>
-                          <p className="text-sm text-synrgy-muted">Automatic cleanup of old logs and data</p>
+                          <p className="text-sm text-synrgy-muted">
+                            Automatic cleanup of old logs and data
+                          </p>
                         </div>
                       </div>
                       <select className="px-3 py-1 bg-synrgy-bg-800 border border-synrgy-primary/20 rounded text-sm text-synrgy-text">

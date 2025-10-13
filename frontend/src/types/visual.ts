@@ -5,7 +5,7 @@
  */
 
 export interface VisualPayload {
-  type: 'composite' | 'chart' | 'table' | 'map' | 'narrative' | 'network_graph'
+  type: 'composite' | 'chart' | 'table' | 'map' | 'narrative' | 'network_graph' | 'summary_card' | 'insight_feed'
   cards?: VisualCard[]
   metadata?: {
     query: string
@@ -22,19 +22,19 @@ export interface VisualPayload {
 }
 
 export interface VisualCard {
-  type: 'summary_card' | 'chart' | 'table' | 'map' | 'network_graph' | 'narrative'
+  type: 'summary_card' | 'chart' | 'table' | 'map' | 'network_graph' | 'narrative' | 'insight_feed'
   title?: string
   subtitle?: string
   data?: any
   value?: number | string
   trend?: 'up' | 'down' | 'stable'
   status?: 'success' | 'warning' | 'error' | 'info'
-  
+
   // Chart specific
   chart_type?: 'timeseries' | 'bar' | 'pie' | 'scatter' | 'heatmap' | 'line' | 'area'
   x_axis?: string
   y_axis?: string
-  
+
   // Table specific
   columns?: Array<{
     key: string
@@ -49,7 +49,7 @@ export interface VisualCard {
     page: number
     per_page: number
   }
-  
+
   // Map specific
   locations?: Array<{
     lat: number
@@ -59,7 +59,7 @@ export interface VisualCard {
     country?: string
     city?: string
   }>
-  
+
   // Network graph specific
   nodes?: Array<{
     id: string
@@ -74,7 +74,7 @@ export interface VisualCard {
     label?: string
     weight?: number
   }>
-  
+
   // Interaction config
   config?: {
     interactive?: boolean
@@ -83,8 +83,15 @@ export interface VisualCard {
     drilldown?: boolean
     clickable?: boolean
     hoverable?: boolean
+    // Chart specific config
+    x_field?: string
+    y_field?: string
+    color?: string
+    strokeWidth?: number
+    outerRadius?: number
+    confidence?: number
   }
-  
+
   // Actions
   actions?: Array<{
     type: 'filter' | 'drilldown' | 'export' | 'investigate' | 'pin'
@@ -104,7 +111,7 @@ export interface SummaryCard extends VisualCard {
     change: number
     period: string
   }
-  sparkline?: Array<{ x: string, y: number }>
+  sparkline?: Array<{ x: string; y: number }>
   icon?: string
   color?: 'primary' | 'accent' | 'success' | 'warning' | 'error'
 }
@@ -115,8 +122,8 @@ export interface ChartCard extends VisualCard {
   chart_type: 'timeseries' | 'bar' | 'pie' | 'scatter' | 'heatmap' | 'line' | 'area'
   data: Array<any>
   axes?: {
-    x: { label: string, type: 'datetime' | 'category' | 'number' }
-    y: { label: string, type: 'number' | 'percentage' }
+    x: { label: string; type: 'datetime' | 'category' | 'number' }
+    y: { label: string; type: 'number' | 'percentage' }
   }
   series?: Array<{
     name: string

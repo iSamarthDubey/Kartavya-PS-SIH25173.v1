@@ -1,6 +1,11 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { ChatMessage, WebSocketMessage } from '../types'
-import { createWebSocketService, getWebSocketService, WebSocketService, WebSocketCallbacks } from '../services/websocket'
+import {
+  createWebSocketService,
+  getWebSocketService,
+  WebSocketService,
+  WebSocketCallbacks,
+} from '../services/websocket'
 import { useAppStore } from '../stores/appStore'
 
 interface UseWebSocketOptions {
@@ -27,15 +32,15 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   const [isConnected, setIsConnected] = useState(false)
   const [isReconnecting, setIsReconnecting] = useState(false)
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
-  const [connectionState, setConnectionState] = useState<'connecting' | 'open' | 'closing' | 'closed'>('closed')
-  
+  const [connectionState, setConnectionState] = useState<
+    'connecting' | 'open' | 'closing' | 'closed'
+  >('closed')
+
   const wsServiceRef = useRef<WebSocketService | null>(null)
   const { user, token } = useAppStore()
 
   // Get WebSocket URL from environment or default
-  const wsUrl = options.url || 
-    import.meta.env.VITE_WS_BASE_URL || 
-    'ws://localhost:8000/ws/chat'
+  const wsUrl = options.url || import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000/ws/chat'
 
   const updateConnectionState = useCallback(() => {
     const service = wsServiceRef.current
@@ -70,10 +75,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     try {
       // Generate or use existing session ID
       const sessionId = crypto.randomUUID()
-      const fullWsUrl = wsUrl.includes('/ws/chat') ? 
-        `${wsUrl}/${sessionId}` : 
-        `${wsUrl}/chat/${sessionId}`
-      
+      const fullWsUrl = wsUrl.includes('/ws/chat')
+        ? `${wsUrl}/${sessionId}`
+        : `${wsUrl}/chat/${sessionId}`
+
       // Create or get existing service
       if (!wsServiceRef.current) {
         wsServiceRef.current = createWebSocketService({
@@ -81,7 +86,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
           token: token || undefined,
           autoReconnect: true,
           maxReconnectAttempts: 5,
-          reconnectDelay: 3000
+          reconnectDelay: 3000,
         })
       }
 
@@ -102,27 +107,26 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
           options.onDisconnect?.()
         },
 
-        onError: (error) => {
+        onError: error => {
           console.error('WebSocket error:', error)
           updateConnectionState()
           options.onError?.(error)
         },
 
-        onReconnecting: (attempt) => {
+        onReconnecting: attempt => {
           console.log(`WebSocket reconnecting (attempt ${attempt})`)
           setIsReconnecting(true)
           setReconnectAttempts(attempt)
         },
 
-        onChatMessage: (message) => {
+        onChatMessage: message => {
           console.log('Chat message received:', message)
           options.onChatMessage?.(message)
-        }
+        },
       }
 
       await wsServiceRef.current.connect(callbacks)
       updateConnectionState()
-
     } catch (error) {
       console.error('Failed to connect WebSocket:', error)
       updateConnectionState()
@@ -148,13 +152,16 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     return wsServiceRef.current.send(message)
   }, [])
 
-  const sendChatMessage = useCallback((query: string, conversationId?: string, context?: any): boolean => {
-    if (!wsServiceRef.current) {
-      console.warn('WebSocket service not initialized')
-      return false
-    }
-    return wsServiceRef.current.sendChatMessage(query, conversationId, context)
-  }, [])
+  const sendChatMessage = useCallback(
+    (query: string, conversationId?: string, context?: any): boolean => {
+      if (!wsServiceRef.current) {
+        console.warn('WebSocket service not initialized')
+        return false
+      }
+      return wsServiceRef.current.sendChatMessage(query, conversationId, context)
+    },
+    []
+  )
 
   // Auto-connect when user is authenticated and autoConnect is true
   useEffect(() => {
@@ -189,7 +196,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     sendChatMessage,
     connect,
     disconnect,
-    connectionState
+    connectionState,
   }
 }
 
@@ -221,21 +228,24 @@ export function useStreamingChat() {
     setIsStreaming(false)
   }, [])
 
-  const sendStreamingQuery = useCallback((query: string, conversationId?: string, context?: any) => {
-    if (!wsService) {
-      console.warn('WebSocket service not available')
-      return false
-    }
+  const sendStreamingQuery = useCallback(
+    (query: string, conversationId?: string, context?: any) => {
+      if (!wsService) {
+        console.warn('WebSocket service not available')
+        return false
+      }
 
-    startNewStream()
-    return wsService.sendChatMessage(query, conversationId, context)
-  }, [wsService, startNewStream])
+      startNewStream()
+      return wsService.sendChatMessage(query, conversationId, context)
+    },
+    [wsService, startNewStream]
+  )
 
   return {
     streamingMessage,
     isStreaming,
     sendStreamingQuery,
     startNewStream,
-    handleStreamingMessage
+    handleStreamingMessage,
   }
 }

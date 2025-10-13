@@ -9,7 +9,7 @@ import {
   Clock,
   Shield,
   BarChart3,
-  AlertTriangle
+  AlertTriangle,
 } from 'lucide-react'
 import { useChatStore } from '@/stores/chatStore'
 import { useQuery } from '@tanstack/react-query'
@@ -25,51 +25,46 @@ interface ComposerProps {
 const QUICK_SUGGESTIONS = [
   {
     icon: Shield,
-    text: "Show me failed login attempts in the last hour",
-    category: "Security"
+    text: 'Show me failed login attempts in the last hour',
+    category: 'Security',
   },
   {
     icon: BarChart3,
-    text: "What are the top threat indicators today?",
-    category: "Analytics"
+    text: 'What are the top threat indicators today?',
+    category: 'Analytics',
   },
   {
     icon: AlertTriangle,
-    text: "Any critical alerts I should know about?",
-    category: "Alerts"
+    text: 'Any critical alerts I should know about?',
+    category: 'Alerts',
   },
   {
     icon: Clock,
-    text: "Generate security summary for last week",
-    category: "Reports"
-  }
+    text: 'Generate security summary for last week',
+    category: 'Reports',
+  },
 ]
 
-export default function Composer({ className = '', disabled = false, placeholder = "Ask ＳＹＮＲＧＹ anything..." }: ComposerProps) {
+export default function Composer({
+  className = '',
+  disabled = false,
+  placeholder = 'Ask ＳＹＮＲＧＹ anything...',
+}: ComposerProps) {
   const [message, setMessage] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { sendMessage, isLoading, context, suggestions } = useChatStore()
-  
+
   // WebSocket streaming integration
-  const { 
-    isConnected, 
-    isConnecting, 
+  const {
+    isConnected,
+    isConnecting,
     isStreaming,
     sendMessage: sendStreamingMessage,
-    error: wsError 
+    error: wsError,
   } = useWebSocketStream({
     autoConnect: true,
-    onStreamStart: () => {
-      console.log('🚀 Stream started')
-    },
-    onStreamComplete: () => {
-      console.log('✅ Stream completed')
-    },
-    onStreamError: (error) => {
-      console.error('❌ Stream error:', error)
-    }
   })
 
   // Auto-resize textarea
@@ -99,11 +94,11 @@ export default function Composer({ className = '', disabled = false, placeholder
     if (!message.trim() || isLoading || isStreaming || disabled) return
 
     const queryText = message.trim()
-    
+
     // Clear input immediately
     setMessage('')
     setShowSuggestions(false)
-    
+
     // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
@@ -113,16 +108,14 @@ export default function Composer({ className = '', disabled = false, placeholder
       // Use streaming WebSocket if connected, fallback to HTTP
       if (isConnected) {
         // Send via WebSocket streaming
-        sendStreamingMessage(
-          queryText,
-          context?.conversation_id || 'new_conversation',
-          { timestamp: new Date().toISOString() }
-        )
+        sendStreamingMessage(queryText, context?.conversation_id || 'new_conversation', {
+          timestamp: new Date().toISOString(),
+        })
       } else {
         // Fallback to HTTP API
         await sendMessage({
           query: queryText,
-          conversation_id: context?.conversation_id || 'new_conversation'
+          conversation_id: context?.conversation_id || 'new_conversation',
         })
       }
     } catch (error) {
@@ -171,7 +164,10 @@ export default function Composer({ className = '', disabled = false, placeholder
   }
 
   const contextSuggestions = suggestions || []
-  const allSuggestions = [...QUICK_SUGGESTIONS, ...contextSuggestions.map(s => ({ icon: Zap, text: s, category: "Context" }))]
+  const allSuggestions = [
+    ...QUICK_SUGGESTIONS,
+    ...contextSuggestions.map(s => ({ icon: Zap, text: s, category: 'Context' })),
+  ]
 
   return (
     <div className={`relative ${className}`}>
@@ -182,7 +178,7 @@ export default function Composer({ className = '', disabled = false, placeholder
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
             className="absolute bottom-full left-0 right-0 mb-2 bg-synrgy-surface border border-synrgy-primary/20 rounded-xl shadow-2xl overflow-hidden z-10"
           >
             <div className="p-4">
@@ -190,7 +186,7 @@ export default function Composer({ className = '', disabled = false, placeholder
                 <Zap className="w-4 h-4 text-synrgy-accent" />
                 <span className="text-sm font-medium text-synrgy-text">Quick Suggestions</span>
               </div>
-              
+
               <div className="grid gap-2 max-h-64 overflow-y-auto">
                 {allSuggestions.slice(0, 6).map((suggestion, index) => (
                   <motion.button
@@ -205,12 +201,8 @@ export default function Composer({ className = '', disabled = false, placeholder
                       <suggestion.icon className="w-4 h-4 text-synrgy-primary" />
                     </div>
                     <div className="flex-1">
-                      <div className="text-sm text-synrgy-text line-clamp-1">
-                        {suggestion.text}
-                      </div>
-                      <div className="text-xs text-synrgy-muted">
-                        {suggestion.category}
-                      </div>
+                      <div className="text-sm text-synrgy-text line-clamp-1">{suggestion.text}</div>
+                      <div className="text-xs text-synrgy-muted">{suggestion.category}</div>
                     </div>
                   </motion.button>
                 ))}
@@ -221,7 +213,7 @@ export default function Composer({ className = '', disabled = false, placeholder
                 <div className="mt-4 pt-4 border-t border-synrgy-primary/10">
                   <div className="text-xs text-synrgy-muted mb-2">Popular queries</div>
                   <div className="flex flex-wrap gap-2">
-                    {backendSuggestions.data.suggestions.slice(0, 2).map((category) =>
+                    {backendSuggestions.data.suggestions.slice(0, 2).map(category =>
                       category.queries.slice(0, 2).map((query, index) => (
                         <button
                           key={`backend-${index}`}
@@ -243,15 +235,17 @@ export default function Composer({ className = '', disabled = false, placeholder
       {/* Context chips */}
       {context && context.entities && Object.keys(context.entities).length > 0 && (
         <div className="flex flex-wrap gap-2 mb-3">
-          {Object.entries(context.entities).slice(0, 3).map(([key, values]) => (
-            <div
-              key={key}
-              className="flex items-center gap-2 bg-synrgy-accent/10 text-synrgy-accent px-3 py-1 rounded-full text-xs"
-            >
-              <span className="font-medium">{key}:</span>
-              <span>{Array.isArray(values) ? values[0] : values}</span>
-            </div>
-          ))}
+          {Object.entries(context.entities)
+            .slice(0, 3)
+            .map(([key, values]) => (
+              <div
+                key={key}
+                className="flex items-center gap-2 bg-synrgy-accent/10 text-synrgy-accent px-3 py-1 rounded-full text-xs"
+              >
+                <span className="font-medium">{key}:</span>
+                <span>{Array.isArray(values) ? values[0] : values}</span>
+              </div>
+            ))}
         </div>
       )}
 
@@ -264,7 +258,7 @@ export default function Composer({ className = '', disabled = false, placeholder
               <textarea
                 ref={textareaRef}
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={e => setMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
                 onFocus={() => setShowSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
@@ -311,9 +305,9 @@ export default function Composer({ className = '', disabled = false, placeholder
                     ? 'bg-synrgy-muted/20 text-synrgy-muted cursor-not-allowed'
                     : 'bg-synrgy-primary text-synrgy-bg-900 hover:bg-synrgy-primary/90 hover:scale-105 active:scale-95'
                 }`}
-                title={isStreaming ? "Streaming..." : "Send message"}
+                title={isStreaming ? 'Streaming...' : 'Send message'}
               >
-                {(isLoading || isStreaming) ? (
+                {isLoading || isStreaming ? (
                   <div className="w-5 h-5 border-2 border-synrgy-bg-900 border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <Send className="w-5 h-5" />
@@ -324,49 +318,49 @@ export default function Composer({ className = '', disabled = false, placeholder
 
           {/* Character count / status */}
           <div className="flex items-center justify-between mt-2 text-xs text-synrgy-muted">
-          <div className="flex items-center gap-4">
-            {isStreaming && (
-              <div className="flex items-center gap-2 text-synrgy-primary">
-                <div className="w-2 h-2 bg-synrgy-primary rounded-full animate-pulse" />
-                <span>ＳＹＮＲＧＹ is streaming...</span>
-              </div>
-            )}
-            
-            {isLoading && !isStreaming && (
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-synrgy-primary rounded-full animate-pulse" />
-                <span>ＳＹＮＲＧＹ is processing...</span>
-              </div>
-            )}
-            
-            {isConnecting && (
-              <div className="flex items-center gap-2 text-synrgy-accent">
-                <div className="w-2 h-2 bg-synrgy-accent rounded-full animate-pulse" />
-                <span>Connecting...</span>
-              </div>
-            )}
-            
-            {!isConnected && !isConnecting && (
-              <div className="flex items-center gap-2 text-yellow-500">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full" />
-                <span>Streaming offline</span>
-              </div>
-            )}
-            
-            {isConnected && !isStreaming && !isLoading && (
-              <div className="flex items-center gap-2 text-green-500">
-                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                <span>Streaming ready</span>
-              </div>
-            )}
-            
-            {wsError && (
-              <div className="flex items-center gap-2 text-red-500">
-                <div className="w-2 h-2 bg-red-500 rounded-full" />
-                <span>Connection error</span>
-              </div>
-            )}
-              
+            <div className="flex items-center gap-4">
+              {isStreaming && (
+                <div className="flex items-center gap-2 text-synrgy-primary">
+                  <div className="w-2 h-2 bg-synrgy-primary rounded-full animate-pulse" />
+                  <span>ＳＹＮＲＧＹ is streaming...</span>
+                </div>
+              )}
+
+              {isLoading && !isStreaming && (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-synrgy-primary rounded-full animate-pulse" />
+                  <span>ＳＹＮＲＧＹ is processing...</span>
+                </div>
+              )}
+
+              {isConnecting && (
+                <div className="flex items-center gap-2 text-synrgy-accent">
+                  <div className="w-2 h-2 bg-synrgy-accent rounded-full animate-pulse" />
+                  <span>Connecting...</span>
+                </div>
+              )}
+
+              {!isConnected && !isConnecting && (
+                <div className="flex items-center gap-2 text-yellow-500">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full" />
+                  <span>Streaming offline</span>
+                </div>
+              )}
+
+              {isConnected && !isStreaming && !isLoading && (
+                <div className="flex items-center gap-2 text-green-500">
+                  <div className="w-2 h-2 bg-green-500 rounded-full" />
+                  <span>Streaming ready</span>
+                </div>
+              )}
+
+              {wsError && (
+                <div className="flex items-center gap-2 text-red-500">
+                  <div className="w-2 h-2 bg-red-500 rounded-full" />
+                  <span>Connection error</span>
+                </div>
+              )}
+
               {isRecording && (
                 <div className="flex items-center gap-2 text-red-500">
                   <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
@@ -374,7 +368,7 @@ export default function Composer({ className = '', disabled = false, placeholder
                 </div>
               )}
             </div>
-            
+
             <div className="text-right">
               <span className={message.length > 500 ? 'text-synrgy-accent' : ''}>
                 {message.length}/1000

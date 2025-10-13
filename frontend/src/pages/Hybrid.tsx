@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Helmet } from 'react-helmet-async'
 
-import HybridConsole from '@/components/Hybrid/HybridConsole'
+import EnhancedHybridLayout from '@/components/Hybrid/EnhancedHybridLayout'
 import { useAppStore } from '@/stores/appStore'
 
 export default function Hybrid() {
@@ -16,7 +16,10 @@ export default function Hybrid() {
     <>
       <Helmet>
         <title>Hybrid Mode - SYNRGY</title>
-        <meta name="description" content="Unified dashboard and chat interface for comprehensive cybersecurity intelligence" />
+        <meta
+          name="description"
+          content="Unified dashboard and chat interface for comprehensive cybersecurity intelligence"
+        />
       </Helmet>
 
       <motion.div
@@ -25,7 +28,7 @@ export default function Hybrid() {
         exit={{ opacity: 0 }}
         className="h-full overflow-hidden"
       >
-        <HybridConsole className="w-full h-full" />
+        <EnhancedHybridLayout className="w-full h-full" />
       </motion.div>
     </>
   )

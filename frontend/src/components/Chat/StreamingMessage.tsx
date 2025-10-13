@@ -3,20 +3,25 @@ import { Loader2, Eye, Bot, User } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 import type { ChatMessage, StreamingChatResponse } from '@/types'
-import VisualRenderer from '@/components/Visuals/VisualRenderer'
+import { StreamingMessage as StreamingMessageType } from '@/hooks/useWebSocketStream'
+import EnhancedVisualRenderer from './EnhancedVisualRenderer'
 
 interface StreamingMessageProps {
   message?: ChatMessage
-  stream?: StreamingChatResponse
+  stream?: StreamingChatResponse | StreamingMessageType
   isStreaming?: boolean
   className?: string
+  onPin?: (visual: any) => void
+  onExport?: (visual: any) => void
 }
 
-export default function StreamingMessage({ 
-  message, 
-  stream, 
+export default function StreamingMessage({
+  message,
+  stream,
   isStreaming = false,
-  className = '' 
+  className = '',
+  onPin,
+  onExport,
 }: StreamingMessageProps) {
   const [displayText, setDisplayText] = useState('')
   const [visiblePayloads, setVisiblePayloads] = useState<any[]>([])
@@ -24,11 +29,17 @@ export default function StreamingMessage({
   // Handle streaming text accumulation
   useEffect(() => {
     if (stream) {
-      setDisplayText(stream.accumulated_text || '')
-      
-      // Add visual payloads as they arrive
-      if (stream.visual_payloads && stream.visual_payloads.length > 0) {
-        setVisiblePayloads(stream.visual_payloads)
+      // Handle both StreamingChatResponse and StreamingMessage types
+      if ('accumulated_text' in stream) {
+        setDisplayText(stream.accumulated_text || '')
+        if (stream.visual_payloads && stream.visual_payloads.length > 0) {
+          setVisiblePayloads(stream.visual_payloads)
+        }
+      } else if ('content' in stream) {
+        setDisplayText(stream.content || '')
+        if (stream.visualPayload) {
+          setVisiblePayloads([stream.visualPayload])
+        }
       }
     } else if (message) {
       setDisplayText(message.content)
@@ -37,7 +48,6 @@ export default function StreamingMessage({
 
   // Use streaming data or fallback to message
   const isAssistant = message?.role === 'assistant' || stream?.role === 'assistant'
-  const messageId = message?.id || stream?.conversation_id || 'streaming'
   const timestamp = message?.timestamp || stream?.timestamp || new Date().toISOString()
 
   return (
@@ -48,11 +58,13 @@ export default function StreamingMessage({
       className={`flex gap-4 group ${className}`}
     >
       {/* Avatar */}
-      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-        isAssistant 
-          ? 'bg-gradient-to-br from-synrgy-primary/20 to-synrgy-accent/20 border border-synrgy-primary/30'
-          : 'bg-synrgy-surface border border-synrgy-primary/20'
-      }`}>
+      <div
+        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+          isAssistant
+            ? 'bg-gradient-to-br from-synrgy-primary/20 to-synrgy-accent/20 border border-synrgy-primary/30'
+            : 'bg-synrgy-surface border border-synrgy-primary/20'
+        }`}
+      >
         {isAssistant ? (
           <Bot className="w-4 h-4 text-synrgy-primary" />
         ) : (
@@ -67,7 +79,7 @@ export default function StreamingMessage({
           <span className="text-sm font-medium text-synrgy-text">
             {isAssistant ? 'SYNRGY Assistant' : 'You'}
           </span>
-          
+
           <span className="text-xs text-synrgy-muted">
             {new Date(timestamp).toLocaleTimeString()}
           </span>
@@ -109,30 +121,50 @@ export default function StreamingMessage({
           ) : null}
         </div>
 
-        {/* Visual Payloads */}
+        {/* Visual Payloads from streaming or message */}
         <AnimatePresence>
-          {visiblePayloads.length > 0 && (
+          {(visiblePayloads.length > 0 || message?.visual_payload) && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               className="mt-4 space-y-4"
             >
+              {/* Streaming visual payloads */}
               {visiblePayloads.map((payload, index) => (
                 <motion.div
-                  key={`payload-${index}`}
+                  key={`stream-payload-${index}`}
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: index * 0.1 }}
                   className="border border-synrgy-primary/20 rounded-lg overflow-hidden bg-synrgy-surface/30"
                 >
-                  <VisualRenderer
+                  <EnhancedVisualRenderer
                     payload={payload}
-                    messageId={messageId}
-                    conversationId={stream?.conversation_id || message?.conversation_id}
+                    onPin={onPin}
+                    onExport={onExport}
+                    interactive={true}
                   />
                 </motion.div>
               ))}
+
+              {/* Message visual payload */}
+              {message?.visual_payload && (
+                <motion.div
+                  key="message-payload"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.2 }}
+                  className="border border-synrgy-primary/20 rounded-lg overflow-hidden bg-synrgy-surface/30"
+                >
+                  <EnhancedVisualRenderer
+                    payload={message.visual_payload}
+                    onPin={onPin}
+                    onExport={onExport}
+                    interactive={true}
+                  />
+                </motion.div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

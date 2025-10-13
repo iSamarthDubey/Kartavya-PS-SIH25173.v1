@@ -13,53 +13,134 @@ import type {
   SiemConnector,
   DashboardWidget,
   User,
-  PaginatedResponse
+  PaginatedResponse,
 } from '@/types'
+
+// Enhanced retry configuration
+const MAX_RETRIES = parseInt(import.meta.env.VITE_MAX_RETRY_ATTEMPTS || '3')
+const RETRY_DELAY = parseInt(import.meta.env.VITE_RETRY_DELAY || '1000')
+const REQUEST_TIMEOUT = parseInt(import.meta.env.VITE_REQUEST_TIMEOUT || '30000')
 
 // Create axios instance with default config
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: 30000,
+  timeout: REQUEST_TIMEOUT,
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
+// Exponential backoff retry helper
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+const isRetryableError = (error: any): boolean => {
+  if (!error.response) {
+    // Network errors (no response)
+    return true
+  }
+
+  const status = error.response.status
+  // Retry on 5xx server errors and 429 rate limiting
+  return status >= 500 || status === 429
+}
+
+const retryRequest = async (
+  requestFn: () => Promise<any>,
+  maxRetries: number = MAX_RETRIES
+): Promise<any> => {
+  let lastError: any
+
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      return await requestFn()
+    } catch (error: any) {
+      lastError = error
+
+      if (attempt > maxRetries || !isRetryableError(error)) {
+        throw error
+      }
+
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = RETRY_DELAY * Math.pow(2, attempt - 1)
+      if (import.meta.env.VITE_ENABLE_DEBUG === 'true') {
+        console.log(
+          `Request failed (attempt ${attempt}/${maxRetries + 1}), retrying in ${delay}ms...`
+        )
+      }
+      await sleep(delay)
+    }
+  }
+
+  throw lastError
+}
+
 // Request interceptor for adding auth token
 api.interceptors.request.use(
-  (config) => {
+  config => {
     const token = localStorage.getItem('synrgy_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
     return config
   },
-  (error) => {
+  error => {
     return Promise.reject(error)
   }
 )
 
-// Response interceptor for handling errors
+// Response interceptor for comprehensive error handling
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
-  (error) => {
+  error => {
     // Handle common error scenarios
     if (error.response?.status === 401) {
       // Clear token and redirect to login
       localStorage.removeItem('synrgy_token')
+      if (import.meta.env.VITE_ENABLE_DEBUG === 'true') {
+        console.warn('Authentication expired, redirecting to login')
+      }
       window.location.href = '/login'
+      return Promise.reject(new Error('Authentication expired'))
     }
-    
-    return Promise.reject(error)
+
+    if (error.response?.status === 403) {
+      return Promise.reject(new Error('Access forbidden'))
+    }
+
+    if (error.response?.status === 429) {
+      // Let the retry logic handle this
+      return Promise.reject(error)
+    }
+
+    if (error.response?.status >= 500) {
+      // Let the retry logic handle this
+      return Promise.reject(error)
+    }
+
+    if (!error.response) {
+      return Promise.reject(new Error('Network error - please check your connection'))
+    }
+
+    // For other errors, include response data if available
+    const errorMessage =
+      error.response?.data?.message || error.response?.data?.detail || error.message
+    return Promise.reject(new Error(errorMessage))
   }
 )
 
 // ===== Authentication APIs =====
+
+// Fixed interface to match backend expectations
+interface LoginCredentials {
+  identifier: string // Changed from 'email' to match backend
+  password: string
+}
+
 export const authApi = {
-  login: async (credentials: { email: string; password: string }) => {
+  login: async (credentials: LoginCredentials) => {
     const response = await api.post('/auth/login', {
-      identifier: credentials.email, // Backend expects 'identifier' not 'email'
-      password: credentials.password
+      identifier: credentials.identifier, // Now consistent with interface
+      password: credentials.password,
     })
     return response.data
   },
@@ -77,40 +158,41 @@ export const authApi = {
   refreshToken: async () => {
     const response = await api.post<ApiResponse<{ token: string }>>('/auth/refresh')
     return response.data
-  }
+  },
 }
 
 // ===== Chat & Assistant APIs =====
 export const chatApi = {
   sendMessage: async (request: ChatRequest): Promise<ChatResponse> => {
-    try {
-      // Try the standard assistant endpoint first
-      const response = await api.post<ChatResponse>('/assistant/chat', request)
-      return response.data
-    } catch (error: any) {
-      // If standard endpoint fails, try Windows-specific endpoint as fallback
-      if (error.response?.status === 400 || error.response?.status === 503) {
-        console.log('Standard endpoint failed, trying Windows-specific endpoint')
-        const windowsResponse = await windowsApi.simpleChat(request.query)
-        // Convert Windows response to standard ChatResponse format
-        return {
-          conversation_id: 'fallback',
-          query: request.query,
-          intent: windowsResponse.intent,
-          confidence: windowsResponse.confidence,
-          entities: windowsResponse.entities || [],
-          siem_query: windowsResponse.siem_query,
-          results: windowsResponse.results,
-          summary: windowsResponse.summary,
-          visualizations: windowsResponse.visualizations || [],
-          suggestions: windowsResponse.suggestions || [],
-          metadata: windowsResponse.metadata,
-          status: windowsResponse.status,
-          error: windowsResponse.error
+    return await retryRequest(async () => {
+      try {
+        // Try the standard assistant endpoint first with retry logic
+        const response = await api.post<ChatResponse>('/assistant/chat', request)
+        return response.data
+      } catch (error: any) {
+        // If standard endpoint fails, try Windows-specific endpoint as fallback
+        if (error.response?.status === 400 || error.response?.status === 503) {
+          const windowsResponse = await windowsApi.simpleChat(request.query)
+          // Convert Windows response to standard ChatResponse format
+          return {
+            conversation_id: 'fallback',
+            query: request.query,
+            intent: windowsResponse.intent,
+            confidence: windowsResponse.confidence,
+            entities: windowsResponse.entities || [],
+            siem_query: windowsResponse.siem_query,
+            results: windowsResponse.results,
+            summary: windowsResponse.summary,
+            visualizations: windowsResponse.visualizations || [],
+            suggestions: windowsResponse.suggestions || [],
+            metadata: windowsResponse.metadata,
+            status: windowsResponse.status,
+            error: windowsResponse.error,
+          }
         }
+        throw error
       }
-      throw error
-    }
+    })
   },
 
   clarify: async (data: {
@@ -123,11 +205,13 @@ export const chatApi = {
   },
 
   getHistory: async (conversationId: string, limit: number = 10) => {
-    const response = await api.get<ApiResponse<{
-      conversation_id: string
-      history: any[]
-      total_messages: number
-    }>>(`/assistant/history/${conversationId}?limit=${limit}`)
+    const response = await api.get<
+      ApiResponse<{
+        conversation_id: string
+        history: any[]
+        total_messages: number
+      }>
+    >(`/assistant/history/${conversationId}?limit=${limit}`)
     return response.data
   },
 
@@ -137,30 +221,34 @@ export const chatApi = {
   },
 
   getSuggestions: async () => {
-    const response = await api.get<ApiResponse<{
-      suggestions: Array<{
-        category: string
-        queries: string[]
+    const response = await api.get<
+      ApiResponse<{
+        suggestions: Array<{
+          category: string
+          queries: string[]
+        }>
       }>
-    }>>('/assistant/suggestions')
+    >('/assistant/suggestions')
     return response.data
-  }
+  },
 }
 
 // ===== Dashboard APIs =====
 export const dashboardApi = {
   getOverview: async () => {
     // Use our new Windows data endpoint instead of static data
-    const response = await api.get<ApiResponse<{
-      summary_cards: Array<{
-        title: string
-        value: string | number
-        change?: { value: number; trend: 'up' | 'down' | 'stable' }
-        status?: 'normal' | 'warning' | 'critical'
+    const response = await api.get<
+      ApiResponse<{
+        summary_cards: Array<{
+          title: string
+          value: string | number
+          change?: { value: number; trend: 'up' | 'down' | 'stable' }
+          status?: 'normal' | 'warning' | 'critical'
+        }>
+        recent_alerts: any[]
+        system_health: any
       }>
-      recent_alerts: any[]
-      system_health: any
-    }>>('/windows/dashboard-summary')
+    >('/windows/dashboard-summary')
     return response.data
   },
 
@@ -177,7 +265,7 @@ export const dashboardApi = {
   deleteWidget: async (widgetId: string) => {
     const response = await api.delete<ApiResponse>(`/dashboard/widgets/${widgetId}`)
     return response.data
-  }
+  },
 }
 
 // ===== Query APIs =====
@@ -211,10 +299,7 @@ export const queryApi = {
   },
 
   // Translate natural language to SIEM query
-  translate: async (data: {
-    query: string
-    params?: Record<string, any>
-  }) => {
+  translate: async (data: { query: string; params?: Record<string, any> }) => {
     const response = await api.post<{
       success: boolean
       data?: {
@@ -245,10 +330,7 @@ export const queryApi = {
   },
 
   // Optimize query for better performance
-  optimize: async (data: {
-    query: string
-    params?: Record<string, any>
-  }) => {
+  optimize: async (data: { query: string; params?: Record<string, any> }) => {
     const response = await api.post<{
       success: boolean
       data?: {
@@ -261,7 +343,7 @@ export const queryApi = {
       error?: string
     }>('/query/optimize', data)
     return response.data
-  }
+  },
 }
 
 // ===== Windows Data APIs =====
@@ -336,13 +418,15 @@ export const windowsApi = {
       error?: string
     }>('/windows/simple-chat', { query })
     return response.data
-  }
+  },
 }
 
 // ===== Reports APIs =====
 export const reportsApi = {
   list: async (page: number = 1, limit: number = 20) => {
-    const response = await api.get<PaginatedResponse<Report>>(`/reports?page=${page}&limit=${limit}`)
+    const response = await api.get<PaginatedResponse<Report>>(
+      `/reports?page=${page}&limit=${limit}`
+    )
     return response.data
   },
 
@@ -358,13 +442,16 @@ export const reportsApi = {
     template?: string
     time_range?: { start: string; end: string }
   }) => {
-    const response = await api.post<ApiResponse<{ report_id: string; status: string }>>('/reports/generate', data)
+    const response = await api.post<ApiResponse<{ report_id: string; status: string }>>(
+      '/reports/generate',
+      data
+    )
     return response.data
   },
 
   download: async (reportId: string) => {
     const response = await api.get(`/reports/${reportId}/download`, {
-      responseType: 'blob'
+      responseType: 'blob',
     })
     return response
   },
@@ -372,18 +459,18 @@ export const reportsApi = {
   delete: async (reportId: string) => {
     const response = await api.delete<ApiResponse>(`/reports/${reportId}`)
     return response.data
-  }
+  },
 }
 
 // ===== Investigations APIs =====
 export const investigationsApi = {
   list: async (page: number = 1, limit: number = 20, status?: string) => {
-    const params = new URLSearchParams({ 
-      page: page.toString(), 
-      limit: limit.toString() 
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
     })
     if (status) params.append('status', status)
-    
+
     const response = await api.get<PaginatedResponse<Investigation>>(`/investigations?${params}`)
     return response.data
   },
@@ -399,14 +486,123 @@ export const investigationsApi = {
   },
 
   update: async (investigationId: string, data: Partial<Investigation>) => {
-    const response = await api.put<ApiResponse<Investigation>>(`/investigations/${investigationId}`, data)
+    const response = await api.put<ApiResponse<Investigation>>(
+      `/investigations/${investigationId}`,
+      data
+    )
     return response.data
   },
 
   delete: async (investigationId: string) => {
     const response = await api.delete<ApiResponse>(`/investigations/${investigationId}`)
     return response.data
-  }
+  },
+}
+
+// ===== Platform Events APIs =====
+export const platformEventsApi = {
+  getCapabilities: async () => {
+    const response = await api.get<{
+      success: boolean
+      capabilities: Record<string, any>
+      timestamp: string
+    }>('/events/capabilities')
+    return response.data
+  },
+
+  getAuthenticationEvents: async (data: {
+    query?: string
+    time_range?: string
+    limit?: number
+  }) => {
+    const response = await api.post<{
+      success: boolean
+      intent: string
+      query_info: Record<string, any>
+      platform_info: Record<string, any>
+      results: Record<string, any>
+      total_hits: number
+      has_more: boolean
+      error?: string
+    }>('/events/authentication', {
+      query: data.query || '',
+      time_range: data.time_range || '1h',
+      limit: data.limit || 100,
+    })
+    return response.data
+  },
+
+  getFailedLogins: async (data: { query?: string; time_range?: string; limit?: number }) => {
+    const response = await api.post<{
+      success: boolean
+      intent: string
+      query_info: Record<string, any>
+      platform_info: Record<string, any>
+      results: Record<string, any>
+      total_hits: number
+      has_more: boolean
+      error?: string
+    }>('/events/failed-logins', {
+      query: data.query || '',
+      time_range: data.time_range || '1h',
+      limit: data.limit || 100,
+    })
+    return response.data
+  },
+
+  getSuccessfulLogins: async (data: { query?: string; time_range?: string; limit?: number }) => {
+    const response = await api.post<{
+      success: boolean
+      intent: string
+      query_info: Record<string, any>
+      platform_info: Record<string, any>
+      results: Record<string, any>
+      total_hits: number
+      has_more: boolean
+      error?: string
+    }>('/events/successful-logins', {
+      query: data.query || '',
+      time_range: data.time_range || '1h',
+      limit: data.limit || 100,
+    })
+    return response.data
+  },
+
+  getSystemMetrics: async (data: { query?: string; time_range?: string; limit?: number }) => {
+    const response = await api.post<{
+      success: boolean
+      intent: string
+      query_info: Record<string, any>
+      platform_info: Record<string, any>
+      results: Record<string, any>
+      total_hits: number
+      has_more: boolean
+      error?: string
+    }>('/events/system-metrics', {
+      query: data.query || '',
+      time_range: data.time_range || '1h',
+      limit: data.limit || 100,
+    })
+    return response.data
+  },
+
+  getNetworkActivity: async (data: { query?: string; time_range?: string; limit?: number }) => {
+    const response = await api.post<{
+      success: boolean
+      intent: string
+      query_info: Record<string, any>
+      platform_info: Record<string, any>
+      results: Record<string, any>
+      total_hits: number
+      has_more: boolean
+      error?: string
+    }>('/events/network-activity', {
+      query: data.query || '',
+      time_range: data.time_range || '1h',
+      limit: data.limit || 100,
+    })
+    return response.data
+  },
 }
 
 // ===== Admin APIs =====
@@ -422,11 +618,13 @@ export const adminApi = {
   },
 
   testConnector: async (connectorId: string) => {
-    const response = await api.post<ApiResponse<{
-      status: 'success' | 'error'
-      message: string
-      details?: any
-    }>>(`/admin/connectors/${connectorId}/test`)
+    const response = await api.post<
+      ApiResponse<{
+        status: 'success' | 'error'
+        message: string
+        details?: any
+      }>
+    >(`/admin/connectors/${connectorId}/test`)
     return response.data
   },
 
@@ -436,18 +634,22 @@ export const adminApi = {
   },
 
   getAuditLogs: async (page: number = 1, limit: number = 50) => {
-    const response = await api.get<PaginatedResponse<any>>(`/admin/audit?page=${page}&limit=${limit}`)
+    const response = await api.get<PaginatedResponse<any>>(
+      `/admin/audit?page=${page}&limit=${limit}`
+    )
     return response.data
   },
 
   getUsage: async () => {
-    const response = await api.get<ApiResponse<{
-      query_counts: Record<string, number>
-      user_activity: any[]
-      system_metrics: any
-    }>>('/admin/usage')
+    const response = await api.get<
+      ApiResponse<{
+        query_counts: Record<string, number>
+        user_activity: any[]
+        system_metrics: any
+      }>
+    >('/admin/usage')
     return response.data
-  }
+  },
 }
 
 // ===== Health & System APIs =====
@@ -460,7 +662,7 @@ export const systemApi = {
       services: Record<string, boolean>
       health_score: string
     }>('/health', {
-      baseURL: import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8000'
+      baseURL: import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8000',
     })
     return response.data
   },
@@ -468,10 +670,10 @@ export const systemApi = {
   ping: async () => {
     // Ping endpoint is also at root level
     const response = await axios.get<{ status: string; timestamp: string }>('/ping', {
-      baseURL: import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8000'
+      baseURL: import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8000',
     })
     return response.data
-  }
+  },
 }
 
 // Export the base axios instance for custom requests
@@ -484,8 +686,9 @@ export default {
   dashboard: dashboardApi,
   windows: windowsApi,
   query: queryApi,
+  platformEvents: platformEventsApi,
   reports: reportsApi,
   investigations: investigationsApi,
   admin: adminApi,
-  system: systemApi
+  system: systemApi,
 }

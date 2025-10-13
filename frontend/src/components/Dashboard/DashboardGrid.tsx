@@ -1,143 +1,156 @@
 import React, { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Grid3X3, 
-  Plus, 
-  LayoutDashboard, 
-  Trash2, 
+import {
+  Grid3X3,
+  Plus,
+  LayoutDashboard,
+  Trash2,
   RotateCcw,
   Maximize2,
-  Settings
+  Settings,
 } from 'lucide-react'
 
-import { useHybridStore, useWidgetManagement } from '../../stores/hybridStore'
-import VisualRenderer from '@/components/Visuals/VisualRenderer'
-import ChartWidget from '../widgets/ChartWidget'
-import SummaryCardWidget from '../widgets/SummaryCardWidget'
-import BaseWidget from '../widgets/BaseWidget'
+import EnhancedVisualRenderer from '../Chat/EnhancedVisualRenderer'
 import type { DashboardWidget, VisualPayload, SummaryCard } from '../../types'
+import { sampleWidgets } from '@/data/sampleWidgets'
 
 interface DashboardGridProps {
   hybridMode?: boolean
   onWidgetAction?: (widgetId: string, action: string, data?: any) => void
+  onWidgetClick?: (widget: DashboardWidget, clickData?: any) => void
+  interactive?: boolean
   className?: string
 }
 
-export default function DashboardGrid({ 
-  hybridMode = false, 
+export default function DashboardGrid({
+  hybridMode = false,
   onWidgetAction,
-  className = '' 
+  onWidgetClick,
+  interactive = false,
+  className = '',
 }: DashboardGridProps) {
   const [expandedWidget, setExpandedWidget] = useState<string | null>(null)
   const [draggedWidget, setDraggedWidget] = useState<string | null>(null)
-  
-  const { 
-    pinnedWidgets, 
-    widgetLayout,
-    pinWidget,
-    unpinWidget,
-    updateWidgetPosition,
-    clearAllWidgets,
-    optimizeLayout
-  } = useWidgetManagement()
+
+  // Use sample widgets for demo
+  const pinnedWidgets = sampleWidgets
 
   // Handle widget expansion
-  const handleExpand = useCallback((widgetId: string) => {
-    setExpandedWidget(expandedWidget === widgetId ? null : widgetId)
-  }, [expandedWidget])
+  const handleExpand = useCallback(
+    (widgetId: string) => {
+      setExpandedWidget(expandedWidget === widgetId ? null : widgetId)
+    },
+    [expandedWidget]
+  )
 
-  // Handle widget pinning
-  const handlePin = useCallback((widget: DashboardWidget) => {
-    pinWidget(widget)
-    onWidgetAction?.(widget.id, 'pin', { widget })
-  }, [pinWidget, onWidgetAction])
+  // Handle widget clicks for hybrid mode
+  const handleWidgetClick = useCallback(
+    (widget: DashboardWidget, clickData?: any) => {
+      if (interactive && onWidgetClick) {
+        onWidgetClick(widget, clickData)
+      }
+    },
+    [interactive, onWidgetClick]
+  )
 
   // Handle widget unpinning
-  const handleUnpin = useCallback((widgetId: string) => {
-    unpinWidget(widgetId)
-    onWidgetAction?.(widgetId, 'unpin')
-  }, [unpinWidget, onWidgetAction])
+  const handleUnpin = useCallback(
+    (widgetId: string) => {
+      unpinWidget(widgetId)
+      onWidgetAction?.(widgetId, 'unpin')
+    },
+    [unpinWidget, onWidgetAction]
+  )
 
   // Handle widget refresh
-  const handleRefresh = useCallback(async (widgetId: string) => {
-    // Simulate refresh - in real app, this would call API
-    const widget = pinnedWidgets.find(w => w.id === widgetId)
-    if (widget) {
-      const updatedWidget = {
-        ...widget,
-        last_updated: new Date().toISOString()
+  const handleRefresh = useCallback(
+    async (widgetId: string) => {
+      // Simulate refresh - in real app, this would call API
+      const widget = pinnedWidgets.find(w => w.id === widgetId)
+      if (widget) {
+        const updatedWidget = {
+          ...widget,
+          last_updated: new Date().toISOString(),
+        }
+        pinWidget(updatedWidget)
+        onWidgetAction?.(widgetId, 'refresh', { widget: updatedWidget })
       }
-      pinWidget(updatedWidget)
-      onWidgetAction?.(widgetId, 'refresh', { widget: updatedWidget })
-    }
-  }, [pinnedWidgets, pinWidget, onWidgetAction])
+    },
+    [pinnedWidgets, pinWidget, onWidgetAction]
+  )
 
   // Handle Ask SYNRGY from widget
-  const handleAskSynrgy = useCallback((widgetId: string, query: string) => {
-    onWidgetAction?.(widgetId, 'ask_synrgy', { query })
-  }, [onWidgetAction])
+  const handleAskSynrgy = useCallback(
+    (widgetId: string, query: string) => {
+      onWidgetAction?.(widgetId, 'ask_synrgy', { query })
+    },
+    [onWidgetAction]
+  )
 
   // Handle widget removal
-  const handleRemove = useCallback((widgetId: string) => {
-    handleUnpin(widgetId)
-    onWidgetAction?.(widgetId, 'remove')
-  }, [handleUnpin, onWidgetAction])
+  const handleRemove = useCallback(
+    (widgetId: string) => {
+      handleUnpin(widgetId)
+      onWidgetAction?.(widgetId, 'remove')
+    },
+    [handleUnpin, onWidgetAction]
+  )
 
   // Handle widget settings
-  const handleSettings = useCallback((widgetId: string) => {
-    onWidgetAction?.(widgetId, 'settings')
-  }, [onWidgetAction])
+  const handleSettings = useCallback(
+    (widgetId: string) => {
+      onWidgetAction?.(widgetId, 'settings')
+    },
+    [onWidgetAction]
+  )
 
   // Render widget using VisualRenderer for consistency
   const renderWidget = (widget: DashboardWidget) => {
     // Convert widget data to visual payload if needed
-    const payload = widget.data && typeof widget.data === 'object' && 'type' in widget.data 
-      ? widget.data as VisualPayload
-      : {
-          type: widget.type,
-          title: widget.title,
-          description: widget.description || `${widget.type} widget`,
-          data: widget.data
-        }
+    const payload =
+      widget.data && typeof widget.data === 'object' && 'type' in widget.data
+        ? (widget.data as VisualPayload)
+        : {
+            type: widget.type,
+            title: widget.title,
+            description: widget.description || `${widget.type} widget`,
+            data: widget.data,
+          }
 
     return (
-      <VisualRenderer
-        payload={payload}
-        messageId={widget.id}
-        conversationId="dashboard"
-        onAskSynrgy={onWidgetAction ? (query: string) => handleAskSynrgy(widget.id, query) : undefined}
-        showActions={true}
-        compact={expandedWidget !== widget.id}
-        actions={[
-          {
-            label: expandedWidget === widget.id ? 'Collapse' : 'Expand',
-            icon: 'maximize',
-            action: () => handleExpand(widget.id)
-          },
-          {
-            label: 'Refresh',
-            icon: 'refresh',
-            action: () => handleRefresh(widget.id)
-          },
-          {
-            label: 'Settings',
-            icon: 'settings',
-            action: () => handleSettings(widget.id)
-          },
-          {
-            label: 'Remove',
-            icon: 'trash',
-            action: () => handleRemove(widget.id)
-          }
-        ]}
-      />
+      <div
+        className={`relative ${interactive ? 'cursor-pointer hover:ring-2 hover:ring-synrgy-primary/30 rounded-xl transition-all' : ''}`}
+        onClick={() => interactive && handleWidgetClick(widget)}
+      >
+        <EnhancedVisualRenderer
+          payload={payload}
+          interactive={interactive}
+          compact={expandedWidget !== widget.id}
+        />
+
+        {/* Ask CYNRGY button overlay for interactive mode */}
+        {interactive && (
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={e => {
+                e.stopPropagation()
+                handleAskSynrgy(widget.id, `Analyze ${widget.title}`)
+              }}
+              className="px-2 py-1 bg-synrgy-primary/90 text-synrgy-bg-900 text-xs rounded 
+                       hover:bg-synrgy-primary transition-colors shadow-lg"
+            >
+              Ask CYNRGY
+            </button>
+          </div>
+        )}
+      </div>
     )
   }
 
   // Get grid layout classes based on number of widgets
   const getGridLayout = () => {
     const count = pinnedWidgets.length
-    
+
     if (count === 0) return 'grid-cols-1'
     if (count === 1) return 'grid-cols-1'
     if (count === 2) return 'grid-cols-1 lg:grid-cols-2'
@@ -157,18 +170,15 @@ export default function DashboardGrid({
           <div className="w-20 h-20 mx-auto mb-6 bg-synrgy-primary/10 rounded-full flex items-center justify-center">
             <Grid3X3 className="w-10 h-10 text-synrgy-primary" />
           </div>
-          
-          <h3 className="text-xl font-semibold text-synrgy-text mb-3">
-            No Pinned Widgets
-          </h3>
-          
+
+          <h3 className="text-xl font-semibold text-synrgy-text mb-3">No Pinned Widgets</h3>
+
           <p className="text-synrgy-muted mb-6 leading-relaxed">
-            {hybridMode 
-              ? "Start a conversation with SYNRGY and pin visualizations to build your custom dashboard."
-              : "Pin charts, metrics, and insights from chat responses to create your personalized security dashboard."
-            }
+            {hybridMode
+              ? 'Start a conversation with SYNRGY and pin visualizations to build your custom dashboard.'
+              : 'Pin charts, metrics, and insights from chat responses to create your personalized security dashboard.'}
           </p>
-          
+
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={() => onWidgetAction?.('new', 'create')}
@@ -177,7 +187,7 @@ export default function DashboardGrid({
               <Plus className="w-4 h-4" />
               Add Widget
             </button>
-            
+
             {hybridMode && (
               <button
                 onClick={() => onWidgetAction?.('chat', 'open')}
@@ -205,16 +215,16 @@ export default function DashboardGrid({
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <button
-            onClick={optimizeLayout}
+            onClick={() => setExpandedWidget(null)}
             className="p-2 rounded-lg text-synrgy-muted hover:text-synrgy-primary hover:bg-synrgy-primary/10 transition-colors"
-            title="Optimize layout"
+            title="Reset layout"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
-          
+
           <button
             onClick={() => onWidgetAction?.('dashboard', 'settings')}
             className="p-2 rounded-lg text-synrgy-muted hover:text-synrgy-primary hover:bg-synrgy-primary/10 transition-colors"
@@ -222,16 +232,6 @@ export default function DashboardGrid({
           >
             <Settings className="w-4 h-4" />
           </button>
-          
-          {pinnedWidgets.length > 0 && (
-            <button
-              onClick={clearAllWidgets}
-              className="p-2 rounded-lg text-synrgy-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-              title="Clear all widgets"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
         </div>
       </div>
 
@@ -239,26 +239,26 @@ export default function DashboardGrid({
       <div className="p-6">
         <div className={`grid ${getGridLayout()} gap-6`}>
           <AnimatePresence mode="popLayout">
-            {pinnedWidgets.map((widget) => (
+            {pinnedWidgets.map(widget => (
               <motion.div
                 key={widget.id}
                 layout
                 initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ 
-                  opacity: 1, 
+                animate={{
+                  opacity: 1,
                   scale: 1,
-                  zIndex: expandedWidget === widget.id ? 50 : 1
+                  zIndex: expandedWidget === widget.id ? 50 : 1,
                 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ 
-                  type: "spring", 
-                  damping: 25, 
+                transition={{
+                  type: 'spring',
+                  damping: 25,
                   stiffness: 300,
-                  opacity: { duration: 0.2 }
+                  opacity: { duration: 0.2 },
                 }}
                 className={`relative ${
-                  expandedWidget === widget.id 
-                    ? 'fixed inset-4 z-50 bg-synrgy-bg-900/95 p-4 rounded-xl' 
+                  expandedWidget === widget.id
+                    ? 'fixed inset-4 z-50 bg-synrgy-bg-900/95 p-4 rounded-xl'
                     : ''
                 }`}
               >

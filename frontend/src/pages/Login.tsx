@@ -2,16 +2,7 @@ import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Helmet } from 'react-helmet-async'
-import { 
-  Shield, 
-  Eye,
-  Activity,
-  Globe,
-  Zap,
-  Lock,
-  Server,
-  AlertTriangle
-} from 'lucide-react'
+import { Shield, Eye, Activity, Globe, Zap, Lock, Server, AlertTriangle } from 'lucide-react'
 
 import LoginForm from '@/components/Auth/LoginForm'
 import { useAppStore, useAuth } from '@/stores/appStore'
@@ -26,13 +17,17 @@ export default function Login() {
     return <Navigate to="/dashboard" replace />
   }
 
-  const handleLogin = async (credentials: { username: string; password: string; remember?: boolean }) => {
+  const handleLogin = async (credentials: {
+    identifier: string
+    password: string
+    remember?: boolean
+  }) => {
     try {
       setLoginError('')
-      await login(credentials.username, credentials.password)
+      await login(credentials.identifier, credentials.password)
 
       if (credentials.remember) {
-        localStorage.setItem('synrgy_remember_user', credentials.username)
+        localStorage.setItem('synrgy_remember_user', credentials.identifier)
       } else {
         localStorage.removeItem('synrgy_remember_user')
       }
@@ -45,30 +40,33 @@ export default function Login() {
     {
       icon: Eye,
       title: 'Real-time Monitoring',
-      description: 'Continuous threat surveillance across your infrastructure'
+      description: 'Continuous threat surveillance across your infrastructure',
     },
     {
       icon: Activity,
       title: 'Intelligent Analysis',
-      description: 'AI-powered threat detection and pattern recognition'
+      description: 'AI-powered threat detection and pattern recognition',
     },
     {
       icon: Globe,
       title: 'Global Intelligence',
-      description: 'Worldwide threat intelligence integration and correlation'
+      description: 'Worldwide threat intelligence integration and correlation',
     },
     {
       icon: Zap,
       title: 'Rapid Response',
-      description: 'Automated incident response and mitigation workflows'
-    }
+      description: 'Automated incident response and mitigation workflows',
+    },
   ]
 
   return (
     <>
       <Helmet>
         <title>Sign In - SYNRGY</title>
-        <meta name="description" content="Secure access to SYNRGY cybersecurity intelligence platform" />
+        <meta
+          name="description"
+          content="Secure access to SYNRGY cybersecurity intelligence platform"
+        />
       </Helmet>
 
       <div className="min-h-screen bg-synrgy-bg-900 flex">
@@ -77,7 +75,7 @@ export default function Login() {
           {/* Background Pattern */}
           <div className="absolute inset-0 bg-gradient-to-br from-synrgy-primary/20 via-synrgy-bg-800 to-synrgy-accent/20" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(120,119,198,0.3),transparent_50%),radial-gradient(circle_at_80%_20%,rgba(255,119,198,0.3),transparent_50%),radial-gradient(circle_at_40%_80%,rgba(120,119,198,0.2),transparent_50%)]" />
-          
+
           <div className="relative z-10 flex flex-col justify-center p-12 text-white">
             {/* Logo and Brand */}
             <motion.div
@@ -97,8 +95,8 @@ export default function Login() {
                 </div>
               </div>
               <p className="text-lg text-synrgy-text/80 max-w-md">
-                Advanced threat intelligence and real-time security monitoring 
-                for modern enterprises.
+                Advanced threat intelligence and real-time security monitoring for modern
+                enterprises.
               </p>
             </motion.div>
 
@@ -152,8 +150,14 @@ export default function Login() {
 
           {/* Animated Elements */}
           <div className="absolute top-10 right-10 w-20 h-20 border border-synrgy-primary/30 rounded-full animate-pulse" />
-          <div className="absolute bottom-20 left-10 w-16 h-16 border border-synrgy-accent/30 rounded-full animate-bounce" style={{ animationDuration: '3s' }} />
-          <div className="absolute top-1/3 right-1/4 w-12 h-12 border border-synrgy-primary/20 rounded-full animate-spin" style={{ animationDuration: '8s' }} />
+          <div
+            className="absolute bottom-20 left-10 w-16 h-16 border border-synrgy-accent/30 rounded-full animate-bounce"
+            style={{ animationDuration: '3s' }}
+          />
+          <div
+            className="absolute top-1/3 right-1/4 w-12 h-12 border border-synrgy-primary/20 rounded-full animate-spin"
+            style={{ animationDuration: '8s' }}
+          />
         </div>
 
         {/* Right Panel - Login Form */}
@@ -179,12 +183,8 @@ export default function Login() {
               transition={{ delay: 0.1 }}
               className="text-center mb-8"
             >
-              <h2 className="text-2xl font-bold text-synrgy-text mb-2">
-                Welcome Back
-              </h2>
-              <p className="text-synrgy-muted">
-                Sign in to access your security dashboard
-              </p>
+              <h2 className="text-2xl font-bold text-synrgy-text mb-2">Welcome Back</h2>
+              <p className="text-synrgy-muted">Sign in to access your security dashboard</p>
             </motion.div>
 
             {/* Login Form */}
@@ -193,11 +193,7 @@ export default function Login() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <LoginForm 
-                onLogin={handleLogin}
-                loading={loading}
-                error={loginError}
-              />
+              <LoginForm onLogin={handleLogin} loading={loading} error={loginError} />
             </motion.div>
 
             {/* Security Notice */}

@@ -1,16 +1,22 @@
-import { useState } from 'react'
+/**
+ * SYNRGY Chat VisualRenderer - Enhanced visualization component
+ * Handles all chart types, tables, and visual data rendering
+ */
+
+import { useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
+  Pin,
+  Info,
+  TrendingUp,
   BarChart3,
   PieChart,
-  TrendingUp,
-  Table2,
-  Map,
-  Network,
-  Download,
   Maximize2,
-  Pin,
-  Filter
+  Download,
+  MapPin,
+  Globe,
+  Table,
+  Filter as FilterIcon,
 } from 'lucide-react'
 import {
   BarChart,
@@ -26,7 +32,9 @@ import {
   Tooltip,
   ResponsiveContainer,
   AreaChart,
-  Area
+  Area,
+  ScatterChart,
+  Scatter,
 } from 'recharts'
 
 import type { VisualPayload, VisualCard } from '@/types'
@@ -34,24 +42,139 @@ import type { VisualPayload, VisualCard } from '@/types'
 interface VisualRendererProps {
   payload: VisualPayload
   className?: string
+  onPin?: (card: VisualCard) => void
+  onExport?: (card: VisualCard) => void
+  interactive?: boolean
 }
 
 // SYNRGY color palette for charts
 const CHART_COLORS = [
   '#00EFFF', // synrgy-primary
-  '#FF7A00', // synrgy-accent  
+  '#FF7A00', // synrgy-accent
   '#22D3EE', // cyan-400
   '#F97316', // orange-500
   '#06B6D4', // cyan-500
   '#EA580C', // orange-600
   '#0891B2', // cyan-600
-  '#C2410C'  // orange-700
+  '#C2410C', // orange-700
 ]
 
-export default function VisualRenderer({ payload, className = '' }: VisualRendererProps) {
+/**
+ * Enhanced table renderer for backend table data
+ */
+const TableRenderer = ({ card }: { card: VisualCard }) => {
+  if (!card.columns || !card.rows) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-synrgy-surface/30 border border-synrgy-primary/20 rounded-xl overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b border-synrgy-primary/10">
+        <h3 className="text-sm font-medium text-synrgy-text">{card.title || 'Data Table'}</h3>
+      </div>
+
+      <div className="overflow-x-auto max-h-64">
+        <table className="w-full text-sm">
+          <thead className="bg-synrgy-bg-900/50">
+            <tr>
+              {card.columns.map((col: any, idx: number) => (
+                <th
+                  key={idx}
+                  className="px-4 py-2 text-left text-synrgy-muted font-medium border-b border-synrgy-primary/10"
+                >
+                  {col.label || col.key}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {card.rows.slice(0, 10).map((row: any[], idx: number) => (
+              <tr key={idx} className="hover:bg-synrgy-primary/5 transition-colors">
+                {row.map((cell: any, cellIdx: number) => (
+                  <td
+                    key={cellIdx}
+                    className="px-4 py-2 text-synrgy-text border-b border-synrgy-primary/5"
+                  >
+                    {typeof cell === 'object' ? JSON.stringify(cell) : String(cell)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {card.rows.length > 10 && (
+        <div className="px-4 py-2 text-xs text-synrgy-muted bg-synrgy-bg-900/20 border-t border-synrgy-primary/10">
+          Showing 10 of {card.rows.length} results
+        </div>
+      )}
+    </motion.div>
+  )
+}
+
+/**
+ * Narrative/Summary renderer for AI-generated text
+ */
+const NarrativeRenderer = ({ card }: { card: VisualCard }) => {
+  if (!card.data && !card.title) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-synrgy-surface/20 border border-synrgy-accent/20 rounded-xl p-4"
+    >
+      <div className="flex items-start gap-3">
+        <div className="w-8 h-8 bg-synrgy-accent/20 rounded-full flex items-center justify-center mt-1">
+          <Info className="w-4 h-4 text-synrgy-accent" />
+        </div>
+        <div className="flex-1">
+          {card.title && <h3 className="font-medium text-synrgy-text mb-2">{card.title}</h3>}
+          <div className="text-sm text-synrgy-muted leading-relaxed">
+            {typeof card.data === 'string' ? card.data : card.value || 'No summary available.'}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+export default function VisualRenderer({
+  payload,
+  className = '',
+  onPin,
+  onExport,
+  interactive = true,
+}: VisualRendererProps) {
   const [expandedCard, setExpandedCard] = useState<string | null>(null)
+  const [showMetadata, setShowMetadata] = useState(false)
 
   if (!payload) return null
+
+  // Handle composite payload with multiple cards
+  const cards = payload.cards || [payload as VisualCard]
+  const isComposite = payload.type === 'composite' && payload.cards && payload.cards.length > 0
+
+  const handlePin = useCallback(
+    (card: VisualCard) => {
+      if (onPin && interactive) {
+        onPin(card)
+      }
+    },
+    [onPin, interactive]
+  )
+
+  const handleExport = useCallback(
+    (card: VisualCard) => {
+      if (onExport && interactive) {
+        onExport(card)
+      }
+    },
+    [onExport, interactive]
+  )
 
   const renderSummaryCard = (card: VisualCard, index: number) => (
     <motion.div
@@ -70,16 +193,39 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
           <Pin className="w-4 h-4 text-synrgy-muted" />
         </button>
       </div>
-      
+
       <div className="text-3xl font-bold text-synrgy-text mb-1">
         {typeof card.value === 'number' ? card.value.toLocaleString() : card.value}
       </div>
-      
+
       {/* Optional trend indicator */}
-      <div className="flex items-center gap-1 text-xs">
-        <TrendingUp className="w-3 h-3 text-green-500" />
-        <span className="text-synrgy-muted">vs last period</span>
-      </div>
+      {card.trend && (
+        <div className="flex items-center gap-1 text-xs mt-2">
+          <TrendingUp
+            className={`w-3 h-3 ${
+              card.trend === 'up'
+                ? 'text-green-500'
+                : card.trend === 'down'
+                  ? 'text-red-500'
+                  : 'text-synrgy-muted'
+            }`}
+          />
+          <span className="text-synrgy-muted">vs last period</span>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      {interactive && (
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2 flex gap-1">
+          <button
+            onClick={() => handlePin(card)}
+            className="p-1 bg-synrgy-primary/20 hover:bg-synrgy-primary/30 rounded text-synrgy-primary"
+            title="Pin to Dashboard"
+          >
+            <Pin className="w-3 h-3" />
+          </button>
+        </div>
+      )}
     </motion.div>
   )
 
@@ -87,20 +233,20 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
     if (!card.data || !Array.isArray(card.data)) return null
 
     const isExpanded = expandedCard === `chart-${index}`
-    
+
     // Dynamic field mapping from config
     const config = card.config || {}
     const xField = config.x_field || 'x'
     const yField = config.y_field || 'y'
     // Dynamic field mapping configuration available for future use
-    
+
     // Process data with dynamic field mapping
     const processedData = card.data.map((item: any) => ({
       ...item,
       x: item[xField] || item.x,
       y: item[yField] || item.y,
       name: item.name || item[xField] || item.x,
-      value: item.value || item[yField] || item.y
+      value: item.value || item[yField] || item.y,
     }))
 
     let chartBody: JSX.Element | null = null
@@ -109,30 +255,17 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
       chartBody = (
         <BarChart data={processedData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" opacity={0.2} />
-          <XAxis 
-            dataKey="x" 
-            stroke="#94A3B8" 
-            fontSize={12}
-            tick={{ fill: '#94A3B8' }}
-          />
-          <YAxis 
-            stroke="#94A3B8" 
-            fontSize={12}
-            tick={{ fill: '#94A3B8' }}
-          />
+          <XAxis dataKey="x" stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
+          <YAxis stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
           <Tooltip
             contentStyle={{
               backgroundColor: '#0F1724',
               border: '1px solid #00EFFF',
               borderRadius: '8px',
-              color: '#E6EEF8'
+              color: '#E6EEF8',
             }}
           />
-          <Bar 
-            dataKey="y" 
-            fill={config.color || "#00EFFF"} 
-            radius={[4, 4, 0, 0]}
-          />
+          <Bar dataKey="y" fill={config.color || '#00EFFF'} radius={[4, 4, 0, 0]} />
         </BarChart>
       )
     }
@@ -141,30 +274,26 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
       chartBody = (
         <LineChart data={processedData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" opacity={0.2} />
-          <XAxis 
-            dataKey="x" 
-            stroke="#94A3B8" 
+          <XAxis
+            dataKey="x"
+            stroke="#94A3B8"
             fontSize={12}
             tick={{ fill: '#94A3B8' }}
             type={card.chart_type === 'timeseries' ? 'category' : 'category'}
           />
-          <YAxis 
-            stroke="#94A3B8" 
-            fontSize={12}
-            tick={{ fill: '#94A3B8' }}
-          />
+          <YAxis stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
           <Tooltip
             contentStyle={{
               backgroundColor: '#0F1724',
               border: '1px solid #00EFFF',
               borderRadius: '8px',
-              color: '#E6EEF8'
+              color: '#E6EEF8',
             }}
           />
-          <Line 
-            type="monotone" 
-            dataKey="y" 
-            stroke={config.color || "#00EFFF"} 
+          <Line
+            type="monotone"
+            dataKey="y"
+            stroke={config.color || '#00EFFF'}
             strokeWidth={config.strokeWidth || 3}
             dot={{ fill: config.color || '#00EFFF', strokeWidth: 2, r: 4 }}
             activeDot={{ r: 6, fill: '#FF7A00' }}
@@ -177,39 +306,31 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
       const gradientId = `gradient-${index}`
       chartBody = (
         <AreaChart data={processedData}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={config.color || '#00EFFF'} stopOpacity={0.8} />
+              <stop offset="95%" stopColor={config.color || '#00EFFF'} stopOpacity={0.1} />
+            </linearGradient>
+          </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#94A3B8" opacity={0.2} />
-          <XAxis 
-            dataKey="x" 
-            stroke="#94A3B8" 
-            fontSize={12}
-            tick={{ fill: '#94A3B8' }}
-          />
-          <YAxis 
-            stroke="#94A3B8" 
-            fontSize={12}
-            tick={{ fill: '#94A3B8' }}
-          />
+          <XAxis dataKey="x" stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
+          <YAxis stroke="#94A3B8" fontSize={12} tick={{ fill: '#94A3B8' }} />
           <Tooltip
             contentStyle={{
               backgroundColor: '#0F1724',
               border: '1px solid #00EFFF',
               borderRadius: '8px',
-              color: '#E6EEF8'
+              color: '#E6EEF8',
             }}
           />
-          <Area 
-            type="monotone" 
-            dataKey="y" 
-            stroke={config.color || "#00EFFF"} 
+          <Area
+            type="monotone"
+            dataKey="y"
+            stroke={config.color || '#00EFFF'}
             strokeWidth={config.strokeWidth || 2}
+            fillOpacity={1}
             fill={`url(#${gradientId})`}
           />
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={config.color || "#00EFFF"} stopOpacity={0.3}/>
-              <stop offset="95%" stopColor={config.color || "#00EFFF"} stopOpacity={0}/>
-            </linearGradient>
-          </defs>
         </AreaChart>
       )
     }
@@ -222,12 +343,17 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
             cx="50%"
             cy="50%"
             outerRadius={config.outerRadius || 80}
-            fill={config.color || "#00EFFF"}
+            fill={config.color || '#00EFFF'}
             dataKey="value"
-            label={({ name, percent }: { name: string; percent: number }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+            label={({ name, percent }: { name: string; percent: number }) =>
+              `${name}: ${(percent * 100).toFixed(1)}%`
+            }
           >
             {processedData.map((_, dataIndex) => (
-              <Cell key={`cell-${dataIndex}`} fill={CHART_COLORS[dataIndex % CHART_COLORS.length]} />
+              <Cell
+                key={`cell-${dataIndex}`}
+                fill={CHART_COLORS[dataIndex % CHART_COLORS.length]}
+              />
             ))}
           </Pie>
           <Tooltip
@@ -235,7 +361,7 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
               backgroundColor: '#0F1724',
               border: '1px solid #00EFFF',
               borderRadius: '8px',
-              color: '#E6EEF8'
+              color: '#E6EEF8',
             }}
           />
         </RechartsPieChart>
@@ -261,13 +387,15 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-synrgy-primary/10 rounded-lg flex items-center justify-center">
               {card.chart_type === 'bar' && <BarChart3 className="w-4 h-4 text-synrgy-primary" />}
-              {(card.chart_type === 'line' || card.chart_type === 'timeseries') && <TrendingUp className="w-4 h-4 text-synrgy-primary" />}
+              {(card.chart_type === 'line' || card.chart_type === 'timeseries') && (
+                <TrendingUp className="w-4 h-4 text-synrgy-primary" />
+              )}
               {card.chart_type === 'pie' && <PieChart className="w-4 h-4 text-synrgy-primary" />}
               {card.chart_type === 'area' && <TrendingUp className="w-4 h-4 text-synrgy-primary" />}
             </div>
             <h3 className="text-lg font-semibold text-synrgy-text">{card.title}</h3>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <button
               onClick={() => setExpandedCard(isExpanded ? null : `chart-${index}`)}
@@ -309,17 +437,20 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-synrgy-primary/10 rounded-lg flex items-center justify-center">
-              <Map className="w-4 h-4 text-synrgy-primary" />
+              <MapPin className="w-4 h-4 text-synrgy-primary" />
             </div>
             <h3 className="text-lg font-semibold text-synrgy-text">{card.title}</h3>
           </div>
         </div>
-        
+
         {/* Data-driven map content */}
         <div className="space-y-3">
           {Array.isArray(card.data) ? (
             card.data.slice(0, 10).map((location: any, idx: number) => (
-              <div key={idx} className="flex items-center justify-between p-3 bg-synrgy-surface/50 rounded-lg">
+              <div
+                key={idx}
+                className="flex items-center justify-between p-3 bg-synrgy-surface/50 rounded-lg"
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 bg-synrgy-primary rounded-full" />
                   <div>
@@ -360,12 +491,12 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-synrgy-primary/10 rounded-lg flex items-center justify-center">
-              <Network className="w-4 h-4 text-synrgy-primary" />
+              <Globe className="w-4 h-4 text-synrgy-primary" />
             </div>
             <h3 className="text-lg font-semibold text-synrgy-text">{card.title}</h3>
           </div>
         </div>
-        
+
         {/* Data-driven network content */}
         <div className="space-y-4">
           {card.data && typeof card.data === 'object' && (card.data as any).nodes && (
@@ -373,8 +504,13 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
               <div className="text-sm font-medium text-synrgy-text mb-2">Network Nodes</div>
               <div className="grid grid-cols-2 gap-2">
                 {((card.data as any).nodes as any[]).slice(0, 8).map((node: any, idx: number) => (
-                  <div key={idx} className="flex items-center gap-2 p-2 bg-synrgy-surface/50 rounded">
-                    <div className={`w-3 h-3 rounded-full ${node.type === 'source' ? 'bg-synrgy-primary' : 'bg-synrgy-accent'}`} />
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 p-2 bg-synrgy-surface/50 rounded"
+                  >
+                    <div
+                      className={`w-3 h-3 rounded-full ${node.type === 'source' ? 'bg-synrgy-primary' : 'bg-synrgy-accent'}`}
+                    />
                     <div className="text-xs text-synrgy-text truncate">
                       {node.id || node.name || node.ip}
                     </div>
@@ -383,7 +519,7 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
               </div>
             </div>
           )}
-          
+
           {card.data && typeof card.data === 'object' && (card.data as any).edges && (
             <div>
               <div className="text-sm font-medium text-synrgy-text mb-2">Network Connections</div>
@@ -423,12 +559,16 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
             <h3 className="text-lg font-semibold text-synrgy-text">{card.title}</h3>
           </div>
         )}
-        
+
         <div className="prose prose-invert prose-sm max-w-none">
           <div className="text-synrgy-text leading-relaxed">
-            {typeof card.value === 'string' ? card.value : 
-             typeof card.data === 'string' ? card.data :
-             (card.data && typeof card.data === 'object' ? (card.data as any).narrative || (card.data as any).content : null) || 'No narrative content available'}
+            {typeof card.value === 'string'
+              ? card.value
+              : typeof card.data === 'string'
+                ? card.data
+                : (card.data && typeof card.data === 'object'
+                    ? (card.data as any).narrative || (card.data as any).content
+                    : null) || 'No narrative content available'}
           </div>
         </div>
       </motion.div>
@@ -450,14 +590,14 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
         <div className="flex items-center justify-between p-6 border-b border-synrgy-primary/10">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-synrgy-primary/10 rounded-lg flex items-center justify-center">
-              <Table2 className="w-4 h-4 text-synrgy-primary" />
+              <Table className="w-4 h-4 text-synrgy-primary" />
             </div>
             <h3 className="text-lg font-semibold text-synrgy-text">{card.title}</h3>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <button className="p-2 hover:bg-synrgy-primary/10 rounded-lg transition-colors">
-              <Filter className="w-4 h-4 text-synrgy-muted" />
+              <FilterIcon className="w-4 h-4 text-synrgy-muted" />
             </button>
             <button className="p-2 hover:bg-synrgy-primary/10 rounded-lg transition-colors">
               <Download className="w-4 h-4 text-synrgy-muted" />
@@ -542,25 +682,19 @@ export default function VisualRenderer({ payload, className = '' }: VisualRender
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {payload.cards
             .filter(card => card.type === 'summary_card')
-            .map((card, index) => renderCard(card, index))
-          }
+            .map((card, index) => renderCard(card, index))}
         </div>
 
         {/* Charts and tables */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {payload.cards
             .filter(card => card.type !== 'summary_card')
-            .map((card, index) => renderCard(card, index))
-          }
+            .map((card, index) => renderCard(card, index))}
         </div>
       </div>
     )
   }
 
   // Handle single card payloads
-  return (
-    <div className={`${className}`}>
-      {renderCard(payload as any, 0)}
-    </div>
-  )
+  return <div className={`${className}`}>{renderCard(payload as any, 0)}</div>
 }

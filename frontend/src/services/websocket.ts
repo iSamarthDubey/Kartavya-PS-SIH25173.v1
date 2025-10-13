@@ -1,18 +1,24 @@
-import { WebSocketMessage, ChatMessage, VisualPayload } from '../types'
+import { WebSocketMessage, ChatMessage, VisualPayload, StreamingChatResponse } from '../types'
+
+// Re-export for external use
+export type { StreamingChatResponse }
 import { useAppStore } from '../stores/appStore'
 
-// SYNRGY Streaming Response Interface
-export interface StreamingChatResponse {
-  message_id: string
+// Backend WebSocket message format adapter - ACTUAL BACKEND FORMAT
+interface BackendStreamingResponse {
+  id: string
   conversation_id: string
-  text_chunk?: string
-  text_complete?: string
+  role: string
+  content: string
+  status: 'processing' | 'success' | 'error' | 'clarification_needed'
+  stage: 'nlp_processing' | 'query_building' | 'siem_query' | 'complete' | 'error'
   visual_payload?: VisualPayload
-  status: 'streaming' | 'complete' | 'error'
   metadata?: {
+    intent?: string
     confidence?: number
-    dsl?: any
-    kql?: string
+    entities?: any[]
+    results_count?: number
+    processing_time?: number
     execution_time?: number
   }
 }
@@ -30,7 +36,7 @@ export interface WebSocketCallbacks {
   onChatMessage?: (message: ChatMessage) => void
   onChatStream?: (response: StreamingChatResponse) => void
   onChatComplete?: (response: StreamingChatResponse) => void
-  onChatError?: (response: StreamingChatResponse) => void
+  onChatError?: (response: BackendStreamingResponse) => void
   onConnect?: () => void
   onDisconnect?: () => void
   onError?: (error: Event) => void
@@ -42,8 +48,8 @@ class WebSocketService {
   private config: WebSocketConfig
   private callbacks: WebSocketCallbacks = {}
   private reconnectAttempts = 0
-  private reconnectTimer: NodeJS.Timeout | null = null
-  private heartbeatTimer: NodeJS.Timeout | null = null
+  private reconnectTimer: number | null = null
+  private heartbeatTimer: number | null = null
   private isReconnecting = false
   private isManuallyDisconnected = false
 
@@ -52,7 +58,7 @@ class WebSocketService {
       autoReconnect: true,
       maxReconnectAttempts: 5,
       reconnectDelay: 3000,
-      ...config
+      ...config,
     }
   }
 
@@ -71,8 +77,7 @@ class WebSocketService {
         this.ws = new WebSocket(wsUrl.toString())
         this.isManuallyDisconnected = false
 
-        this.ws.onopen = (event) => {
-          console.log('WebSocket connected:', wsUrl.toString())
+        this.ws.onopen = event => {
           this.reconnectAttempts = 0
           this.isReconnecting = false
           this.startHeartbeat()
@@ -80,17 +85,16 @@ class WebSocketService {
           resolve()
         }
 
-        this.ws.onmessage = (event) => {
+        this.ws.onmessage = event => {
           try {
             const message: WebSocketMessage = JSON.parse(event.data)
             this.handleMessage(message)
           } catch (error) {
-            console.error('Failed to parse WebSocket message:', error, event.data)
+            console.error('Failed to parse WebSocket message:', error)
           }
         }
 
-        this.ws.onclose = (event) => {
-          console.log('WebSocket disconnected:', event.code, event.reason)
+        this.ws.onclose = event => {
           this.stopHeartbeat()
           this.callbacks.onDisconnect?.()
 
@@ -99,12 +103,10 @@ class WebSocketService {
           }
         }
 
-        this.ws.onerror = (event) => {
-          console.error('WebSocket error:', event)
+        this.ws.onerror = event => {
           this.callbacks.onError?.(event)
           reject(new Error('WebSocket connection failed'))
         }
-
       } catch (error) {
         reject(error)
       }
@@ -119,35 +121,63 @@ class WebSocketService {
     switch (message.type) {
       case 'chat_response':
         if (message.data) {
-          // Handle streaming responses
-          const streamingResponse = message.data as StreamingChatResponse
-          
-          // Call streaming callback
-          this.callbacks.onChatStream?.(streamingResponse)
-          
+          // Convert backend format to frontend format
+          const backendResponse = message.data as BackendStreamingResponse
+
+          const frontendResponse: StreamingChatResponse = {
+            conversation_id: backendResponse.conversation_id,
+            role: 'assistant',
+            accumulated_text: backendResponse.content || '',
+            current_chunk: backendResponse.content,
+            is_complete:
+              backendResponse.status === 'success' || backendResponse.stage === 'complete',
+            timestamp: message.timestamp,
+            visual_payloads: backendResponse.visual_payload
+              ? [backendResponse.visual_payload]
+              : undefined,
+            metadata: {
+              processing_step: backendResponse.stage
+                ? backendResponse.stage.replace('_', ' ').toUpperCase()
+                : 'Processing...',
+              confidence: backendResponse.metadata?.confidence,
+              execution_time:
+                backendResponse.metadata?.execution_time ||
+                backendResponse.metadata?.processing_time,
+              intent: backendResponse.metadata?.intent,
+              entities: backendResponse.metadata?.entities,
+            },
+            error: backendResponse.status === 'error' ? backendResponse.content : undefined,
+          }
+
+          // Call streaming callback with converted data
+          this.callbacks.onChatStream?.(frontendResponse)
+
           // Handle completion
-          if (streamingResponse.status === 'complete') {
-            this.callbacks.onChatComplete?.(streamingResponse)
-            
+          if (backendResponse.status === 'success' || backendResponse.stage === 'complete') {
+            this.callbacks.onChatComplete?.(frontendResponse)
+
             // Also create a complete ChatMessage for compatibility
             if (this.callbacks.onChatMessage) {
               const chatMessage: ChatMessage = {
-                id: streamingResponse.message_id,
-                conversation_id: streamingResponse.conversation_id,
-                role: 'assistant',
-                content: streamingResponse.text_complete || streamingResponse.text_chunk || '',
+                id: backendResponse.id,
+                conversation_id: backendResponse.conversation_id,
+                role:
+                  backendResponse.role === 'user' || backendResponse.role === 'system'
+                    ? (backendResponse.role as 'user' | 'system')
+                    : 'assistant',
+                content: backendResponse.content || '',
                 timestamp: message.timestamp,
-                metadata: streamingResponse.metadata,
-                visual_payload: streamingResponse.visual_payload,
-                status: 'success'
+                metadata: backendResponse.metadata,
+                visual_payload: backendResponse.visual_payload,
+                status: backendResponse.status === 'error' ? 'error' : 'success',
               }
               this.callbacks.onChatMessage(chatMessage)
             }
           }
-          
+
           // Handle errors
-          if (streamingResponse.status === 'error') {
-            this.callbacks.onChatError?.(streamingResponse)
+          if (backendResponse.status === 'error') {
+            this.callbacks.onChatError?.(backendResponse)
           }
         }
         break
@@ -157,18 +187,17 @@ class WebSocketService {
         if (message.data) {
           const { addNotification } = useAppStore.getState()
           addNotification({
-            id: `ws_${Date.now()}`,
             type: message.data.type || 'info',
             title: message.data.title || 'Notification',
             message: message.data.message || '',
-            timestamp: message.timestamp
+            timestamp: message.timestamp,
+            read: false
           })
         }
         break
 
       case 'system_update':
-        // Handle system-wide updates
-        console.log('System update received:', message.data)
+        // Handle system-wide updates (silent)
         break
 
       case 'error':
@@ -176,13 +205,12 @@ class WebSocketService {
         break
 
       default:
-        console.log('Unknown WebSocket message type:', message.type)
+      // Unknown message type - ignore silently in production
     }
   }
 
   private attemptReconnect() {
-    if (this.isReconnecting || 
-        this.reconnectAttempts >= (this.config.maxReconnectAttempts || 5)) {
+    if (this.isReconnecting || this.reconnectAttempts >= (this.config.maxReconnectAttempts || 5)) {
       console.log('Max reconnection attempts reached')
       return
     }
@@ -190,12 +218,18 @@ class WebSocketService {
     this.isReconnecting = true
     this.reconnectAttempts++
 
-    console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`)
+    if (import.meta.env.VITE_ENABLE_DEBUG === 'true') {
+      console.log(
+        `Attempting to reconnect... (${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`
+      )
+    }
     this.callbacks.onReconnecting?.(this.reconnectAttempts)
 
     this.reconnectTimer = setTimeout(() => {
       this.connect().catch(error => {
-        console.error('Reconnection failed:', error)
+        if (import.meta.env.VITE_ENABLE_DEBUG === 'true') {
+          console.error('Reconnection failed:', error)
+        }
         this.attemptReconnect()
       })
     }, this.config.reconnectDelay || 3000)
@@ -208,7 +242,7 @@ class WebSocketService {
         this.send({
           type: 'ping',
           data: {},
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         })
       }
     }, 30000)
@@ -227,7 +261,9 @@ class WebSocketService {
         this.ws.send(JSON.stringify(message))
         return true
       } catch (error) {
-        console.error('Failed to send WebSocket message:', error)
+        if (import.meta.env.VITE_ENABLE_DEBUG === 'true') {
+          console.error('Failed to send WebSocket message:', error)
+        }
         return false
       }
     }
@@ -242,16 +278,16 @@ class WebSocketService {
         query,
         conversation_id: conversationId,
         context,
-        stream: true // Enable streaming response
+        stream: true, // Enable streaming response
       },
       session_id: conversationId,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
   }
 
   disconnect() {
     this.isManuallyDisconnected = true
-    
+
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer)
       this.reconnectTimer = null
@@ -289,7 +325,7 @@ export function createWebSocketService(config: WebSocketConfig): WebSocketServic
   if (wsService) {
     wsService.disconnect()
   }
-  
+
   wsService = new WebSocketService(config)
   return wsService
 }

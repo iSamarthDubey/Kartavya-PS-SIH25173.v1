@@ -17,7 +17,7 @@ import {
   Users,
   Zap,
   Eye,
-  X
+  X,
 } from 'lucide-react'
 import { useHybridStore, useContextSync } from '../../stores/hybridStore'
 import type { ConversationContext } from '../../types'
@@ -31,7 +31,7 @@ interface ContextBridgeProps {
 export const ContextBridge: React.FC<ContextBridgeProps> = ({
   className = '',
   showCompact = false,
-  onContextSelect
+  onContextSelect,
 }) => {
   const {
     activeContextSync,
@@ -43,11 +43,11 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
     bridgeContext,
     startFocusedSession,
     endFocusedSession,
-    clearContextHistory
+    clearContextHistory,
   } = useContextSync()
 
   const { pinnedWidgets } = useHybridStore(state => ({
-    pinnedWidgets: state.pinnedWidgets
+    pinnedWidgets: state.pinnedWidgets,
   }))
 
   const [showHistory, setShowHistory] = useState(false)
@@ -63,11 +63,11 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
 
   const formatContextSummary = (context: ConversationContext | null) => {
     if (!context) return { entities: 0, filters: 0, messages: 0 }
-    
+
     return {
       entities: Object.keys(context.entities || {}).length,
       filters: (context.filters || []).length,
-      messages: (context.history || []).length
+      messages: (context.history || []).length,
     }
   }
 
@@ -102,8 +102,8 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
       metadata: {
         focused_widget: widgetId,
         widget_title: widget.title,
-        widget_type: widget.type
-      }
+        widget_type: widget.type,
+      },
     }
 
     startFocusedSession('widget', widgetId, focusContext, `Tell me more about ${widget.title}`)
@@ -112,22 +112,24 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
   if (showCompact) {
     return (
       <div className={`flex items-center gap-2 ${className}`}>
-        <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-          activeContextSync 
-            ? 'bg-synrgy-accent/20 text-synrgy-accent' 
-            : 'bg-synrgy-muted/20 text-synrgy-muted'
-        }`}>
+        <div
+          className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+            activeContextSync
+              ? 'bg-synrgy-accent/20 text-synrgy-accent'
+              : 'bg-synrgy-muted/20 text-synrgy-muted'
+          }`}
+        >
           {activeContextSync ? <Zap className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
           Sync {activeContextSync ? 'On' : 'Off'}
         </div>
-        
+
         {focusedSession && (
           <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs border border-synrgy-primary/30 text-synrgy-accent">
             <Target className="h-3 w-3" />
             {focusedSession.type}: {focusedSession.id.slice(-8)}
           </div>
         )}
-        
+
         <div className="relative">
           <button
             onClick={() => setShowHistory(!showHistory)}
@@ -139,10 +141,7 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
           <AnimatePresence>
             {showHistory && (
               <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowHistory(false)}
-                />
+                <div className="fixed inset-0 z-40" onClick={() => setShowHistory(false)} />
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95, y: -10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -171,13 +170,13 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
             <ArrowLeftRight className="h-5 w-5" />
             <span className="font-medium text-synrgy-text">Context Bridge</span>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 checked={activeContextSync}
-                onChange={(e) => {
+                onChange={e => {
                   const state = useHybridStore.getState()
                   state.activeContextSync = e.target.checked
                 }}
@@ -185,7 +184,7 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
               />
               <div className="w-11 h-6 bg-synrgy-bg-900 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-synrgy-accent"></div>
             </label>
-            <button 
+            <button
               onClick={handleManualSync}
               className="p-2 rounded-lg text-synrgy-muted hover:text-synrgy-accent hover:bg-synrgy-accent/10 transition-colors"
             >
@@ -194,7 +193,7 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
           </div>
         </div>
       </div>
-      
+
       <div className="p-4 space-y-6">
         {/* Focused Session */}
         {focusedSession && (
@@ -215,9 +214,7 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
               </button>
             </div>
             {focusedSession.spawnQuery && (
-              <p className="text-sm text-synrgy-muted">
-                "{focusedSession.spawnQuery}"
-              </p>
+              <p className="text-sm text-synrgy-muted">"{focusedSession.spawnQuery}"</p>
             )}
           </div>
         )}
@@ -293,7 +290,7 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
               <span className="font-medium text-synrgy-text">Spawn Focused Chat</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {pinnedWidgets.slice(0, 6).map((widget) => (
+              {pinnedWidgets.slice(0, 6).map(widget => (
                 <button
                   key={widget.id}
                   onClick={() => handleSpawnFocusedChat(widget.id)}
@@ -328,27 +325,36 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
 
         <div className="h-32 overflow-y-auto">
           <div className="space-y-2">
-            {contextHistory.slice(-5).reverse().map((entry) => (
-              <div
-                key={entry.id}
-                className="flex items-center justify-between p-2 border border-synrgy-primary/10 rounded text-sm"
-              >
-                <div className="flex items-center gap-2">
-                  <div className={`px-2 py-0.5 text-xs rounded ${
-                    entry.type === 'sync' ? 'bg-synrgy-accent/20 text-synrgy-accent' :
-                    entry.type === 'bridge' ? 'bg-blue-500/20 text-blue-400' : 
-                    'bg-synrgy-primary/20 text-synrgy-primary'
-                  }`}>
-                    {entry.type}
+            {contextHistory
+              .slice(-5)
+              .reverse()
+              .map(entry => (
+                <div
+                  key={entry.id}
+                  className="flex items-center justify-between p-2 border border-synrgy-primary/10 rounded text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`px-2 py-0.5 text-xs rounded ${
+                        entry.type === 'sync'
+                          ? 'bg-synrgy-accent/20 text-synrgy-accent'
+                          : entry.type === 'bridge'
+                            ? 'bg-blue-500/20 text-blue-400'
+                            : 'bg-synrgy-primary/20 text-synrgy-primary'
+                      }`}
+                    >
+                      {entry.type}
+                    </div>
+                    <span className="text-synrgy-muted">
+                      {entry.from} → {entry.to}
+                    </span>
                   </div>
-                  <span className="text-synrgy-muted">{entry.from} → {entry.to}</span>
+                  <div className="flex items-center gap-1 text-synrgy-muted">
+                    <Clock className="h-3 w-3" />
+                    {new Date(entry.timestamp).toLocaleTimeString()}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 text-synrgy-muted">
-                  <Clock className="h-3 w-3" />
-                  {new Date(entry.timestamp).toLocaleTimeString()}
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       </div>
@@ -357,10 +363,7 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
       <AnimatePresence>
         {showHistory && (
           <>
-            <div
-              className="fixed inset-0 z-40 bg-black/50"
-              onClick={() => setShowHistory(false)}
-            />
+            <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setShowHistory(false)} />
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -368,7 +371,9 @@ export const ContextBridge: React.FC<ContextBridgeProps> = ({
               className="fixed inset-4 z-50 bg-synrgy-surface border border-synrgy-primary/20 rounded-xl shadow-xl max-w-4xl mx-auto"
             >
               <div className="p-4 border-b border-synrgy-primary/10">
-                <h3 className="text-lg font-semibold text-synrgy-text">Context Synchronization History</h3>
+                <h3 className="text-lg font-semibold text-synrgy-text">
+                  Context Synchronization History
+                </h3>
               </div>
               <ContextHistoryView
                 history={contextHistory}
@@ -400,15 +405,13 @@ interface ContextHistoryViewProps {
 const ContextHistoryView: React.FC<ContextHistoryViewProps> = ({
   history,
   onEntrySelect,
-  onClear
+  onClear,
 }) => {
   return (
     <div className="p-4 space-y-4">
       <div className="flex justify-between items-center">
-        <span className="text-sm text-synrgy-muted">
-          {history.length} synchronization events
-        </span>
-        <button 
+        <span className="text-sm text-synrgy-muted">{history.length} synchronization events</span>
+        <button
           onClick={onClear}
           className="px-3 py-1 text-sm border border-synrgy-primary/20 rounded text-synrgy-text hover:bg-synrgy-primary/10 transition-colors"
         >
@@ -418,7 +421,7 @@ const ContextHistoryView: React.FC<ContextHistoryViewProps> = ({
 
       <div className="h-96 overflow-y-auto">
         <div className="space-y-2">
-          {history.reverse().map((entry) => (
+          {history.reverse().map(entry => (
             <div
               key={entry.id}
               className="cursor-pointer hover:bg-synrgy-primary/10 transition-colors border border-synrgy-primary/10 rounded-lg p-4"
@@ -426,11 +429,15 @@ const ContextHistoryView: React.FC<ContextHistoryViewProps> = ({
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className={`px-2 py-0.5 text-xs rounded ${
-                    entry.type === 'sync' ? 'bg-synrgy-accent/20 text-synrgy-accent' :
-                    entry.type === 'bridge' ? 'bg-blue-500/20 text-blue-400' : 
-                    'bg-synrgy-primary/20 text-synrgy-primary'
-                  }`}>
+                  <div
+                    className={`px-2 py-0.5 text-xs rounded ${
+                      entry.type === 'sync'
+                        ? 'bg-synrgy-accent/20 text-synrgy-accent'
+                        : entry.type === 'bridge'
+                          ? 'bg-blue-500/20 text-blue-400'
+                          : 'bg-synrgy-primary/20 text-synrgy-primary'
+                    }`}
+                  >
                     {entry.type}
                   </div>
                   <ArrowLeftRight className="h-4 w-4 text-synrgy-muted" />
@@ -442,7 +449,7 @@ const ContextHistoryView: React.FC<ContextHistoryViewProps> = ({
                   {new Date(entry.timestamp).toLocaleString()}
                 </span>
               </div>
-              
+
               <div className="flex gap-4 text-xs text-synrgy-muted">
                 <span>Entities: {Object.keys(entry.context.entities || {}).length}</span>
                 <span>Filters: {(entry.context.filters || []).length}</span>

@@ -18,16 +18,16 @@ interface ChatState {
   messages: ChatMessage[]
   isLoading: boolean
   error: string | null
-  
+
   // Context and state
   context: ConversationContext | null
   suggestions: string[]
   typing: boolean
-  
+
   // UI state
   showExplainQuery: boolean
   selectedMessageId: string | null
-  
+
   // Actions
   setCurrentConversation: (id: string) => void
   sendMessage: (request: ChatRequest) => Promise<void>
@@ -38,11 +38,11 @@ interface ChatState {
   setTyping: (typing: boolean) => void
   toggleExplainQuery: () => void
   selectMessage: (messageId: string | null) => void
-  
+
   // Context management
   updateContext: (updates: Partial<ConversationContext>) => void
   clearContext: () => void
-  
+
   // Utility functions
   getMessagesForConversation: (conversationId: string) => ChatMessage[]
   getLastUserMessage: () => ChatMessage | null
@@ -65,25 +65,25 @@ export const useChatStore = create<ChatState>()(
 
       // Actions
       setCurrentConversation: (id: string) => {
-        set({ 
+        set({
           currentConversationId: id,
           messages: get().getMessagesForConversation(id),
-          error: null
+          error: null,
         })
       },
 
       sendMessage: async (request: ChatRequest) => {
         const state = get()
-        
+
         // Generate conversation ID if not provided
         const conversationId = request.conversation_id || state.currentConversationId || uuidv4()
-        
+
         try {
           set({
             currentConversationId: conversationId,
             isLoading: true,
             error: null,
-            typing: true
+            typing: true,
           })
 
           // Add user message immediately
@@ -93,31 +93,64 @@ export const useChatStore = create<ChatState>()(
             role: 'user',
             content: request.query,
             timestamp: new Date().toISOString(),
-            status: 'success'
+            status: 'success',
           }
           get().addMessage(userMessage)
 
           // Send request to SIEM backend (auto-detects platform)
           const response = await chatApi.sendMessage({
             ...request,
-            conversation_id: conversationId
+            conversation_id: conversationId,
           })
 
-          // Add assistant response message
+          // Add assistant response message with full backend integration
           const assistantMessage: ChatMessage = {
             id: uuidv4(),
             conversation_id: conversationId,
             role: 'assistant',
             content: response.summary || 'I processed your security query.',
             timestamp: new Date().toISOString(),
-            status: response.status === 'success' ? 'success' : 'error',
+            status: response.status === 'success' ? 'success' : (response.status as any),
             error: response.error,
+
+            // CRITICAL: Handle visual_payload from backend
+            visual_payload:
+              response.visualizations && response.visualizations.length > 0
+                ? {
+                    type: 'composite',
+                    cards: response.visualizations.map((viz: any) => ({
+                      type: viz.type || 'chart',
+                      title: viz.title,
+                      data: viz.data,
+                      chart_type: viz.config?.chart_type || 'bar',
+                      columns: viz.columns,
+                      rows: viz.rows,
+                      value: viz.value,
+                      config: viz.config,
+                    })),
+                    metadata: {
+                      query: request.query,
+                      confidence: response.confidence,
+                      execution_time: response.metadata?.execution_time_ms || 0,
+                      results_count: Array.isArray(response.results) ? response.results.length : 0,
+                      dsl: response.siem_query,
+                      kql: response.metadata?.kql,
+                    },
+                  }
+                : undefined,
+
             metadata: {
               intent: response.intent,
               confidence: response.confidence,
               query_type: response.intent,
-              results_count: Object.keys(response.results || {}).length
-            }
+              results_count: Array.isArray(response.results)
+                ? response.results.length
+                : Object.keys(response.results || {}).length,
+              siem_query: response.siem_query,
+              entities: response.entities || [],
+              execution_time_ms: response.metadata?.execution_time_ms,
+              kql: response.metadata?.kql,
+            },
           }
           get().addMessage(assistantMessage)
 
@@ -127,19 +160,18 @@ export const useChatStore = create<ChatState>()(
             history: [userMessage, assistantMessage],
             entities: {},
             filters: [],
-            metadata: response.metadata || {}
+            metadata: response.metadata || {},
           }
 
           set({
             context: newContext,
             suggestions: response.suggestions || [],
             typing: false,
-            isLoading: false
+            isLoading: false,
           })
-
         } catch (error: any) {
           console.error('Failed to send message:', error)
-          
+
           // Add error message
           const errorMessage: ChatMessage = {
             id: uuidv4(),
@@ -148,41 +180,41 @@ export const useChatStore = create<ChatState>()(
             content: 'I encountered an error processing your security query. Please try again.',
             timestamp: new Date().toISOString(),
             status: 'error',
-            error: error.message || 'Unknown error occurred'
+            error: error.message || 'Unknown error occurred',
           }
           get().addMessage(errorMessage)
 
           set({
             error: error.message || 'Failed to send message',
             typing: false,
-            isLoading: false
+            isLoading: false,
           })
         }
       },
 
       addMessage: (message: ChatMessage) => {
         set(state => ({
-          messages: [...state.messages, message]
+          messages: [...state.messages, message],
         }))
       },
 
       updateMessage: (messageId: string, updates: Partial<ChatMessage>) => {
         set(state => ({
-          messages: state.messages.map(msg => 
-            msg.id === messageId 
+          messages: state.messages.map(msg =>
+            msg.id === messageId
               ? { ...msg, ...updates, timestamp: updates.timestamp || msg.timestamp }
               : msg
-          )
+          ),
         }))
       },
 
       clearMessages: () => {
-        set({ 
-          messages: [], 
-          context: null, 
+        set({
+          messages: [],
+          context: null,
           suggestions: [],
           selectedMessageId: null,
-          error: null
+          error: null,
         })
       },
 
@@ -205,7 +237,7 @@ export const useChatStore = create<ChatState>()(
       // Context management
       updateContext: (updates: Partial<ConversationContext>) => {
         set(state => ({
-          context: state.context ? { ...state.context, ...updates } : null
+          context: state.context ? { ...state.context, ...updates } : null,
         }))
       },
 
@@ -236,17 +268,17 @@ export const useChatStore = create<ChatState>()(
           }
         }
         return null
-      }
+      },
     }),
     {
       name: 'synrgy-chat-store',
-      partialize: (state) => ({
+      partialize: state => ({
         // Only persist essential state
         currentConversationId: state.currentConversationId,
         messages: state.messages.slice(-50), // Only keep last 50 messages
         context: state.context,
-        showExplainQuery: state.showExplainQuery
-      })
+        showExplainQuery: state.showExplainQuery,
+      }),
     }
   )
 )
@@ -255,9 +287,9 @@ export const useChatStore = create<ChatState>()(
 export const useCurrentMessages = () => {
   const currentConversationId = useChatStore(state => state.currentConversationId)
   const messages = useChatStore(state => state.messages)
-  
-  return messages.filter(msg => 
-    !currentConversationId || msg.conversation_id === currentConversationId
+
+  return messages.filter(
+    msg => !currentConversationId || msg.conversation_id === currentConversationId
   )
 }
 

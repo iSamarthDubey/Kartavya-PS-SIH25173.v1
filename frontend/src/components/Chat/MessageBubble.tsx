@@ -1,15 +1,15 @@
 import { useState, type CSSProperties } from 'react'
 import { motion } from 'framer-motion'
-import { 
-  User, 
-  Bot, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
+import {
+  User,
+  Bot,
+  Clock,
+  CheckCircle,
+  XCircle,
   AlertCircle,
   Copy,
   Code,
-  Download
+  Download,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import ReactMarkdown, { type Components } from 'react-markdown'
@@ -50,18 +50,21 @@ const markdownComponents: Components = {
         {children}
       </code>
     )
-  }
+  },
 }
 
-export default function MessageBubble({ message, isLatest: _isLatest = false }: MessageBubbleProps) {
+export default function MessageBubble({
+  message,
+  isLatest: _isLatest = false,
+}: MessageBubbleProps) {
   const [showExplain, setShowExplain] = useState(false)
   const [copied, setCopied] = useState(false)
   const { showExplainQuery, selectMessage, selectedMessageId } = useChatStore()
-  
+
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
   const isSelected = selectedMessageId === message.id
-  
+
   // isLatest parameter is available for future message highlighting features
 
   const getStatusIcon = () => {
@@ -99,7 +102,7 @@ export default function MessageBubble({ message, isLatest: _isLatest = false }: 
       <motion.div
         initial={{ opacity: 0, y: 10, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
         className="flex justify-center my-4"
       >
         <div className="chat-bubble-system max-w-md">
@@ -114,20 +117,18 @@ export default function MessageBubble({ message, isLatest: _isLatest = false }: 
     <motion.div
       initial={{ opacity: 0, y: 10, x: isUser ? 20 : -20 }}
       animate={{ opacity: 1, y: 0, x: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
+      transition={{ duration: 0.4, ease: 'easeOut' }}
       className={`flex gap-3 mb-6 group ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
     >
       {/* Avatar */}
-      <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-        isUser 
-          ? 'bg-synrgy-primary text-synrgy-bg-900' 
-          : 'bg-gradient-to-br from-synrgy-primary/20 to-synrgy-accent/20 border border-synrgy-primary/30'
-      }`}>
-        {isUser ? (
-          <User className="w-5 h-5" />
-        ) : (
-          <Bot className="w-5 h-5 text-synrgy-primary" />
-        )}
+      <div
+        className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+          isUser
+            ? 'bg-synrgy-primary text-synrgy-bg-900'
+            : 'bg-gradient-to-br from-synrgy-primary/20 to-synrgy-accent/20 border border-synrgy-primary/30'
+        }`}
+      >
+        {isUser ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5 text-synrgy-primary" />}
       </div>
 
       {/* Message Content */}
@@ -143,18 +144,18 @@ export default function MessageBubble({ message, isLatest: _isLatest = false }: 
           {message.status === 'pending' && (
             <div className="flex items-center gap-2 mb-2">
               <div className="flex space-x-1">
-                {[0, 1, 2].map((i) => (
+                {[0, 1, 2].map(i => (
                   <motion.div
                     key={i}
                     className="w-2 h-2 bg-synrgy-primary rounded-full"
                     animate={{
                       scale: [1, 1.2, 1],
-                      opacity: [0.5, 1, 0.5]
+                      opacity: [0.5, 1, 0.5],
                     }}
                     transition={{
                       duration: 1,
                       repeat: Infinity,
-                      delay: i * 0.2
+                      delay: i * 0.2,
                     }}
                   />
                 ))}
@@ -165,9 +166,7 @@ export default function MessageBubble({ message, isLatest: _isLatest = false }: 
 
           {/* Message Text */}
           <div className="prose prose-invert prose-sm max-w-none">
-            <ReactMarkdown components={markdownComponents}>
-              {message.content}
-            </ReactMarkdown>
+            <ReactMarkdown components={markdownComponents}>{message.content}</ReactMarkdown>
           </div>
 
           {/* Error Message */}
@@ -184,22 +183,21 @@ export default function MessageBubble({ message, isLatest: _isLatest = false }: 
           {message.visual_payload && (
             <div className="mt-4 space-y-3">
               <VisualRenderer payload={message.visual_payload} />
-              
+
               {/* Pin to Dashboard Button */}
               <div className="flex justify-end">
-                <PinToDashboardButton 
-                  message={message}
-                  visualPayload={message.visual_payload}
-                />
+                <PinToDashboardButton message={message} visualPayload={message.visual_payload} />
               </div>
             </div>
           )}
 
           {/* Message Actions */}
-          <div className={`flex items-center gap-2 mt-3 ${isUser ? 'justify-start' : 'justify-end'}`}>
+          <div
+            className={`flex items-center gap-2 mt-3 ${isUser ? 'justify-start' : 'justify-end'}`}
+          >
             {/* Copy button */}
             <button
-              onClick={(e) => {
+              onClick={e => {
                 e.stopPropagation()
                 copyToClipboard(message.content)
               }}
@@ -212,7 +210,7 @@ export default function MessageBubble({ message, isLatest: _isLatest = false }: 
             {/* Show query button for assistant messages */}
             {!isUser && message.metadata?.intent && showExplainQuery && (
               <button
-                onClick={(e) => {
+                onClick={e => {
                   e.stopPropagation()
                   setShowExplain(!showExplain)
                 }}
@@ -226,7 +224,7 @@ export default function MessageBubble({ message, isLatest: _isLatest = false }: 
             {/* Export data button */}
             {message.visual_payload && (
               <button
-                onClick={(e) => {
+                onClick={e => {
                   e.stopPropagation()
                   // TODO: Implement data export
                 }}
@@ -248,7 +246,7 @@ export default function MessageBubble({ message, isLatest: _isLatest = false }: 
             className="mt-2 w-full bg-synrgy-surface/50 border border-synrgy-primary/20 rounded-lg p-4"
           >
             <div className="text-xs text-synrgy-muted mb-2">Generated Query Details</div>
-            
+
             {/* Intent and Confidence */}
             <div className="grid grid-cols-2 gap-4 mb-3 text-sm">
               <div>
@@ -280,9 +278,11 @@ export default function MessageBubble({ message, isLatest: _isLatest = false }: 
         )}
 
         {/* Timestamp and Status */}
-        <div className={`flex items-center gap-2 mt-2 text-xs text-synrgy-muted ${
-          isUser ? 'flex-row-reverse' : 'flex-row'
-        }`}>
+        <div
+          className={`flex items-center gap-2 mt-2 text-xs text-synrgy-muted ${
+            isUser ? 'flex-row-reverse' : 'flex-row'
+          }`}
+        >
           <span>{formatTimestamp(message.timestamp)}</span>
           {getStatusIcon()}
         </div>
