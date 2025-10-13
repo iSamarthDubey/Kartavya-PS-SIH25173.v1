@@ -10,6 +10,17 @@ from datetime import datetime
 import logging
 import uuid
 
+# Import standardized visual payload types
+from ...types.visual_responses import (
+    VisualPayload, 
+    create_chart_payload, 
+    create_table_payload, 
+    create_summary_card_payload
+)
+
+# Import Redis caching
+from ...core.caching.redis_manager import get_redis_manager
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -33,7 +44,7 @@ class ChatRequest(BaseModel):
         }
 
 class ChatResponse(BaseModel):
-    """Chat response model"""
+    """Chat response model with standardized visual payload"""
     conversation_id: str
     query: str
     intent: str
@@ -42,7 +53,7 @@ class ChatResponse(BaseModel):
     siem_query: Dict[str, Any]
     results: List[Dict[str, Any]]
     summary: str
-    visualizations: Optional[List[Dict[str, Any]]] = None
+    visualizations: Optional[List[VisualPayload]] = None  # Standardized format
     suggestions: Optional[List[str]] = None
     metadata: Dict[str, Any]
     status: str
@@ -66,7 +77,7 @@ async def chat(
     background_tasks: BackgroundTasks
 ):
     """
-    Main chat endpoint for processing natural language queries
+    Main chat endpoint for processing natural language queries with Redis caching
     """
     try:
         # Import dependencies here to avoid circular imports
@@ -77,14 +88,36 @@ async def chat(
         context_manager = get_context_manager()
         siem_connector = get_siem_connector()  # Can be None in offline mode
         schema_mapper = get_schema_mapper()  # Can be None in offline mode
+        redis_manager = await get_redis_manager()
         
         # Generate conversation ID if not provided
         conversation_id = request.conversation_id or f"conv_{uuid.uuid4().hex[:8]}"
         
         logger.info(f"Processing chat request: {request.query[:100]}...")
         
-        # Get conversation context
-        context = await context_manager.get_context(conversation_id)
+        # Check cache first for identical queries
+        cache_params = {
+            "conversation_id": conversation_id,
+            "user_context": request.user_context,
+            "filters": request.filters,
+            "limit": request.limit
+        }
+        
+        cached_result = await redis_manager.get_cached_query_result(request.query, cache_params)
+        if cached_result:
+            logger.info(f"Returning cached result for query: {request.query[:50]}...")
+            # Update conversation context with cached response
+            await context_manager.update_context(
+                conversation_id=conversation_id,
+                query=request.query,
+                response=cached_result.get("metadata", {})
+            )
+            return ChatResponse(**cached_result)
+        
+        # Get conversation context (try cache first)
+        context = await redis_manager.get_conversation_context(conversation_id)
+        if not context:
+            context = await context_manager.get_context(conversation_id)
         
         # Process the query through the pipeline
         result = await pipeline.process(
@@ -202,12 +235,13 @@ async def chat(
             intent=intent
         )
         
-        # Generate visualizations if applicable
+        # Generate standardized visualizations if applicable
         visualizations = None
         if formatted_results and len(formatted_results) > 0:
-            visualizations = await pipeline.create_visualizations(
+            visualizations = await create_standardized_visualizations(
                 data=formatted_results,
-                query_type=result["intent"]
+                query_type=intent,
+                query=request.query
             )
         
         # Generate follow-up suggestions
@@ -229,6 +263,52 @@ async def chat(
             }
         )
         
+        # Create response object
+        response_data = {
+            "conversation_id": conversation_id,
+            "query": request.query,
+            "intent": intent,
+            "confidence": confidence,
+            "entities": entities,
+            "siem_query": siem_query,
+            "results": formatted_results[:request.limit],
+            "summary": summary,
+            "visualizations": visualizations,
+            "suggestions": suggestions,
+            "metadata": {
+                "timestamp": datetime.now().isoformat(),
+                "processing_time": result.get("processing_time", 0),
+                "total_results": len(formatted_results),
+                "returned_results": min(len(formatted_results), request.limit),
+                "cache_hit": False
+            },
+            "status": "success",
+            "error": None
+        }
+        
+        # Cache the response for future identical queries (background task)
+        background_tasks.add_task(
+            cache_successful_response,
+            redis_manager,
+            request.query,
+            response_data,
+            cache_params
+        )
+        
+        # Cache conversation context (background task)
+        updated_context = context.copy()
+        updated_context.update({
+            "last_query": request.query,
+            "last_intent": intent,
+            "last_results_count": len(formatted_results),
+            "message_count": updated_context.get("message_count", 0) + 1
+        })
+        background_tasks.add_task(
+            redis_manager.cache_conversation_context,
+            conversation_id,
+            updated_context
+        )
+        
         # Background task to log the interaction
         background_tasks.add_task(
             log_interaction,
@@ -238,26 +318,7 @@ async def chat(
             len(formatted_results)
         )
         
-        return ChatResponse(
-            conversation_id=conversation_id,
-            query=request.query,
-            intent=intent,
-            confidence=confidence,
-            entities=entities,
-            siem_query=siem_query,
-            results=formatted_results[:request.limit],
-            summary=summary,
-            visualizations=visualizations,
-            suggestions=suggestions,
-            metadata={
-                "timestamp": datetime.now().isoformat(),
-                "processing_time": result.get("processing_time", 0),
-                "total_results": len(formatted_results),
-                "returned_results": min(len(formatted_results), request.limit)
-            },
-            status="success",
-            error=None
-        )
+        return ChatResponse(**response_data)
         
     except Exception as e:
         logger.error(f"Error processing chat request: {e}", exc_info=True)
@@ -393,6 +454,111 @@ async def get_query_suggestions():
     return {"suggestions": suggestions}
 
 # Helper functions
+async def create_standardized_visualizations(
+    data: List[Dict[str, Any]], 
+    query_type: str, 
+    query: str
+) -> List[VisualPayload]:
+    """
+    Create standardized visualizations that match frontend expectations
+    """
+    visualizations = []
+    
+    try:
+        # Always create a table view for the raw data
+        table_viz = create_table_payload(
+            title=f"Query Results: {query}",
+            data=data[:50],  # Limit to first 50 rows for performance
+            query_type=query_type,
+            data_source="siem"
+        )
+        visualizations.append(table_viz)
+        
+        # Create intent-specific visualizations
+        if query_type in ["search_logs", "authentication", "network_analysis"]:
+            # Create a summary card with total count
+            summary_viz = create_summary_card_payload(
+                title="Total Results Found",
+                value=len(data),
+                status="normal" if len(data) < 100 else "warning" if len(data) < 500 else "critical",
+                query_type=query_type
+            )
+            visualizations.append(summary_viz)
+            
+        # Create charts based on data patterns
+        if len(data) > 0:
+            # Look for timestamp field for time series
+            timestamp_fields = ['@timestamp', 'timestamp', 'time', 'created_at']
+            timestamp_field = None
+            for field in timestamp_fields:
+                if field in data[0]:
+                    timestamp_field = field
+                    break
+            
+            # Look for count/numeric fields
+            numeric_fields = []
+            for key, value in data[0].items():
+                if isinstance(value, (int, float)) and key not in ['id', '_id']:
+                    numeric_fields.append(key)
+            
+            # Create time series chart if timestamp found
+            if timestamp_field and len(data) > 1:
+                chart_viz = create_chart_payload(
+                    title="Activity Over Time",
+                    data=data[:100],  # Limit for performance
+                    chart_type="line",
+                    x_field=timestamp_field,
+                    y_field="count",  # Default count aggregation
+                    query_type=query_type,
+                    data_source="siem"
+                )
+                visualizations.append(chart_viz)
+                
+        logger.info(f"Created {len(visualizations)} standardized visualizations for {query_type}")
+        
+    except Exception as e:
+        logger.error(f"Error creating visualizations: {e}")
+        # Fallback: at least return a basic table
+        visualizations = [
+            create_table_payload(
+                title="Query Results",
+                data=data[:50],
+                query_type=query_type
+            )
+        ]
+    
+    return visualizations
+
+async def cache_successful_response(
+    redis_manager,
+    query: str,
+    response_data: Dict[str, Any],
+    cache_params: Dict[str, Any]
+):
+    """
+    Cache successful response for future identical queries
+    """
+    try:
+        # Only cache successful responses with results
+        if (response_data.get("status") == "success" and 
+            response_data.get("results") and 
+            len(response_data["results"]) > 0):
+            
+            # Mark as cached for future responses
+            cached_response = response_data.copy()
+            cached_response["metadata"]["cache_hit"] = True
+            cached_response["metadata"]["cached_at"] = datetime.now().isoformat()
+            
+            await redis_manager.cache_query_result(
+                query=query,
+                result=cached_response,
+                params=cache_params,
+                ttl=1800  # 30 minutes cache for query results
+            )
+            logger.info(f"Cached successful response for query: {query[:50]}...")
+    except Exception as e:
+        logger.error(f"Error caching response: {e}")
+
 async def log_interaction(
     conversation_id: str,
     query: str,

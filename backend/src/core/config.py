@@ -34,6 +34,7 @@ class SiemPlatform(str, Enum):
     WAZUH = "wazuh"
     SPLUNK = "splunk"
     DATASET = "dataset"
+    MOCK = "mock"
 
 
 class Settings(BaseSettings):

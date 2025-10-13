@@ -21,6 +21,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 from .routes import assistant, query, reports, auth, admin, dashboard, websocket
 from .routes.windows_data import router as windows_router
 from .routes.platform_events import router as platform_events_router
+from .routes.investigations import router as investigations_router
 from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.logging import LoggingMiddleware
 
@@ -65,11 +66,16 @@ async def lifespan(app: FastAPI):
         from src.core.config import settings
         from src.connectors.multi_source_manager import MultiSourceManager
         
-        # Choose initialization strategy based on environment and available sources
-        if settings.is_production:
+        # Choose initialization strategy based on configuration
+        should_use_multi = settings.should_use_multi_source()
+        data_source_mode = settings.get_effective_mode()
+        
+        logger.info(f"🎯 Configuration: multi_source={settings.enable_multi_source}, mode={data_source_mode}, use_multi={should_use_multi}")
+        
+        if should_use_multi and settings.is_production:
             logger.info("🏢 PRODUCTION MODE: Initializing Multi-Source Manager for real data sources...")
             
-            # In production, always try multi-source for real data sources
+            # In production, use multi-source for real data sources only
             multi_source_manager = MultiSourceManager(environment=settings.environment)
             try:
                 success = await multi_source_manager.initialize()
@@ -104,10 +110,10 @@ async def lifespan(app: FastAPI):
                 logger.error("❌ Dataset/demo data is DISABLED for security reasons")
                 raise RuntimeError(f"PRODUCTION DEPLOYMENT BLOCKED: {e}")
                 
-        else:
-            logger.info("🎭 DEMO MODE: Checking for real sources, fallback to dataset if needed...")
+        elif should_use_multi and not settings.is_production:
+            logger.info("🎭 DEMO MODE: Initializing Multi-Source Manager with fallback to dataset...")
             
-            # In demo mode, try multi-source first, fallback to single dataset
+            # In demo mode with multi-source enabled, try multi-source with fallback
             multi_source_manager = MultiSourceManager(environment=settings.environment)
             
             try:
@@ -144,8 +150,12 @@ async def lifespan(app: FastAPI):
                         await multi_source_manager.cleanup()  # Don't need multi-source for just dataset
                         
             except Exception as e:
-                logger.warning(f"⚠️ DEMO: Multi-source failed: {e}, using single dataset fallback")
+                logger.warning(f"⚠️ DEMO: Multi-source failed: {e}, using single source fallback")
                 app_state["multi_source_manager"] = None
+        
+        else:
+            logger.info("🎯 SINGLE SOURCE MODE: Skipping MultiSourceManager, using direct single source")
+            app_state["multi_source_manager"] = None
         
         # Single source mode or fallback
         if not app_state.get("multi_source_manager"):
@@ -178,6 +188,20 @@ async def lifespan(app: FastAPI):
         app_state["schema_mapper"] = SchemaMapper()
         await app_state["schema_mapper"].initialize(app_state["siem_connector"])
         logger.info("✅ Schema mapper initialized")
+        
+        # Initialize Redis caching (optional)
+        logger.info("🔧 Initializing Redis caching...")
+        try:
+            from src.core.caching.redis_manager import redis_manager
+            await redis_manager.initialize()
+            app_state["redis_manager"] = redis_manager
+            if redis_manager.connected:
+                logger.info("✅ Redis caching enabled")
+            else:
+                logger.info("ℹ️ Redis caching disabled - running without cache")
+        except Exception as e:
+            logger.warning(f"Redis initialization failed: {e} - continuing without cache")
+            app_state["redis_manager"] = None
         
         # Initialize platform-aware API service
         logger.info("🔧 Initializing Platform-Aware API Service...")
@@ -221,34 +245,57 @@ async def lifespan(app: FastAPI):
     elif app_state["siem_connector"]:
         if hasattr(app_state["siem_connector"], 'disconnect'):
             await app_state["siem_connector"].disconnect()
+    if app_state.get("redis_manager"):
+        await app_state["redis_manager"].disconnect()
 
-# Create FastAPI app
+# Create FastAPI app with environment-based configuration
 app = FastAPI(
-    title="SIEM NLP Assistant API",
+    title="SYNRGY SIEM NLP Assistant API",
     description="Conversational interface for SIEM investigation and automated threat reporting",
     version="2.0.0",
     lifespan=lifespan,
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json"
+    docs_url="/api/docs" if os.getenv("ENVIRONMENT", "demo") != "production" else None,
+    redoc_url="/api/redoc" if os.getenv("ENVIRONMENT", "demo") != "production" else None,
+    openapi_url="/api/openapi.json" if os.getenv("ENVIRONMENT", "demo") != "production" else None
 )
 
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:8501",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:8501",
+# Configure CORS with environment-based origins
+allowed_origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:8501", 
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:8501"
+]
+
+# Add production origins if in production
+if os.getenv("ENVIRONMENT") == "production":
+    production_origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
+    allowed_origins.extend([origin.strip() for origin in production_origins if origin.strip()])
+else:
+    # Development/demo additional origins
+    allowed_origins.extend([
         "https://kartavya-siem.vercel.app",
         "https://kartavya-siem-backend.onrender.com"
-    ],
+    ])
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+        "Cache-Control",
+        "X-File-Name"
+    ],
+    expose_headers=["X-Total-Count", "X-Page-Count", "Content-Disposition"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 # Add custom middleware
@@ -263,6 +310,7 @@ app.include_router(windows_router, prefix="/api", tags=["Windows Data"])
 app.include_router(assistant.router, prefix="/api/assistant", tags=["Assistant"])
 app.include_router(query.router, prefix="/api/query", tags=["Query"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
+app.include_router(investigations_router, prefix="/api/investigations", tags=["Investigations"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(websocket.router, tags=["WebSocket"])
 

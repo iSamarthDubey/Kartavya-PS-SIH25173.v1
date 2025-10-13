@@ -10,6 +10,7 @@ from .base import BaseSIEMConnector
 from .elastic import ElasticConnector
 from .wazuh import WazuhConnector
 from .dataset_connector import DatasetConnector
+from .mock_connector import MockSIEMConnector
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,14 @@ def create_connector(
         except Exception as e:
             logger.warning(f"⚠️ Elasticsearch connection failed: {e}, using dataset fallback")
     
+    # For demo mode with mock platform, use mock connector
+    if environment == "demo" and platform_lower == "mock":
+        logger.info("🎭 Demo mode: Using dynamic mock data connector")
+        return MockSIEMConnector(
+            name=f"mock_{platform_lower}",
+            **kwargs
+        )
+    
     # For demo mode with other platforms, use dataset connector
     if environment == "demo":
         logger.info("🎭 Demo mode: Using dataset connector with real SIEM datasets")
@@ -66,6 +75,7 @@ def create_connector(
         "elasticsearch": ElasticConnector,
         "elastic": ElasticConnector,
         "wazuh": WazuhConnector,
+        "mock": MockSIEMConnector,
         "dataset": DatasetConnector  # Fallback option
     }
     
