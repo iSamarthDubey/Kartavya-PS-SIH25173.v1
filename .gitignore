@@ -587,3 +587,13 @@ backend/seed_supabase_direct.py
 backend/setup_supabase_tables.py
 backend/test_ai_chat_performance.py
 backend/test_comprehensive_security_mock.py
+test_communication.py
+test_db_connections.py
+backend/test_env.py
+backend/test_real_chat_api.py
+backend/test_backend_quick.py
+backend/test_beats_detection.py
+backend/test_final_functionality.py
+backend/test_platform_aware_api.py
+backend/validate_environment.py
+backend/tests/test_results/chat_test_results.json
