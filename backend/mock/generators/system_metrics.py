@@ -100,6 +100,18 @@ class SystemMetricsGenerator(BaseMockGenerator):
         # Determine severity based on metrics
         severity = self._calculate_severity(event_data, metric_type)
         
+        # Add severity and status fields to event data for dashboard metrics
+        event_data["severity"] = severity.value  # Convert enum to integer
+        event_data["status"] = random.choice(["active", "resolved", "investigating"])
+        
+        # Add additional classification fields for system metrics
+        if severity.value >= 3:  # HIGH or CRITICAL
+            event_data["alert_type"] = "performance_alert"
+            event_data["threat_level"] = "system_performance"
+        elif severity.value >= 2:  # MEDIUM
+            event_data["alert_type"] = "performance_warning"
+            event_data["threat_level"] = "system_performance"
+        
         return MockEvent(
             id=self._generate_id(),
             timestamp=timestamp,

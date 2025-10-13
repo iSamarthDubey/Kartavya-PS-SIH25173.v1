@@ -31,10 +31,10 @@ class MockDataType(Enum):
 
 class SeverityLevel(Enum):
     """Security event severity levels"""
-    LOW = "low"
-    MEDIUM = "medium" 
-    HIGH = "high"
-    CRITICAL = "critical"
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
+    CRITICAL = 4
 
 
 @dataclass
