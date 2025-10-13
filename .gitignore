@@ -610,3 +610,6 @@ backend/tests/test_complete_backend_integration.py
 backend/tests/ULTIMATE_BACKEND_VERIFICATION.py
 tests/FINAL_VERIFICATION_RESULTS.json
 backend/tests/FINAL_VERIFICATION_RESULTS.json
+backend/debug_issue.py
+backend/test_cors_deployment.py
+backend/test_websocket.py
