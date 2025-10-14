@@ -77,7 +77,7 @@ class APIClient:
         self.client.headers.update({
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'User-Agent': 'kartavya-cli/1.0.0'
+            'User-Agent': 'synrgy-cli/1.0.0'
         })
     
     def _login(self, username: str, password: str):

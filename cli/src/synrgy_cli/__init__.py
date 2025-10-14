@@ -1,7 +1,7 @@
 """
-Kartavya CLI - Production-ready SIEM NLP Assistant Command Line Interface
+SYNRGY CLI - Production-ready SIEM NLP Assistant Command Line Interface
 
-A comprehensive CLI tool for interacting with the Kartavya SIEM platform.
+A comprehensive CLI tool for interacting with the SYNRGY SIEM platform.
 Provides natural language query processing, threat hunting capabilities,
 and comprehensive security event analysis.
 
@@ -15,8 +15,8 @@ Features:
 """
 
 __version__ = "1.0.0"
-__author__ = "Kartavya Team"
-__email__ = "support@kartavya.dev"
+__author__ = "SYNRGY Team"
+__email__ = "support@synrgy.dev"
 
 from .core.config import Config
 from .core.client import APIClient

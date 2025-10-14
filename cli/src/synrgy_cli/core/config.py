@@ -35,10 +35,10 @@ class Config:
         # Try to use XDG config directory on Unix-like systems
         if os.name != 'nt':
             config_home = os.environ.get('XDG_CONFIG_HOME', os.path.expanduser('~/.config'))
-            config_dir = Path(config_home) / 'kartavya-cli'
+            config_dir = Path(config_home) / 'synrgy-cli'
         else:
             # Use AppData on Windows
-            config_dir = Path.home() / '.kartavya-cli'
+            config_dir = Path.home() / '.synrgy-cli'
         
         config_dir.mkdir(parents=True, exist_ok=True)
         return config_dir / 'config.ini'
@@ -83,7 +83,7 @@ class Config:
     def get(self, section: str, key: str, default: Any = None) -> Any:
         """Get configuration value with environment variable override."""
         # Check environment variable first (uppercase with underscore)
-        env_key = f"KARTAVYA_{section.upper()}_{key.upper()}"
+        env_key = f"SYNRGY_{section.upper()}_{key.upper()}"
         env_value = os.environ.get(env_key)
         if env_value is not None:
             return env_value

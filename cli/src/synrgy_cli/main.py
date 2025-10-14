@@ -28,8 +28,8 @@ from synrgy_cli.commands import (
 # Initialize console and app
 console = Console()
 app = typer.Typer(
-    name="kartavya",
-    help="Kartavya SIEM NLP Assistant CLI - Intelligent Security Operations",
+    name="synrgy",
+    help="SYNRGY SIEM NLP Assistant CLI - Intelligent Security Operations",
     rich_markup_mode="rich",
     no_args_is_help=True,
 )
@@ -46,15 +46,15 @@ app.add_typer(admin.app, name="admin", help="👥 Admin operations")
 @app.command()
 def version():
     """Show version information."""
-    console.print(f"[bold blue]Kartavya CLI[/bold blue] version [green]{__version__}[/green]")
+    console.print(f"[bold blue]SYNRGY CLI[/bold blue] version [green]{__version__}[/green]")
 
 
 @app.command()
 def setup(
-    base_url: str = typer.Option(
+        base_url: str = typer.Option(
         ..., 
         "--url", 
-        help="Base URL for the Kartavya API"
+        help="Base URL for the SYNRGY API"
     ),
     api_key: Optional[str] = typer.Option(
         None, 
@@ -178,17 +178,17 @@ def main(
     config_file: Optional[str] = typer.Option(None, "--config", help="Path to config file"),
 ):
     """
-    Kartavya SIEM NLP Assistant CLI
+    SYNRGY SIEM NLP Assistant CLI
     
-    A comprehensive command-line interface for the Kartavya SIEM platform.
+    A comprehensive command-line interface for the SYNRGY SIEM platform.
     Provides natural language query processing, threat hunting, and security analysis.
     
     Quick start:
-    1. Run 'kartavya setup --url YOUR_API_URL --api-key YOUR_KEY'
-    2. Test with 'kartavya health'
-    3. Start chatting with 'kartavya chat interactive'
+    1. Run 'synrgy setup --url YOUR_API_URL --api-key YOUR_KEY'
+    2. Test with 'synrgy health'
+    3. Start chatting with 'synrgy chat interactive'
     
-    For help with any command, use: kartavya COMMAND --help
+    For help with any command, use: synrgy COMMAND --help
     """
     # Set global config if provided
     if config_file:

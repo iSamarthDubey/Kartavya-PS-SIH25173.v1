@@ -56,13 +56,13 @@ def interactive(
         formatter.print_info(f"System prompt: {system_prompt}")
     
     console.print(Panel.fit(
-        "[bold blue]Kartavya AI Assistant[/bold blue]\n\n"
+        "[bold blue]SYNRGY AI Assistant[/bold blue]\n\n"
         "💬 Ask questions about security events, threats, or SIEM operations\n"
         "🔍 Use natural language to query your security data\n"
         "📊 Get insights and recommendations for threat hunting\n\n"
         "[dim]Type 'exit', 'quit', or press Ctrl+C to end the session[/dim]\n"
         "[dim]Type 'help' for available commands[/dim]",
-        title="Welcome to Kartavya Chat",
+        title="Welcome to SYNRGY Chat",
         border_style="blue"
     ))
     

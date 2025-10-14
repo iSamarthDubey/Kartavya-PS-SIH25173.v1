@@ -3,14 +3,14 @@ requires = ["setuptools>=45", "wheel", "setuptools-scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "kartavya-cli"
+name = "synrgy-cli"
 version = "1.0.0"
-description = "Production-ready CLI for Kartavya SIEM NLP Assistant"
+description = "Production-ready CLI for SYNRGY SIEM NLP Assistant"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
-    {name = "Kartavya Team", email = "support@kartavya.dev"}
+    {name = "SYNRGY Team", email = "support@synrgy.dev"}
 ]
 keywords = ["siem", "security", "cli", "nlp", "cybersecurity", "threat-hunting"]
 classifiers = [
@@ -57,14 +57,14 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/kartavya-team/kartavya-cli"
-Documentation = "https://kartavya-cli.readthedocs.io"
-Repository = "https://github.com/kartavya-team/kartavya-cli"
-"Bug Tracker" = "https://github.com/kartavya-team/kartavya-cli/issues"
+Homepage = "https://github.com/synrgy-team/synrgy-cli"
+Documentation = "https://synrgy-cli.readthedocs.io"
+Repository = "https://github.com/synrgy-team/synrgy-cli"
+"Bug Tracker" = "https://github.com/synrgy-team/synrgy-cli/issues"
 
 [project.scripts]
-kartavya = "kartavya_cli.main:app"
-kvya = "kartavya_cli.main:app"  # Short alias
+synrgy = "synrgy_cli.main:app"
+syn = "synrgy_cli.main:app"  # Short alias
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -89,12 +89,12 @@ disallow_untyped_defs = true
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q --strict-markers --cov=kartavya_cli --cov-report=term-missing"
+addopts = "-ra -q --strict-markers --cov=synrgy_cli --cov-report=term-missing"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 
 [tool.coverage.run]
-source = ["src/kartavya_cli"]
+source = ["src/synrgy_cli"]
 omit = ["*/tests/*", "*/test_*.py"]
 
 [tool.coverage.report]

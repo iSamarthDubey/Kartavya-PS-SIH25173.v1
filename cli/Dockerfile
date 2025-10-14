@@ -1,4 +1,4 @@
-# Multi-stage build for production-ready Kartavya CLI
+# Multi-stage build for production-ready SYNRGY CLI
 FROM python:3.11-slim as builder
 
 # Set environment variables
@@ -8,8 +8,8 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Create non-root user
-RUN groupadd --gid 1001 kartavya && \
-    useradd --uid 1001 --gid kartavya --create-home --shell /bin/bash kartavya
+RUN groupadd --gid 1001 synrgy && \
+    useradd --uid 1001 --gid synrgy --create-home --shell /bin/bash synrgy
 
 # Set working directory
 WORKDIR /app
@@ -42,31 +42,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN groupadd --gid 1001 kartavya && \
-    useradd --uid 1001 --gid kartavya --create-home --shell /bin/bash kartavya
+RUN groupadd --gid 1001 synrgy && \
+    useradd --uid 1001 --gid synrgy --create-home --shell /bin/bash synrgy
 
 # Switch to non-root user
-USER kartavya
-WORKDIR /home/kartavya
+USER synrgy
+WORKDIR /home/synrgy
 
 # Copy installed application from builder
-COPY --from=builder --chown=kartavya:kartavya /root/.local /home/kartavya/.local
-COPY --from=builder --chown=kartavya:kartavya /app /home/kartavya/app
+COPY --from=builder --chown=synrgy:synrgy /root/.local /home/synrgy/.local
+COPY --from=builder --chown=synrgy:synrgy /app /home/synrgy/app
 
 # Create config directory
-RUN mkdir -p /home/kartavya/.kartavya-cli
+RUN mkdir -p /home/synrgy/.synrgy-cli
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD kartavya version || exit 1
+    CMD synrgy version || exit 1
 
 # Default command
-CMD ["kartavya", "--help"]
+CMD ["synrgy", "--help"]
 
 # Labels
-LABEL maintainer="Kartavya Team <support@kartavya.dev>" \
+LABEL maintainer="SYNRGY Team <support@synrgy.dev>" \
       version="1.0.0" \
-      description="Production-ready CLI for Kartavya SIEM NLP Assistant" \
-      org.opencontainers.image.source="https://github.com/kartavya-team/kartavya-cli" \
-      org.opencontainers.image.documentation="https://kartavya-cli.readthedocs.io" \
+      description="Production-ready CLI for SYNRGY SIEM NLP Assistant" \
+      org.opencontainers.image.source="https://github.com/synrgy-team/synrgy-cli" \
+      org.opencontainers.image.documentation="https://synrgy-cli.readthedocs.io" \
       org.opencontainers.image.licenses="MIT"
