@@ -21,7 +21,7 @@ const MAX_RETRIES = parseInt(import.meta.env.VITE_MAX_RETRY_ATTEMPTS || '3')
 const RETRY_DELAY = parseInt(import.meta.env.VITE_RETRY_DELAY || '1000')
 const REQUEST_TIMEOUT = parseInt(import.meta.env.VITE_REQUEST_TIMEOUT || '30000')
 
-// Create axios instance with default config
+// Create axios instance with simple config
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: REQUEST_TIMEOUT,
@@ -138,7 +138,7 @@ interface LoginCredentials {
 
 export const authApi = {
   login: async (credentials: LoginCredentials) => {
-    const response = await api.post('/auth/login', {
+    const response = await api.post('/api/auth/login', {
       identifier: credentials.identifier, // Now consistent with interface
       password: credentials.password,
     })
@@ -146,17 +146,17 @@ export const authApi = {
   },
 
   logout: async () => {
-    const response = await api.post<ApiResponse>('/auth/logout')
+    const response = await api.post<ApiResponse>('/api/auth/logout')
     return response.data
   },
 
   me: async () => {
-    const response = await api.get('/auth/profile')
+    const response = await api.get('/api/auth/profile')
     return response.data
   },
 
   refreshToken: async () => {
-    const response = await api.post<ApiResponse<{ token: string }>>('/auth/refresh')
+    const response = await api.post<ApiResponse<{ token: string }>>('/api/auth/refresh')
     return response.data
   },
 }
@@ -167,7 +167,7 @@ export const chatApi = {
     return await retryRequest(async () => {
       try {
         // Try the standard assistant endpoint first with retry logic
-        const response = await api.post<ChatResponse>('/assistant/chat', request)
+        const response = await api.post<ChatResponse>('/api/assistant/chat', request)
         return response.data
       } catch (error: any) {
         // If standard endpoint fails, try Windows-specific endpoint as fallback
@@ -200,7 +200,7 @@ export const chatApi = {
     original_query: string
     clarification_choice: string
   }) => {
-    const response = await api.post<ApiResponse>('/assistant/clarify', data)
+    const response = await api.post<ApiResponse>('/api/assistant/clarify', data)
     return response.data
   },
 
@@ -211,12 +211,12 @@ export const chatApi = {
         history: any[]
         total_messages: number
       }>
-    >(`/assistant/history/${conversationId}?limit=${limit}`)
+    >(`/api/assistant/history/${conversationId}?limit=${limit}`)
     return response.data
   },
 
   clearHistory: async (conversationId: string) => {
-    const response = await api.delete<ApiResponse>(`/assistant/history/${conversationId}`)
+    const response = await api.delete<ApiResponse>(`/api/assistant/history/${conversationId}`)
     return response.data
   },
 
@@ -228,7 +228,7 @@ export const chatApi = {
           queries: string[]
         }>
       }>
-    >('/assistant/suggestions')
+    >('/api/assistant/suggestions')
     return response.data
   },
 }
@@ -237,22 +237,22 @@ export const chatApi = {
 export const dashboardApi = {
   getOverview: async () => {
     // Direct call to backend metrics endpoint - no transformation here
-    const response = await api.get('/dashboard/metrics')
+    const response = await api.get('/api/dashboard/metrics')
     return response.data
   },
 
   getWidgets: async () => {
-    const response = await api.get<ApiResponse<DashboardWidget[]>>('/dashboard/widgets')
+    const response = await api.get<ApiResponse<DashboardWidget[]>>('/api/dashboard/widgets')
     return response.data
   },
 
   saveWidget: async (widget: Partial<DashboardWidget>) => {
-    const response = await api.post<ApiResponse<DashboardWidget>>('/dashboard/widgets', widget)
+    const response = await api.post<ApiResponse<DashboardWidget>>('/api/dashboard/widgets', widget)
     return response.data
   },
 
   deleteWidget: async (widgetId: string) => {
-    const response = await api.delete<ApiResponse>(`/dashboard/widgets/${widgetId}`)
+    const response = await api.delete<ApiResponse>(`/api/dashboard/widgets/${widgetId}`)
     return response.data
   },
 }
@@ -283,7 +283,7 @@ export const queryApi = {
       }
       error?: string
       metadata?: any
-    }>('/query/execute', data)
+    }>('/api/query/execute', data)
     return response.data
   },
 
@@ -299,7 +299,7 @@ export const queryApi = {
         confidence: number
       }
       error?: string
-    }>('/query/translate', data)
+    }>('/api/query/translate', data)
     return response.data
   },
 
@@ -314,7 +314,7 @@ export const queryApi = {
         system_monitoring: string[]
       }
       error?: string
-    }>('/query/suggestions')
+    }>('/api/query/suggestions')
     return response.data
   },
 
@@ -330,7 +330,7 @@ export const queryApi = {
         estimated_improvement: string
       }
       error?: string
-    }>('/query/optimize', data)
+    }>('/api/query/optimize', data)
     return response.data
   },
 }
@@ -353,7 +353,7 @@ export const windowsApi = {
           services: Record<string, boolean>
         }
       }
-    }>('/windows/dashboard-summary')
+    }>('/api/windows/dashboard-summary')
     return response.data
   },
 
@@ -370,7 +370,7 @@ export const windowsApi = {
         }>
         total: number
       }
-    }>(`/windows/recent-events?limit=${limit}`)
+    }>(`/api/windows/recent-events?limit=${limit}`)
     return response.data
   },
 
@@ -386,7 +386,7 @@ export const windowsApi = {
         }>
         total: number
       }
-    }>(`/windows/system-metrics?time_range=${timeRange}`)
+    }>(`/api/windows/system-metrics?time_range=${timeRange}`)
     return response.data
   },
 
@@ -405,7 +405,7 @@ export const windowsApi = {
       metadata: any
       status: string
       error?: string
-    }>('/windows/simple-chat', { query })
+    }>('/api/windows/simple-chat', { query })
     return response.data
   },
 }
@@ -414,13 +414,13 @@ export const windowsApi = {
 export const reportsApi = {
   list: async (page: number = 1, limit: number = 20) => {
     const response = await api.get<PaginatedResponse<Report>>(
-      `/reports?page=${page}&limit=${limit}`
+      `/api/reports?page=${page}&limit=${limit}`
     )
     return response.data
   },
 
   get: async (reportId: string) => {
-    const response = await api.get<ApiResponse<Report>>(`/reports/${reportId}`)
+    const response = await api.get<ApiResponse<Report>>(`/api/reports/${reportId}`)
     return response.data
   },
 
@@ -432,21 +432,21 @@ export const reportsApi = {
     time_range?: { start: string; end: string }
   }) => {
     const response = await api.post<ApiResponse<{ report_id: string; status: string }>>(
-      '/reports/generate',
+      '/api/reports/generate',
       data
     )
     return response.data
   },
 
   download: async (reportId: string) => {
-    const response = await api.get(`/reports/${reportId}/download`, {
+    const response = await api.get(`/api/reports/${reportId}/download`, {
       responseType: 'blob',
     })
     return response
   },
 
   delete: async (reportId: string) => {
-    const response = await api.delete<ApiResponse>(`/reports/${reportId}`)
+    const response = await api.delete<ApiResponse>(`/api/reports/${reportId}`)
     return response.data
   },
 }
@@ -460,30 +460,30 @@ export const investigationsApi = {
     })
     if (status) params.append('status', status)
 
-    const response = await api.get<PaginatedResponse<Investigation>>(`/investigations?${params}`)
+    const response = await api.get<PaginatedResponse<Investigation>>(`/api/investigations?${params}`)
     return response.data
   },
 
   get: async (investigationId: string) => {
-    const response = await api.get<ApiResponse<Investigation>>(`/investigations/${investigationId}`)
+    const response = await api.get<ApiResponse<Investigation>>(`/api/investigations/${investigationId}`)
     return response.data
   },
 
   create: async (data: Partial<Investigation>) => {
-    const response = await api.post<ApiResponse<Investigation>>('/investigations', data)
+    const response = await api.post<ApiResponse<Investigation>>('/api/investigations', data)
     return response.data
   },
 
   update: async (investigationId: string, data: Partial<Investigation>) => {
     const response = await api.put<ApiResponse<Investigation>>(
-      `/investigations/${investigationId}`,
+      `/api/investigations/${investigationId}`,
       data
     )
     return response.data
   },
 
   delete: async (investigationId: string) => {
-    const response = await api.delete<ApiResponse>(`/investigations/${investigationId}`)
+    const response = await api.delete<ApiResponse>(`/api/investigations/${investigationId}`)
     return response.data
   },
 }
@@ -495,7 +495,7 @@ export const platformEventsApi = {
       success: boolean
       capabilities: Record<string, any>
       timestamp: string
-    }>('/events/capabilities')
+    }>('/api/events/capabilities')
     return response.data
   },
 
@@ -513,7 +513,7 @@ export const platformEventsApi = {
       total_hits: number
       has_more: boolean
       error?: string
-    }>('/events/authentication', {
+    }>('/api/events/authentication', {
       query: data.query || '',
       time_range: data.time_range || '1h',
       limit: data.limit || 100,
@@ -531,7 +531,7 @@ export const platformEventsApi = {
       total_hits: number
       has_more: boolean
       error?: string
-    }>('/events/failed-logins', {
+    }>('/api/events/failed-logins', {
       query: data.query || '',
       time_range: data.time_range || '1h',
       limit: data.limit || 100,
@@ -549,7 +549,7 @@ export const platformEventsApi = {
       total_hits: number
       has_more: boolean
       error?: string
-    }>('/events/successful-logins', {
+    }>('/api/events/successful-logins', {
       query: data.query || '',
       time_range: data.time_range || '1h',
       limit: data.limit || 100,
@@ -567,7 +567,7 @@ export const platformEventsApi = {
       total_hits: number
       has_more: boolean
       error?: string
-    }>('/events/system-metrics', {
+    }>('/api/events/system-metrics', {
       query: data.query || '',
       time_range: data.time_range || '1h',
       limit: data.limit || 100,
@@ -585,7 +585,7 @@ export const platformEventsApi = {
       total_hits: number
       has_more: boolean
       error?: string
-    }>('/events/network-activity', {
+    }>('/api/events/network-activity', {
       query: data.query || '',
       time_range: data.time_range || '1h',
       limit: data.limit || 100,
@@ -597,12 +597,12 @@ export const platformEventsApi = {
 // ===== Admin APIs =====
 export const adminApi = {
   getConnectors: async () => {
-    const response = await api.get<ApiResponse<SiemConnector[]>>('/admin/connectors')
+    const response = await api.get<ApiResponse<SiemConnector[]>>('/api/admin/connectors')
     return response.data
   },
 
   addConnector: async (connector: Partial<SiemConnector>) => {
-    const response = await api.post<ApiResponse<SiemConnector>>('/admin/connectors', connector)
+    const response = await api.post<ApiResponse<SiemConnector>>('/api/admin/connectors', connector)
     return response.data
   },
 
@@ -613,18 +613,18 @@ export const adminApi = {
         message: string
         details?: any
       }>
-    >(`/admin/connectors/${connectorId}/test`)
+    >(`/api/admin/connectors/${connectorId}/test`)
     return response.data
   },
 
   deleteConnector: async (connectorId: string) => {
-    const response = await api.delete<ApiResponse>(`/admin/connectors/${connectorId}`)
+    const response = await api.delete<ApiResponse>(`/api/admin/connectors/${connectorId}`)
     return response.data
   },
 
   getAuditLogs: async (page: number = 1, limit: number = 50) => {
     const response = await api.get<PaginatedResponse<any>>(
-      `/admin/audit?page=${page}&limit=${limit}`
+      `/api/admin/audit?page=${page}&limit=${limit}`
     )
     return response.data
   },
@@ -636,7 +636,7 @@ export const adminApi = {
         user_activity: any[]
         system_metrics: any
       }>
-    >('/admin/usage')
+    >('/api/admin/usage')
     return response.data
   },
 }
@@ -651,7 +651,7 @@ export const systemApi = {
       services: Record<string, boolean>
       health_score: string
     }>('/health', {
-      baseURL: import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8000',
+      baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
     })
     return response.data
   },
@@ -659,7 +659,7 @@ export const systemApi = {
   ping: async () => {
     // Ping endpoint is also at root level
     const response = await axios.get<{ status: string; timestamp: string }>('/ping', {
-      baseURL: import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:8000',
+      baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
     })
     return response.data
   },
