@@ -273,11 +273,12 @@ class MockDataScheduler:
                 print(f"Mock data generation error: {e}")
                 time.sleep(1)  # Brief pause on error
     
-    def get_latest_data(self, data_type: Optional[MockDataType] = None, limit: int = 100) -> List[MockEvent]:
+    def get_latest_data(self, data_type: Optional[MockDataType] = None, limit: int = None) -> List[MockEvent]:
         """Get the latest generated data"""
         with self._lock:
             if data_type:
-                return self.latest_data.get(data_type, [])[-limit:]
+                data = self.latest_data.get(data_type, [])
+                return data[-limit:] if limit else data  # Return ALL if no limit
             else:
                 # Return all data types combined
                 all_events = []
@@ -286,4 +287,4 @@ class MockDataScheduler:
                 
                 # Sort by timestamp and return latest
                 all_events.sort(key=lambda x: x.timestamp, reverse=True)
-                return all_events[:limit]
+                return all_events[:limit] if limit else all_events  # Return ALL if no limit

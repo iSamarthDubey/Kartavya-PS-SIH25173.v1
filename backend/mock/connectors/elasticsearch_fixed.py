@@ -115,12 +115,12 @@ class MockElasticsearchConnector:
         return self.Cat(self)
     
     def search(self, index: str, body: Dict[str, Any], timeout: str = "30s") -> Dict[str, Any]:
-        """Mock search functionality with realistic responses"""
+        """Mock search functionality with realistic responses (unlimited support)"""
         
-        # Parse the query
-        size = body.get("size", 10)
+        # Parse the query (None means unlimited)
+        size = body.get("size", None)
         
-        # Get appropriate mock data based on index
+        # Get appropriate mock data based on index (unlimited if size is None)
         mock_events = self._get_mock_data_for_index(index, size)
         
         # Convert mock events to Elasticsearch format
@@ -157,7 +157,7 @@ class MockElasticsearchConnector:
         
         return response
     
-    def _get_mock_data_for_index(self, index: str, limit: int) -> List[Any]:
+    def _get_mock_data_for_index(self, index: str, limit: Optional[int]) -> List[Any]:
         """Get appropriate mock data based on index name"""
         
         # Determine data type from index name
@@ -188,17 +188,19 @@ class MockElasticsearchConnector:
                          MockDataType.AUDITBEAT_EVENT, MockDataType.PACKETBEAT_EVENT, MockDataType.FILEBEAT_EVENT,
                          MockDataType.NETWORK_LOG, MockDataType.SECURITY_ALERT, MockDataType.PROCESS_LOG]
         
-        # Get latest data from scheduler
+        # Get ALL available data from scheduler (no limits!)
         all_events = []
         for data_type in data_types:
-            events = self.scheduler.get_latest_data(data_type, limit // len(data_types) + 1)
+            # Get ALL events available for this data type (unlimited!)
+            events = self.scheduler.get_latest_data(data_type, limit=None)  # No limit - get everything!
             all_events.extend(events)
         
-        # If no data available, generate some on the fly
+        # If no data available, generate a large batch on the fly
         if not all_events:
-            generator = random.choice(self.generators)
-            all_events = generator.generate_batch(limit)
+            for generator in self.generators:
+                batch = generator.generate_batch(100)  # Larger batch
+                all_events.extend(batch)
         
-        # Shuffle to mix event types and return requested number
+        # Shuffle to mix event types and return ALL (no limit)
         random.shuffle(all_events)
-        return all_events[:limit]
+        return all_events  # Return EVERYTHING
