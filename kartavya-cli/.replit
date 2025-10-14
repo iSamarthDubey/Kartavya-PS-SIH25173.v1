@@ -1,0 +1,75 @@
+run = "python -m kartavya_cli.main --help"
+language = "python3"
+entrypoint = "main.py"
+
+[nix]
+channel = "stable-23.05"
+
+[deployment]
+run = ["sh", "-c", "python -m kartavya_cli.main setup --url $KARTAVYA_API_URL --api-key $KARTAVYA_API_KEY && python -m kartavya_cli.main chat interactive"]
+deploymentTarget = "cloudrun"
+
+[env]
+PYTHONPATH = "${REPL_HOME}/src"
+KARTAVYA_API_BASE_URL = "https://api.kartavya.dev"
+
+[[ports]]
+localPort = 8080
+externalPort = 80
+
+[languages]
+[languages.python3]
+pattern = "**/*.py"
+
+[languages.python3.languageServer]
+start = "pylsp"
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix", "pyproject.toml"]
+
+[packager]
+language = "python3"
+
+[packager.features]
+enabledForHosting = false
+packageSearch = true
+guessImports = true
+
+[unitTest]
+language = "python3"
+
+[debugger]
+support = true
+
+[debugger.interactive]
+transport = "localhost:5678"
+startCommand = ["python", "-m", "debugpy", "--listen", "5678", "--wait-for-client", "-m", "kartavya_cli.main"]
+
+[debugger.interactive.initializeMessage]
+command = "initialize"
+type = "request"
+
+[debugger.interactive.initializeMessage.arguments]
+clientID = "replit"
+clientName = "replit.com"
+adapterID = "debugpy"
+pathFormat = "path"
+linesStartAt1 = true
+columnsStartAt1 = true
+supportsVariableType = true
+supportsVariablePaging = true
+supportsRunInTerminalRequest = true
+locale = "en-us"
+
+[debugger.interactive.launchMessage]
+command = "launch"
+type = "request"
+
+[debugger.interactive.launchMessage.arguments]
+program = "${REPL_HOME}/src/kartavya_cli/main.py"
+console = "integratedTerminal"
+args = []
+stopOnEntry = false
+cwd = "${REPL_HOME}"
+env = {}
+envFile = "${REPL_HOME}/.env"
