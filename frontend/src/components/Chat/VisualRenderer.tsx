@@ -45,6 +45,7 @@ interface VisualRendererProps {
   onPin?: (card: VisualCard) => void
   onExport?: (card: VisualCard) => void
   interactive?: boolean
+  compact?: boolean
 }
 
 // SYNRGY color palette for charts
@@ -66,6 +67,7 @@ export default function VisualRenderer({
   onPin,
   onExport,
   interactive = true,
+  compact = false,
 }: VisualRendererProps) {
   const [expandedCard, setExpandedCard] = useState<string | null>(null)
   

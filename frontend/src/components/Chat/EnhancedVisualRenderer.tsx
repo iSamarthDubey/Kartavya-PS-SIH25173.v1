@@ -48,6 +48,7 @@ interface VisualRendererProps {
   onPin?: (card: VisualCard) => void
   onExport?: (card: VisualCard) => void
   interactive?: boolean
+  compact?: boolean
 }
 
 // SYNRGY color palette for charts
@@ -257,6 +258,7 @@ export default function EnhancedVisualRenderer({
   onPin,
   onExport,
   interactive = true,
+  compact = false,
 }: VisualRendererProps) {
   const [expandedCard, setExpandedCard] = useState<string | null>(null)
   const [showMetadata, setShowMetadata] = useState(false)
@@ -310,73 +312,132 @@ export default function EnhancedVisualRenderer({
     [onExport, interactive]
   )
 
-  const renderSummaryCard = useMemo(() => (card: VisualCard, index: number) => (
-    <motion.div
-      key={`summary-${index}`}
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3, delay: index * 0.1 }}
-      className="relative group bg-synrgy-surface/50 border border-synrgy-primary/20 rounded-xl p-6 hover:border-synrgy-primary/40 transition-all duration-200"
-    >
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-synrgy-primary rounded-full" />
-          <h3 className="text-sm font-medium text-synrgy-muted">{card.title}</h3>
-        </div>
-      </div>
+  const renderSummaryCard = useMemo(() => (card: VisualCard, index: number) => {
+    // Clean status colors
+    const getStatusColor = (status: string) => {
+      switch (status) {
+        case 'success':
+        case 'normal':
+          return {
+            border: 'border-synrgy-primary/30',
+            badge: 'bg-synrgy-primary/15 text-synrgy-primary',
+            dot: 'bg-synrgy-primary'
+          }
+        case 'warning':
+          return {
+            border: 'border-yellow-500/30',
+            badge: 'bg-yellow-500/15 text-yellow-400',
+            dot: 'bg-yellow-500'
+          }
+        case 'critical':
+        case 'error':
+          return {
+            border: 'border-red-500/30',
+            badge: 'bg-red-500/15 text-red-400',
+            dot: 'bg-red-500'
+          }
+        default:
+          return {
+            border: 'border-synrgy-primary/30',
+            badge: 'bg-synrgy-primary/15 text-synrgy-primary',
+            dot: 'bg-synrgy-primary'
+          }
+      }
+    }
 
-      <div className="text-3xl font-bold text-synrgy-text mb-1">
-        {typeof card.value === 'number' ? card.value.toLocaleString() : card.value}
-      </div>
+    const statusColor = getStatusColor(card.status || 'normal')
 
-      {/* Status indicator */}
-      {card.status && (
-        <div
-          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-            card.status === 'success'
-              ? 'bg-green-500/20 text-green-400'
-              : card.status === 'warning'
-                ? 'bg-yellow-500/20 text-yellow-400'
-                : card.status === 'error'
-                  ? 'bg-red-500/20 text-red-400'
-                  : 'bg-synrgy-primary/20 text-synrgy-primary'
-          }`}
-        >
-          {card.status === 'success' && <CheckCircle className="w-3 h-3" />}
-          {card.status === 'warning' && <AlertTriangle className="w-3 h-3" />}
-          {card.status === 'error' && <AlertTriangle className="w-3 h-3" />}
-          {card.status}
-        </div>
-      )}
+    return (
+      <motion.div
+        key={`summary-${index}`}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: index * 0.1 }}
+        whileHover={{ y: -2, transition: { duration: 0.2 } }}
+        className="group relative"
+      >
+        {/* Clean, modern card */}
+        <div className={`
+          bg-synrgy-surface/80 backdrop-blur-sm
+          border ${statusColor.border}
+          rounded-2xl p-8
+          shadow-lg hover:shadow-xl
+          transition-all duration-300
+          min-h-[180px] w-full
+        `}>
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className={`w-4 h-4 ${statusColor.dot} rounded-full`} />
+              <h3 className="text-sm font-semibold text-synrgy-muted uppercase tracking-wide">
+                {card.title}
+              </h3>
+            </div>
+          </div>
 
-      {/* Trend indicator */}
-      {card.trend && (
-        <div className="flex items-center gap-1 text-xs mt-2">
-          {card.trend === 'up' ? (
-            <TrendingUp className="w-3 h-3 text-green-500" />
-          ) : card.trend === 'down' ? (
-            <TrendingDown className="w-3 h-3 text-red-500" />
-          ) : (
-            <div className="w-3 h-1 bg-synrgy-muted rounded-full" />
+          {/* Main value */}
+          <div className="mb-6">
+            <div className="text-4xl font-bold text-synrgy-text">
+              {typeof card.value === 'number' ? card.value.toLocaleString() : card.value}
+            </div>
+          </div>
+
+          {/* Status and trend */}
+          <div className="flex items-center justify-between">
+            {/* Status badge */}
+            <div className={`
+              inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium
+              ${statusColor.badge}
+            `}>
+              {card.status === 'success' || card.status === 'normal' ? (
+                <CheckCircle className="w-3 h-3" />
+              ) : card.status === 'warning' ? (
+                <AlertTriangle className="w-3 h-3" />
+              ) : card.status === 'critical' || card.status === 'error' ? (
+                <AlertTriangle className="w-3 h-3" />
+              ) : (
+                <div className="w-3 h-3 rounded-full bg-current" />
+              )}
+              {card.status || 'normal'}
+            </div>
+
+            {/* Trend indicator */}
+            {(card.trend || card.data?.change) && (
+              <div className="text-xs text-synrgy-muted">
+                {(card.trend === 'up' || card.data?.change?.trend === 'up') ? (
+                  <div className="flex items-center gap-1 text-green-400">
+                    <TrendingUp className="w-3 h-3" />
+                    <span>+{card.data?.change?.value || 0}%</span>
+                  </div>
+                ) : (card.trend === 'down' || card.data?.change?.trend === 'down') ? (
+                  <div className="flex items-center gap-1 text-red-400">
+                    <TrendingDown className="w-3 h-3" />
+                    <span>-{Math.abs(card.data?.change?.value || 0)}%</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-1 bg-synrgy-muted rounded-full" />
+                    <span>stable</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          
+          {/* Action button */}
+          {interactive && (
+            <button
+              onClick={() => handlePin(card)}
+              className="opacity-0 group-hover:opacity-100 transition-opacity absolute top-3 right-3 p-2 bg-synrgy-primary/20 hover:bg-synrgy-primary/30 rounded-lg text-synrgy-primary"
+              title="Pin to Dashboard"
+            >
+              <Pin className="w-3 h-3" />
+            </button>
           )}
-          <span className="text-synrgy-muted">vs last period</span>
         </div>
-      )}
-
-      {/* Action buttons */}
-      {interactive && (
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2 flex gap-1">
-          <button
-            onClick={() => handlePin(card)}
-            className="p-1 bg-synrgy-primary/20 hover:bg-synrgy-primary/30 rounded text-synrgy-primary"
-            title="Pin to Dashboard"
-          >
-            <Pin className="w-3 h-3" />
-          </button>
-        </div>
-      )}
-    </motion.div>
-  ), [handlePin, interactive])
+      </motion.div>
+    )
+  }, [handlePin, interactive])
 
   const renderChart = useCallback((card: VisualCard, index: number) => {
     if (!card.data || !Array.isArray(card.data)) return null
@@ -474,7 +535,7 @@ export default function EnhancedVisualRenderer({
           )}
         </div>
 
-        <div className={isExpanded ? 'h-96' : 'h-48'}>
+        <div className={`w-full ${isExpanded ? 'h-[500px]' : 'h-[320px]'}`}>
           <ResponsiveContainer width="100%" height="100%">
             {chartBody}
           </ResponsiveContainer>
@@ -613,10 +674,10 @@ export default function EnhancedVisualRenderer({
 
       {/* Render cards with performance optimization */}
       {isComposite ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="w-full">
           {virtualizationConfig.enabled ? (
             // Virtual scrolling for large datasets
-            <div className="space-y-4">
+            <div className="w-full space-y-6">
               {cards
                 .slice(0, virtualizationConfig.chunkSize)
                 .map((card, index) => 
@@ -624,8 +685,8 @@ export default function EnhancedVisualRenderer({
                     <Suspense 
                       key={`${card.type}-${index}`}
                       fallback={
-                        <div className="h-32 bg-synrgy-surface/20 border border-synrgy-primary/10 rounded-xl animate-pulse flex items-center justify-center">
-                          <Loader2 className="w-6 h-6 text-synrgy-primary animate-spin" />
+                        <div className="h-48 bg-synrgy-surface/20 border border-synrgy-primary/10 rounded-xl animate-pulse flex items-center justify-center">
+                          <Loader2 className="w-8 h-8 text-synrgy-primary animate-spin" />
                         </div>
                       }
                     >
@@ -636,7 +697,7 @@ export default function EnhancedVisualRenderer({
                   )
                 )}
               {cards.length > virtualizationConfig.chunkSize && (
-                <div className="text-center py-4">
+                <div className="text-center py-6">
                   <span className="text-sm text-synrgy-muted">
                     Showing {virtualizationConfig.chunkSize} of {cards.length} items
                     {import.meta.env.DEV && (
@@ -649,33 +710,35 @@ export default function EnhancedVisualRenderer({
               )}
             </div>
           ) : (
-            cards.map((card, index) => 
-              shouldLazyLoad(card) ? (
-                <Suspense 
-                  key={`${card.type}-${index}`}
-                  fallback={
-                    <div className="h-32 bg-synrgy-surface/20 border border-synrgy-primary/10 rounded-xl animate-pulse flex items-center justify-center">
-                      <Loader2 className="w-6 h-6 text-synrgy-primary animate-spin" />
-                    </div>
-                  }
-                >
-                  {renderCard(card, index)}
-                </Suspense>
-              ) : (
-                renderCard(card, index)
-              )
-            )
+            <div className="w-full space-y-6">
+              {cards.map((card, index) => 
+                shouldLazyLoad(card) ? (
+                  <Suspense 
+                    key={`${card.type}-${index}`}
+                    fallback={
+                      <div className="h-48 bg-synrgy-surface/20 border border-synrgy-primary/10 rounded-xl animate-pulse flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 text-synrgy-primary animate-spin" />
+                      </div>
+                    }
+                  >
+                    {renderCard(card, index)}
+                  </Suspense>
+                ) : (
+                  renderCard(card, index)
+                )
+              )}
+            </div>
           )}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="w-full space-y-6">
           {cards.map((card, index) => 
             shouldLazyLoad(card) ? (
               <Suspense 
                 key={`${card.type}-${index}`}
                 fallback={
-                  <div className="h-32 bg-synrgy-surface/20 border border-synrgy-primary/10 rounded-xl animate-pulse flex items-center justify-center">
-                    <Loader2 className="w-6 h-6 text-synrgy-primary animate-spin" />
+                  <div className="h-48 bg-synrgy-surface/20 border border-synrgy-primary/10 rounded-xl animate-pulse flex items-center justify-center">
+                    <Loader2 className="w-8 h-8 text-synrgy-primary animate-spin" />
                   </div>
                 }
               >

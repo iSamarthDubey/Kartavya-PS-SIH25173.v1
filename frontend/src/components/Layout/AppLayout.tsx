@@ -1,5 +1,4 @@
-import { ReactNode } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard,
   MessageSquare,
@@ -11,25 +10,21 @@ import {
   UserCog,
   LogOut,
 } from 'lucide-react'
-import { useAuth } from '@/stores/appStore'
-
-interface AppLayoutProps {
-  children: ReactNode
-}
+import { useAuth } from '@/providers/AuthProvider'
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Chat', href: '/chat', icon: MessageSquare },
-  { name: 'Hybrid', href: '/hybrid', icon: Activity },
-  { name: 'Reports', href: '/reports', icon: FileText },
-  { name: 'Investigations', href: '/investigations', icon: Search },
+  { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
+  { name: 'Chat', href: '/app/chat', icon: MessageSquare },
+  { name: 'Hybrid', href: '/app/hybrid', icon: Activity },
+  { name: 'Reports', href: '/app/reports', icon: FileText },
+  { name: 'Investigations', href: '/app/investigations', icon: Search },
 ]
 
-const adminNavigation = [{ name: 'Admin Panel', href: '/admin', icon: UserCog }]
+const adminNavigation = [{ name: 'Admin Panel', href: '/app/admin', icon: UserCog }]
 
-const bottomNavigation = [{ name: 'Settings', href: '/settings', icon: Settings }]
+const bottomNavigation = [{ name: 'Settings', href: '/app/settings', icon: Settings }]
 
-export default function AppLayout({ children }: AppLayoutProps) {
+export default function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
@@ -150,7 +145,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </div>
 
       {/* Main content - Scrollable independently */}
-      <div className="flex-1 h-full overflow-hidden">{children}</div>
+      <div className="flex-1 h-full overflow-hidden">
+        <Outlet />
+      </div>
     </div>
   )
 }

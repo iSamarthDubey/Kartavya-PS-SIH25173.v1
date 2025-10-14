@@ -15,6 +15,7 @@ interface ChatWindowProps {
   onSettingsClick?: () => void
   onPin?: (visual: any) => void
   onExport?: (visual: any) => void
+  compact?: boolean
 }
 
 export default function ChatWindow({
@@ -24,6 +25,7 @@ export default function ChatWindow({
   onSettingsClick,
   onPin,
   onExport,
+  compact = false,
 }: ChatWindowProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
