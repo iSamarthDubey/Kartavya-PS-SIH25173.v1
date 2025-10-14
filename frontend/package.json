@@ -50,6 +50,7 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@tanstack/react-query-devtools": "^5.90.2",
     "@types/crypto-js": "^4.2.2",
     "@types/cytoscape": "^3.19.16",
     "@types/react": "^18.2.38",
