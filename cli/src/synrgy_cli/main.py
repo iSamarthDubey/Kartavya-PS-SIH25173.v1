@@ -22,19 +22,21 @@ from synrgy_cli.commands import (
     reports,
     query,
     dashboard,
-    admin
+    admin,
+    config
 )
 
 # Initialize console and app
 console = Console()
 app = typer.Typer(
-    name="synrgy",
-    help="SYNRGY SIEM NLP Assistant CLI - Intelligent Security Operations",
+    name="kartavya",
+    help="Kartavya SIEM NLP Assistant CLI - Intelligent Security Operations",
     rich_markup_mode="rich",
     no_args_is_help=True,
 )
 
 # Add command groups
+app.add_typer(config.app, name="config", help="🔧 Configuration management")
 app.add_typer(assistant.app, name="chat", help="💬 Interactive AI assistant")
 app.add_typer(platform_events.app, name="events", help="🔍 Platform event analysis")
 app.add_typer(reports.app, name="reports", help="📊 Report generation")
@@ -46,7 +48,7 @@ app.add_typer(admin.app, name="admin", help="👥 Admin operations")
 @app.command()
 def version():
     """Show version information."""
-    console.print(f"[bold blue]SYNRGY CLI[/bold blue] version [green]{__version__}[/green]")
+    console.print(f"[bold blue]Kartavya CLI[/bold blue] version [green]{__version__}[/green]")
 
 
 @app.command()
@@ -54,7 +56,7 @@ def setup(
         base_url: str = typer.Option(
         ..., 
         "--url", 
-        help="Base URL for the SYNRGY API"
+        help="Base URL for the Kartavya API"
     ),
     api_key: Optional[str] = typer.Option(
         None, 
@@ -178,17 +180,17 @@ def main(
     config_file: Optional[str] = typer.Option(None, "--config", help="Path to config file"),
 ):
     """
-    SYNRGY SIEM NLP Assistant CLI
+    Kartavya SIEM NLP Assistant CLI
     
-    A comprehensive command-line interface for the SYNRGY SIEM platform.
+    A comprehensive command-line interface for the Kartavya SIEM platform.
     Provides natural language query processing, threat hunting, and security analysis.
     
     Quick start:
-    1. Run 'synrgy setup --url YOUR_API_URL --api-key YOUR_KEY'
-    2. Test with 'synrgy health'
-    3. Start chatting with 'synrgy chat interactive'
+    1. Run 'kartavya config setup' for interactive setup
+    2. Test with 'kartavya config test'
+    3. Start chatting with 'kartavya chat ask "Show me recent events"'
     
-    For help with any command, use: synrgy COMMAND --help
+    For help with any command, use: kartavya COMMAND --help
     """
     # Set global config if provided
     if config_file:

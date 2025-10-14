@@ -2,6 +2,7 @@
 Command modules for the Kartavya CLI.
 
 This package contains all the command group implementations:
+- config: Configuration management and setup
 - assistant: AI chat and conversation management
 - platform_events: Security event analysis and filtering
 - reports: Report generation and management
@@ -11,6 +12,7 @@ This package contains all the command group implementations:
 """
 
 from . import (
+    config,
     assistant,
     platform_events,
     reports,
@@ -20,6 +22,7 @@ from . import (
 )
 
 __all__ = [
+    "config",
     "assistant",
     "platform_events", 
     "reports",
