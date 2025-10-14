@@ -29,6 +29,16 @@ export interface VisualCard {
   value?: number | string
   trend?: 'up' | 'down' | 'stable'
   status?: 'success' | 'warning' | 'error' | 'info'
+  metadata?: {
+    query?: string
+    time_range?: {
+      start: string
+      end: string
+    }
+    confidence?: number
+    execution_time?: number
+    [key: string]: any
+  }
 
   // Chart specific
   chart_type?: 'timeseries' | 'bar' | 'pie' | 'scatter' | 'heatmap' | 'line' | 'area'

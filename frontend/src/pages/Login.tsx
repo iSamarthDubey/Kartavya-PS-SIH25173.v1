@@ -1,20 +1,22 @@
-import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Helmet } from 'react-helmet-async'
 import { Shield, Eye, Activity, Globe, Zap, Lock, Server, AlertTriangle } from 'lucide-react'
 
 import LoginForm from '@/components/Auth/LoginForm'
-import { useAppStore, useAuth } from '@/stores/appStore'
+import { useAuth } from '@/providers/AuthProvider'
+import { useAppStore } from '@/stores/appStore'
 
 export default function Login() {
   const { login, isAuthenticated } = useAuth()
   const loading = useAppStore(state => state.loading)
   const [loginError, setLoginError] = useState<string>('')
+  const navigate = useNavigate()
 
   // Redirect if already authenticated
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to="/app/dashboard" replace />
   }
 
   const handleLogin = async (credentials: {
@@ -24,12 +26,17 @@ export default function Login() {
   }) => {
     try {
       setLoginError('')
-      await login(credentials.identifier, credentials.password)
+      const success = await login(credentials.identifier, credentials.password)
 
-      if (credentials.remember) {
-        localStorage.setItem('synrgy_remember_user', credentials.identifier)
-      } else {
-        localStorage.removeItem('synrgy_remember_user')
+      if (success) {
+        if (credentials.remember) {
+          localStorage.setItem('synrgy_remember_user', credentials.identifier)
+        } else {
+          localStorage.removeItem('synrgy_remember_user')
+        }
+        
+        // Navigate to dashboard after successful login
+        navigate('/app/dashboard', { replace: true })
       }
     } catch (error: any) {
       setLoginError(error.message || 'Authentication failed. Please check your credentials.')
