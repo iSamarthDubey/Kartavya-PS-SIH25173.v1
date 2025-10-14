@@ -21,6 +21,7 @@ import {
   Code,
   Eye,
   Loader2,
+  Gauge,
 } from 'lucide-react'
 import {
   BarChart,
@@ -41,6 +42,8 @@ import {
 
 import { useVisualPerformance } from '@/hooks/useVisualPerformance'
 import type { VisualPayload, VisualCard } from '@/types'
+import GaugeChart from '@/components/Charts/GaugeChart'
+import AlertFeed from '@/components/Charts/AlertFeed'
 
 interface VisualRendererProps {
   payload: VisualPayload
@@ -574,6 +577,48 @@ export default function EnhancedVisualRenderer({
             <div className="h-48 bg-synrgy-bg-900/50 rounded border border-synrgy-primary/10 flex items-center justify-center">
               <span className="text-synrgy-muted">Map visualization (requires implementation)</span>
             </div>
+          </motion.div>
+        )
+      case 'metric_gauge':
+        return (
+          <motion.div
+            key={`gauge-${index}`}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-synrgy-surface/30 border border-synrgy-primary/20 rounded-xl p-4"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <Gauge className="w-4 h-4 text-synrgy-primary" />
+              <h3 className="font-medium text-synrgy-text">{card.title || 'Metric Gauge'}</h3>
+            </div>
+            <div className="flex justify-center">
+              <GaugeChart
+                value={typeof card.value === 'number' ? card.value : 0}
+                max={card.config?.max || 100}
+                title={card.title || 'Metric'}
+                unit={card.config?.unit || '%'}
+                size={card.config?.size || 'md'}
+                critical={card.config?.critical || 80}
+                warning={card.config?.warning || 60}
+              />
+            </div>
+          </motion.div>
+        )
+      case 'alert_feed':
+        return (
+          <motion.div
+            key={`alerts-${index}`}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-synrgy-surface/30 border border-synrgy-primary/20 rounded-xl p-4"
+          >
+            <AlertFeed
+              alerts={card.data || []}
+              maxVisible={card.config?.limit || 10}
+              compact={card.config?.compact || false}
+              autoScroll={card.config?.autoScroll !== false}
+              showTimestamps={card.config?.showTimestamps !== false}
+            />
           </motion.div>
         )
       case 'network_graph':

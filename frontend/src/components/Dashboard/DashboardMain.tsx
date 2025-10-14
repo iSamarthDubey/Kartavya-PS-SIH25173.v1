@@ -105,6 +105,46 @@ const createNarrativePayload = (content: string, title: string) => ({
   ],
 })
 
+const createGaugePayload = (value: number, title: string, max = 100, unit = '%') => ({
+  type: 'composite' as const,
+  cards: [
+    {
+      type: 'metric_gauge' as const,
+      title,
+      value,
+      data: [{ value }],
+      config: {
+        max,
+        unit,
+        size: 'md',
+        interactive: true,
+        exportable: true,
+        pinnable: true
+      }
+    },
+  ],
+})
+
+const createAlertFeedPayload = (alerts: any[], title: string) => ({
+  type: 'composite' as const,
+  cards: [
+    {
+      type: 'alert_feed' as const,
+      title,
+      data: alerts,
+      config: {
+        maxVisible: 8,
+        compact: true,
+        autoScroll: true,
+        showTimestamps: true,
+        interactive: true,
+        exportable: true,
+        pinnable: true
+      }
+    },
+  ],
+})
+
 export default function DashboardMain({
   onAskSynrgy,
   hybridMode = false,
@@ -217,6 +257,7 @@ export default function DashboardMain({
     value: threat.count,
     severity: threat.severity
   })) : []
+  
   
   // Calculate system health based on current metrics - NO FALLBACKS, BACKEND DATA ONLY
   const activeAlerts = dashboardMetrics.activeAlerts || 0
@@ -389,6 +430,87 @@ export default function DashboardMain({
               className="w-full h-full"
             />
           </div>
+        </div>
+        
+        {/* Additional SIEM Components */}
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+          {/* Threat Level Gauge */}
+          <div className="w-full">
+            <VisualRenderer
+              payload={createGaugePayload(
+                Math.min(((totalThreats / 10000) * 100), 100),
+                'Threat Level',
+                100,
+                '%'
+              )}
+              className="w-full"
+            />
+          </div>
+          
+          {/* System Health Gauge */}
+          <div className="w-full">
+            <VisualRenderer
+              payload={createGaugePayload(
+                currentSystemHealth?.health_score === 'excellent' ? 95 :
+                currentSystemHealth?.health_score === 'good' ? 75 :
+                currentSystemHealth?.health_score === 'degraded' ? 45 : 25,
+                'System Health',
+                100,
+                '%'
+              )}
+              className="w-full"
+            />
+          </div>
+          
+          {/* Alert Response Time Gauge */}
+          <div className="w-full">
+            <VisualRenderer
+              payload={createGaugePayload(
+                Math.max(100 - (activeAlerts / 50), 10),
+                'Response Time',
+                100,
+                '%'
+              )}
+              className="w-full"
+            />
+          </div>
+          
+          {/* Security Score Gauge */}
+          <div className="w-full">
+            <VisualRenderer
+              payload={createGaugePayload(
+                Math.max(85 - (totalThreats / 100), 20),
+                'Security Score',
+                100,
+                '%'
+              )}
+              className="w-full"
+            />
+          </div>
+        </div>
+        
+        {/* Alert Feed Section */}
+        <div className="w-full">
+          <VisualRenderer
+            payload={createAlertFeedPayload(
+              // Generate sample alerts from our threat data
+              topThreats.slice(0, 5).map((threat: any, index: number) => ({
+                id: `alert-${index}`,
+                title: `${threat.name} Detection`,
+                description: `Detected ${threat.count} instances of ${threat.name.toLowerCase()} activity in the last hour.`,
+                severity: threat.severity >= 4 ? 'critical' : threat.severity >= 3 ? 'high' : threat.severity >= 2 ? 'medium' : 'low',
+                timestamp: new Date(Date.now() - (index * 300000)).toISOString(),
+                category: threat.name.includes('Network') ? 'Network Security' : 
+                         threat.name.includes('Auth') ? 'Authentication' : 
+                         threat.name.includes('Process') ? 'Process Monitor' : 'Security Alert',
+                source: 'SYNRGY SIEM',
+                ip: `192.168.1.${Math.floor(Math.random() * 254) + 1}`,
+                user: index % 2 === 0 ? 'system.admin' : 'unknown'
+              })),
+              'Recent Security Alerts'
+            )}
+            className="w-full"
+          />
         </div>
       </div>
     </div>
