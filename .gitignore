@@ -613,3 +613,4 @@ backend/tests/FINAL_VERIFICATION_RESULTS.json
 backend/debug_issue.py
 backend/test_cors_deployment.py
 backend/test_websocket.py
+backend/debug_severity_error.py
