@@ -17,7 +17,7 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       staleTime: 0, // Real-time data - always fresh
-      cacheTime: 1000 * 60 * 5, // Keep in memory for 5 minutes
+      gcTime: 1000 * 60 * 5, // Keep in memory for 5 minutes (gcTime replaces cacheTime)
       refetchOnWindowFocus: true, // Refetch when user returns to tab
       refetchOnReconnect: true, // Refetch when internet reconnects
       refetchInterval: false, // Let individual queries control their intervals
@@ -120,7 +120,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <HelmetProvider>
-        <BrowserRouter>
+        <BrowserRouter
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true
+          }}
+        >
           <QueryClientProvider client={queryClient}>
             <App />
             <Toaster
