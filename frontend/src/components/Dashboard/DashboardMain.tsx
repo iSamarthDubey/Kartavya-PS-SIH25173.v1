@@ -166,67 +166,72 @@ export default function DashboardMain({
   // Extract dashboard metrics data from the main API endpoint
   const dashboardMetrics = dashboardData?.data?.data || {}
   
-  // Create summary cards from dashboard metrics
-  const summaryCards = [
+  // Create summary cards from dashboard metrics - NO FALLBACKS, BACKEND DATA ONLY
+  const summaryCards = dashboardMetrics.totalThreats !== undefined || dashboardMetrics.activeAlerts !== undefined ? [
     {
       title: 'Total Threats',
       value: dashboardMetrics.totalThreats || 0,
       status: (dashboardMetrics.totalThreats || 0) > 500 ? 'warning' : 'normal',
       color: 'primary',
-      change: { value: 12, trend: 'up' }
+      change: { value: dashboardMetrics.totalThreatsChange || 0, trend: (dashboardMetrics.totalThreatsChange || 0) > 0 ? 'up' : 'down' }
     },
     {
       title: 'Active Alerts',
       value: dashboardMetrics.activeAlerts || 0,
-      status: (dashboardMetrics.activeAlerts || 0) > 700 ? 'error' : 'warning',
+      status: (dashboardMetrics.activeAlerts || 0) > 700 ? 'error' : (dashboardMetrics.activeAlerts || 0) > 300 ? 'warning' : 'normal',
       color: 'accent',
-      change: { value: 8, trend: 'up' }
+      change: { value: dashboardMetrics.activeAlertsChange || 0, trend: (dashboardMetrics.activeAlertsChange || 0) > 0 ? 'up' : 'down' }
     },
     {
       title: 'Systems Online',
       value: dashboardMetrics.systemsOnline || 0,
-      status: 'success',
+      status: (dashboardMetrics.systemsOnline || 0) > 3 ? 'success' : 'warning',
       color: 'success',
-      change: { value: 0, trend: 'stable' }
+      change: { value: dashboardMetrics.systemsOnlineChange || 0, trend: (dashboardMetrics.systemsOnlineChange || 0) >= 0 ? 'stable' : 'down' }
     },
     {
       title: 'Incidents Today',
       value: dashboardMetrics.incidentsToday || 0,
       status: (dashboardMetrics.incidentsToday || 0) > 1000 ? 'warning' : 'info',
       color: 'warning',
-      change: { value: 15, trend: 'up' }
+      change: { value: dashboardMetrics.incidentsTodayChange || 0, trend: (dashboardMetrics.incidentsTodayChange || 0) > 0 ? 'up' : 'down' }
     }
-  ]
+  ] : []
   
-  // Extract chart data from dashboard metrics
+  // Extract chart data from dashboard metrics - NO FALLBACKS, BACKEND DATA ONLY
   const threatTrends = dashboardMetrics.threatTrends || []
   const topThreats = dashboardMetrics.topThreats || []
   
-  // Map data to chart format with proper field names for visualization
-  const threatData = threatTrends.map((trend: any) => ({
+  // Map data to chart format with proper field names for visualization - only if data exists
+  const threatData = threatTrends.length > 0 ? threatTrends.map((trend: any) => ({
     x: trend.date,
     y: trend.count,
     name: trend.date,
     value: trend.count
-  }))
+  })) : []
   
-  const topThreatsData = topThreats.map((threat: any) => ({
+  const topThreatsData = topThreats.length > 0 ? topThreats.map((threat: any) => ({
     x: threat.name,
     y: threat.count,
     name: threat.name,
     value: threat.count,
     severity: threat.severity
-  }))
+  })) : []
   
-  // Calculate system health based on current metrics
+  // Calculate system health based on current metrics - NO FALLBACKS, BACKEND DATA ONLY
+  const activeAlerts = dashboardMetrics.activeAlerts || 0
+  const totalThreats = dashboardMetrics.totalThreats || 0
+  const systemsOnline = dashboardMetrics.systemsOnline || 0
+  
   const currentSystemHealth = {
-    health_score: (dashboardMetrics.activeAlerts || 0) > 700 ? 'degraded' : 
-                  (dashboardMetrics.totalThreats || 0) > 500 ? 'good' : 'excellent',
+    health_score: activeAlerts > 700 ? 'degraded' : 
+                  totalThreats > 500 ? 'good' : 
+                  activeAlerts === 0 && totalThreats === 0 ? 'unknown' : 'excellent',
     services: {
-      'SIEM Monitor': true,
-      'Threat Detection': (dashboardMetrics.systemsOnline || 0) > 0,
-      'Alert System': (dashboardMetrics.activeAlerts || 0) < 1000,
-      'Data Pipeline': true
+      'SIEM Monitor': dashboardMetrics.siemMonitor ?? true,
+      'Threat Detection': systemsOnline > 0,
+      'Alert System': activeAlerts < 1000,
+      'Data Pipeline': dashboardMetrics.dataPipeline ?? false
     }
   }
 

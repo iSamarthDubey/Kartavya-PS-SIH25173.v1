@@ -147,7 +147,7 @@ class MockElasticsearchConnector:
             },
             "hits": {
                 "total": {
-                    "value": random.randint(size, size * 10),
+                    "value": len(hits) if size is None else random.randint(max(1, size), max(2, size * 10)),
                     "relation": "eq"
                 },
                 "max_score": max([hit["_score"] for hit in hits]) if hits else 0,
