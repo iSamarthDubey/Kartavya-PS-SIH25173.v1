@@ -256,10 +256,19 @@ class ConversationalPipeline:
     
     def _format_event(self, event: Dict[str, Any], query_type: str) -> Dict[str, Any]:
         """Format a single event based on query type"""
+        # Safely extract and normalize severity from multiple possible paths
+        severity_raw = (
+            event.get("event", {}).get("severity") or  # Standard ECS format
+            event.get("severity") or                    # Direct severity field
+            event.get("log", {}).get("level") or        # Log level format
+            "unknown"
+        )
+        severity = self._normalize_severity(severity_raw)
+        
         formatted = {
             "timestamp": event.get("@timestamp", ""),
             "message": event.get("message", ""),
-            "severity": event.get("event", {}).get("severity", "unknown")
+            "severity": severity
         }
         
         # Add specific fields based on query type
@@ -287,6 +296,30 @@ class ConversationalPipeline:
         
         return formatted
     
+    def _normalize_severity(self, severity_raw: Any) -> str:
+        """Normalize severity to a consistent string format"""
+        if severity_raw is None:
+            return "unknown"
+        
+        # Handle integer severities (common in SIEM systems)
+        if isinstance(severity_raw, int):
+            severity_map = {
+                0: "info",
+                1: "low", 
+                2: "medium",
+                3: "high",
+                4: "critical"
+            }
+            return severity_map.get(severity_raw, f"level_{severity_raw}")
+        
+        # Handle string severities
+        elif isinstance(severity_raw, str):
+            return severity_raw.lower().strip()
+        
+        # Handle any other types
+        else:
+            return str(severity_raw).lower().strip()
+    
     async def generate_summary(
         self,
         results: List[Dict[str, Any]],
@@ -306,11 +339,15 @@ class ConversationalPipeline:
         """
         # Use AI response generator if available
         if hasattr(self, 'response_generator') and self.response_generator:
-            return await self.response_generator.generate_summary(
-                results=results,
-                query=query,
-                intent=intent
-            )
+            try:
+                return await self.response_generator.generate_summary(
+                    results=results,
+                    query=query,
+                    intent=intent
+                )
+            except Exception as e:
+                logger.error(f"AI response generator failed: {e}, using fallback")
+                # Fall through to template-based summary
         
         # Fallback to template-based summary
         if not results:

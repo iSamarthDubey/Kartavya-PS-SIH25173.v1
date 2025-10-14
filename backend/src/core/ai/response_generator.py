@@ -448,7 +448,8 @@ class ResponseGenerator:
             return f"Detected {count} malware events involving {unique_threats} threat signatures on {affected_hosts} hosts. Immediate containment and forensic analysis recommended."
         
         elif intent == "security_alerts":
-            high_severity = len([r for r in results if r.get("severity", "").lower() == "high"])
+            # Safely handle severity comparison (could be string or int)
+            high_severity = len([r for r in results if str(r.get("severity", "")).lower() in ["high", "4", "critical"]])
             return f"Found {count} security alerts with {high_severity} high-severity events. Review critical alerts immediately and assess potential impact on infrastructure."
         
         elif intent == "network_traffic":
@@ -690,7 +691,8 @@ class ResponseGenerator:
         """Analyze severity distribution"""
         severities = {}
         for result in results:
-            severity = result.get("severity", "unknown").lower()
+            # Safely handle severity as string or int
+            severity = str(result.get("severity", "unknown")).lower()
             severities[severity] = severities.get(severity, 0) + 1
         
         return severities

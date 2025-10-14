@@ -269,7 +269,7 @@ async def lifespan(app: FastAPI):
     if app_state.get("redis_manager"):
         await app_state["redis_manager"].disconnect()
 
-# Create FastAPI app with environment-based configuration
+# Create FastAPI app with simple configuration
 app = FastAPI(
     title="SYNRGY SIEM NLP Assistant API",
     description="Conversational interface for SIEM investigation and automated threat reporting",
@@ -280,26 +280,23 @@ app = FastAPI(
     openapi_url="/api/openapi.json" if os.getenv("ENVIRONMENT", "demo") != "production" else None
 )
 
-# Configure CORS with environment-based origins
+# Configure CORS with simple origins
 allowed_origins = [
     "http://localhost:3000",
     "http://localhost:5173",
+    "http://localhost:5174",
     "http://localhost:8501", 
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
-    "http://127.0.0.1:8501"
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:8501",
+    "https://kartavya-sih25173.vercel.app"
 ]
 
 # Add production origins if in production
 if os.getenv("ENVIRONMENT") == "production":
     production_origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
     allowed_origins.extend([origin.strip() for origin in production_origins if origin.strip()])
-else:
-    # Development/demo additional origins
-    allowed_origins.extend([
-        "https://kartavya-siem.vercel.app",
-        "https://kartavya-siem-backend.onrender.com"
-    ])
 
 app.add_middleware(
     CORSMiddleware,
@@ -316,14 +313,14 @@ app.add_middleware(
         "X-File-Name"
     ],
     expose_headers=["X-Total-Count", "X-Page-Count", "Content-Disposition"],
-    max_age=3600,  # Cache preflight requests for 1 hour
+    max_age=3600,
 )
 
 # Add custom middleware
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(LoggingMiddleware)
 
-# Include routers
+# Include routers with simple hardcoded prefixes
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(platform_events_router, prefix="/api", tags=["Platform Events"])

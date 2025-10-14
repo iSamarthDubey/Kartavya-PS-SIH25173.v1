@@ -81,8 +81,29 @@ class ConnectionManager:
 # Global connection manager
 connection_manager = ConnectionManager()
 
+@router.websocket("/ws/chat")
+async def websocket_chat_simple(
+    websocket: WebSocket
+):
+    """
+    Simple WebSocket endpoint without session_id requirement
+    Auto-generates session_id for compatibility
+    """
+    # Generate a session ID automatically
+    session_id = f"auto_{uuid.uuid4().hex[:8]}"
+    await websocket_chat_endpoint_impl(websocket, session_id)
+
 @router.websocket("/ws/chat/{session_id}")
-async def websocket_chat_endpoint(
+async def websocket_chat_with_session(
+    websocket: WebSocket,
+    session_id: str
+):
+    """
+    WebSocket endpoint with explicit session_id
+    """
+    await websocket_chat_endpoint_impl(websocket, session_id)
+
+async def websocket_chat_endpoint_impl(
     websocket: WebSocket,
     session_id: str
 ):

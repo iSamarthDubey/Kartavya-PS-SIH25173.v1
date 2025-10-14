@@ -62,7 +62,7 @@ class MockSIEMConnector(BaseSIEMConnector):
     async def execute_query(
         self,
         query: Dict[str, Any],
-        size: int = 100,
+        size: Optional[int] = None,
         index: Optional[str] = None
     ) -> Dict[str, Any]:
         """
@@ -83,11 +83,10 @@ class MockSIEMConnector(BaseSIEMConnector):
             # Use default index if none specified
             target_index = index or "security-logs-demo"
             
-            # Build the search body
-            search_body = {
-                "size": size,
-                **query
-            }
+            # Build the search body (unlimited if size is None)
+            search_body = {**query}
+            if size is not None:
+                search_body["size"] = size
             
             # Execute search via mock Elasticsearch
             result = self.mock_es.search(target_index, search_body)
@@ -204,8 +203,8 @@ class MockSIEMConnector(BaseSIEMConnector):
             if not self.connected or not self.mock_es:
                 await self.connect()
             
-            # Extract parameters
-            size = query_params.get('size', 100)
+            # Extract parameters (no size limit!)
+            size = query_params.get('size', None)  # None = unlimited
             query_type = query_params.get('type', 'general')
             filters = query_params.get('filters', {})
             
