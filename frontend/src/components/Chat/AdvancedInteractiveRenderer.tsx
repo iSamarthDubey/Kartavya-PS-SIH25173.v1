@@ -150,7 +150,7 @@ const InteractiveChart = memo(({
   }, [card.data, xField, yField, selectedDataPoints])
 
   // Handle chart element clicks
-  const handleChartClick = useCallback((data: any, index: number, event: any) => {
+  const handleChartClick = useCallback((data: any, event?: any) => {
     if (!data) return
 
     const rect = chartRef.current?.getBoundingClientRect()
@@ -281,8 +281,7 @@ const InteractiveChart = memo(({
   // Generate chart component based on type
   const renderChartBody = useMemo(() => {
     const commonProps = {
-      data: processedData,
-      onClick: handleChartClick
+      data: processedData
     }
 
     switch (card.chart_type) {
@@ -306,6 +305,7 @@ const InteractiveChart = memo(({
               fill={config.color || SEMANTIC_COLORS.primary}
               radius={[4, 4, 0, 0]}
               cursor="pointer"
+              onClick={handleChartClick}
               onMouseEnter={(data, index) => {
                 // Highlight related data points
                 setSelectedDataPoints([index])
@@ -344,6 +344,7 @@ const InteractiveChart = memo(({
               dataKey="y"
               stroke={config.color || SEMANTIC_COLORS.primary}
               strokeWidth={3}
+              onClick={handleChartClick}
               dot={{ 
                 fill: config.color || SEMANTIC_COLORS.primary, 
                 strokeWidth: 2, 
@@ -381,6 +382,7 @@ const InteractiveChart = memo(({
               fillOpacity={1}
               fill={`url(#${gradientId})`}
               cursor="pointer"
+              onClick={handleChartClick}
             />
           </AreaChart>
         )
@@ -577,11 +579,12 @@ const InteractiveTable = memo(({
   if (!card.columns || !card.rows) return null
 
   const filteredRows = useMemo(() => {
+    if (!card.rows || !Array.isArray(card.rows)) return []
     let filtered = card.rows
     
     // Apply search filter
     if (searchTerm) {
-      filtered = filtered.filter(row => 
+      filtered = filtered.filter(row =>
         row.some(cell => 
           String(cell).toLowerCase().includes(searchTerm.toLowerCase())
         )
@@ -589,9 +592,9 @@ const InteractiveTable = memo(({
     }
 
     // Apply sorting
-    if (sortConfig) {
+    if (sortConfig && card.columns) {
       const columnIndex = card.columns.findIndex(col => col.key === sortConfig.key || col.label === sortConfig.key)
-      if (columnIndex !== -1) {
+      if (columnIndex !== -1 && filtered) {
         filtered = [...filtered].sort((a, b) => {
           const aVal = a[columnIndex]
           const bVal = b[columnIndex]
@@ -684,9 +687,9 @@ const InteractiveTable = memo(({
               <th className="w-8 px-4 py-3">
                 <input
                   type="checkbox"
-                  checked={selectedRows.size === filteredRows.length && filteredRows.length > 0}
+                  checked={filteredRows && selectedRows.size === filteredRows.length && filteredRows.length > 0}
                   onChange={(e) => {
-                    if (e.target.checked) {
+                    if (e.target.checked && filteredRows) {
                       setSelectedRows(new Set(filteredRows.map((_, idx) => idx)))
                     } else {
                       setSelectedRows(new Set())
@@ -707,7 +710,7 @@ const InteractiveTable = memo(({
                       <div className="flex flex-col">
                         <ChevronDown 
                           className={`w-3 h-3 transition-transform ${
-                            sortConfig.direction === 'asc' ? 'rotate-180' : ''
+                            sortConfig?.direction === 'asc' ? 'rotate-180' : ''
                           }`}
                         />
                       </div>
@@ -718,7 +721,7 @@ const InteractiveTable = memo(({
             </tr>
           </thead>
           <tbody>
-            {filteredRows.slice(0, 20).map((row: any[], rowIdx: number) => (
+            {filteredRows && filteredRows.slice(0, 20).map((row: any[], rowIdx: number) => (
               <motion.tr
                 key={rowIdx}
                 initial={{ opacity: 0, x: -10 }}
@@ -750,7 +753,7 @@ const InteractiveTable = memo(({
                     className="px-4 py-3 text-synrgy-text border-b border-synrgy-primary/5 cursor-pointer hover:text-synrgy-primary transition-colors"
                     onClick={() => {
                       // Handle cell click for filtering
-                      if (onFilter && card.columns[cellIdx]) {
+                      if (onFilter && card.columns && card.columns[cellIdx]) {
                         onFilter({
                           field: card.columns[cellIdx].key || card.columns[cellIdx].label,
                           operator: 'equals',
@@ -773,10 +776,10 @@ const InteractiveTable = memo(({
       {/* Table Footer */}
       <div className="px-4 py-3 bg-synrgy-bg-900/20 border-t border-synrgy-primary/10 flex items-center justify-between text-xs text-synrgy-muted">
         <span>
-          Showing {Math.min(20, filteredRows.length)} of {filteredRows.length} results
-          {searchTerm && ` (filtered from ${card.rows.length} total)`}
+          Showing {Math.min(20, filteredRows?.length || 0)} of {filteredRows?.length || 0} results
+          {searchTerm && card.rows && ` (filtered from ${card.rows.length} total)`}
         </span>
-        {card.rows.length > 20 && (
+        {card.rows && card.rows.length > 20 && (
           <span className="text-synrgy-accent">Pagination coming soon</span>
         )}
       </div>

@@ -336,7 +336,7 @@ const createAppStore = () => {
   }
 }
 
-export const useAppStore = create<AppState>()(createAppStore())
+export const useAppStore = create<AppState>()(createAppStore() as any)
 
 // Selectors
 export const useAuth = () => {

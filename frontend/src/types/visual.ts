@@ -5,7 +5,7 @@
  */
 
 export interface VisualPayload {
-  type: 'composite' | 'chart' | 'table' | 'map' | 'narrative' | 'network_graph' | 'summary_card' | 'insight_feed'
+  type: 'composite' | 'chart' | 'table' | 'map' | 'narrative' | 'network_graph' | 'summary_card' | 'insight_feed' | 'metric_gauge' | 'alert_feed'
   cards?: VisualCard[]
   metadata?: {
     query: string
@@ -22,7 +22,7 @@ export interface VisualPayload {
 }
 
 export interface VisualCard {
-  type: 'summary_card' | 'chart' | 'table' | 'map' | 'network_graph' | 'narrative' | 'insight_feed'
+  type: 'summary_card' | 'chart' | 'table' | 'map' | 'network_graph' | 'narrative' | 'insight_feed' | 'metric_gauge' | 'alert_feed'
   title?: string
   subtitle?: string
   data?: any
@@ -100,6 +100,17 @@ export interface VisualCard {
     strokeWidth?: number
     outerRadius?: number
     confidence?: number
+    // Gauge specific config
+    max?: number
+    unit?: string
+    size?: 'sm' | 'md' | 'lg'
+    critical?: number
+    warning?: number
+    // Alert feed specific config
+    limit?: number
+    compact?: boolean
+    autoScroll?: boolean
+    showTimestamps?: boolean
   }
 
   // Actions

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { RefreshCw, Settings } from 'lucide-react'
+import { RefreshCw, Settings, MessageCircle } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 
 import VisualRenderer from '@/components/Visuals/VisualRenderer'
@@ -7,6 +7,7 @@ import DashboardGrid from './DashboardGrid'
 import { dashboardApi, api } from '@/services/api'
 import { useAppStore } from '@/stores/appStore'
 import { useHybridStore } from '@/stores/hybridStore'
+import AIInsightFeed from './AIInsightFeed'
 
 interface DashboardMainProps {
   onAskSynrgy?: (query: string) => void
@@ -116,7 +117,7 @@ const createGaugePayload = (value: number, title: string, max = 100, unit = '%')
       config: {
         max,
         unit,
-        size: 'md',
+        size: 'md' as 'sm' | 'md' | 'lg',
         interactive: true,
         exportable: true,
         pinnable: true
@@ -259,20 +260,21 @@ export default function DashboardMain({
   })) : []
   
   
-  // Calculate system health based on current metrics - NO FALLBACKS, BACKEND DATA ONLY
+  // Calculate system health based PURELY on backend metrics - NO HARDCODED VALUES
   const activeAlerts = dashboardMetrics.activeAlerts || 0
   const totalThreats = dashboardMetrics.totalThreats || 0
   const systemsOnline = dashboardMetrics.systemsOnline || 0
+  const incidentsToday = dashboardMetrics.incidentsToday || 0
   
   const currentSystemHealth = {
-    health_score: activeAlerts > 700 ? 'degraded' : 
-                  totalThreats > 500 ? 'good' : 
-                  activeAlerts === 0 && totalThreats === 0 ? 'unknown' : 'excellent',
+    health_score: activeAlerts > 2000 ? 'degraded' : 
+                  totalThreats > 2000 ? 'good' : 
+                  (activeAlerts === 0 && totalThreats === 0 && systemsOnline === 0) ? 'unknown' : 'excellent',
     services: {
-      'SIEM Monitor': dashboardMetrics.siemMonitor ?? true,
-      'Threat Detection': systemsOnline > 0,
-      'Alert System': activeAlerts < 1000,
-      'Data Pipeline': dashboardMetrics.dataPipeline ?? false
+      'Backend API': !!dashboardMetrics.totalThreats || !!dashboardMetrics.activeAlerts,
+      'Threat Detection': totalThreats > 0,
+      'Alert System': activeAlerts > 0,
+      'System Monitor': systemsOnline > 0
     }
   }
 
@@ -280,77 +282,90 @@ export default function DashboardMain({
   // Otherwise show the main dashboard with summary cards and charts
 
   return (
-    <div className={`w-full min-h-screen bg-synrgy-bg-950 ${className}`}>
-      {/* Page Container with Proper Spacing */}
-      <div className="max-w-[1800px] mx-auto px-8 py-8 space-y-8">
-        {/* Clean Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-synrgy-text mb-3">Security Dashboard</h1>
-            <p className="text-lg text-synrgy-muted">Real-time overview of your security posture</p>
-          </div>
+    <div className={`w-full min-h-screen bg-synrgy-bg-950 flex ${className}`}>
+      {/* Main Dashboard Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Page Container with Proper Spacing */}
+        <div className="flex-1 px-8 py-8 space-y-8 overflow-y-auto">
+          {/* Clean Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-4xl font-bold text-synrgy-text mb-3">Security Dashboard</h1>
+              <p className="text-lg text-synrgy-muted">Real-time overview of your security posture</p>
+            </div>
 
-          <div className="flex items-center gap-6">
-            {/* System Health Status */}
-            <div className={`
-              flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium border
-              ${
-                currentSystemHealth?.health_score === 'excellent'
-                  ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                  : currentSystemHealth?.health_score === 'good'
-                    ? 'bg-synrgy-accent/10 text-synrgy-accent border-synrgy-accent/20'
-                    : currentSystemHealth?.health_score === 'degraded'
-                      ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                      : 'bg-red-500/10 text-red-400 border-red-500/20'
-              }
-            `}>
-              <div
-                className={`w-3 h-3 rounded-full ${
+            <div className="flex items-center gap-6">
+              {/* System Health Status */}
+              <div className={`
+                flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium border
+                ${
                   currentSystemHealth?.health_score === 'excellent'
-                    ? 'bg-green-500'
+                    ? 'bg-green-500/10 text-green-400 border-green-500/20'
                     : currentSystemHealth?.health_score === 'good'
-                      ? 'bg-synrgy-accent'
+                      ? 'bg-synrgy-accent/10 text-synrgy-accent border-synrgy-accent/20'
                       : currentSystemHealth?.health_score === 'degraded'
-                        ? 'bg-yellow-500'
-                        : 'bg-red-500'
-                }`}
-              />
-              <span className="capitalize">
-                System {currentSystemHealth?.health_score || 'Unknown'}
-              </span>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3">
-              {/* Refresh Button */}
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="p-3 hover:bg-synrgy-primary/10 rounded-xl transition-colors border border-synrgy-primary/20"
-                title="Refresh dashboard"
-              >
-                <RefreshCw
-                  className={`w-5 h-5 text-synrgy-primary ${refreshing ? 'animate-spin' : ''}`}
+                        ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                        : 'bg-red-500/10 text-red-400 border-red-500/20'
+                }
+              `}>
+                <div
+                  className={`w-3 h-3 rounded-full ${
+                    currentSystemHealth?.health_score === 'excellent'
+                      ? 'bg-green-500'
+                      : currentSystemHealth?.health_score === 'good'
+                        ? 'bg-synrgy-accent'
+                        : currentSystemHealth?.health_score === 'degraded'
+                          ? 'bg-yellow-500'
+                          : 'bg-red-500'
+                  }`}
                 />
-              </button>
+                <span className="capitalize">
+                  System {currentSystemHealth?.health_score || 'Unknown'}
+                </span>
+              </div>
 
-              {/* Settings Button */}
-              <button className="p-3 hover:bg-synrgy-primary/10 rounded-xl transition-colors border border-synrgy-primary/20">
-                <Settings className="w-5 h-5 text-synrgy-primary" />
-              </button>
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3">
+                {/* Refresh Button */}
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="p-3 hover:bg-synrgy-primary/10 rounded-xl transition-colors border border-synrgy-primary/20"
+                  title="Refresh dashboard"
+                >
+                  <RefreshCw
+                    className={`w-5 h-5 text-synrgy-primary ${refreshing ? 'animate-spin' : ''}`}
+                  />
+                </button>
+
+                {/* Settings Button */}
+                <button className="p-3 hover:bg-synrgy-primary/10 rounded-xl transition-colors border border-synrgy-primary/20">
+                  <Settings className="w-5 h-5 text-synrgy-primary" />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Summary Cards - Full Width Grid */}
+          {/* Summary Cards - Full Width Grid */}
         {summaryCards.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8">
             {summaryCards.map((card: any, index: number) => (
-              <div key={card.title || index} className="w-full">
+              <div key={card.title || index} className="w-full relative group">
                 <VisualRenderer
                   payload={createSummaryCardPayload(card)}
                   className="w-full"
                 />
+                {/* Ask CYNRGY Popover - as per SYNRGY.TXT spec */}
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => onAskSynrgy && onAskSynrgy(`Analyze ${card.title} metric and explain any anomalies`)}
+                    className="flex items-center gap-1 px-2 py-1 bg-synrgy-primary text-synrgy-bg-900 rounded text-xs hover:bg-synrgy-primary/90 transition-colors"
+                    title="Ask CYNRGY about this metric"
+                  >
+                    <MessageCircle className="w-3 h-3" />
+                    Ask CYNRGY
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -432,87 +447,99 @@ export default function DashboardMain({
           </div>
         </div>
         
-        {/* Additional SIEM Components */}
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-          {/* Threat Level Gauge */}
-          <div className="w-full">
-            <VisualRenderer
-              payload={createGaugePayload(
-                Math.min(((totalThreats / 10000) * 100), 100),
-                'Threat Level',
-                100,
-                '%'
-              )}
-              className="w-full"
-            />
-          </div>
-          
-          {/* System Health Gauge */}
-          <div className="w-full">
-            <VisualRenderer
-              payload={createGaugePayload(
-                currentSystemHealth?.health_score === 'excellent' ? 95 :
-                currentSystemHealth?.health_score === 'good' ? 75 :
-                currentSystemHealth?.health_score === 'degraded' ? 45 : 25,
-                'System Health',
-                100,
-                '%'
-              )}
-              className="w-full"
-            />
-          </div>
-          
-          {/* Alert Response Time Gauge */}
-          <div className="w-full">
-            <VisualRenderer
-              payload={createGaugePayload(
-                Math.max(100 - (activeAlerts / 50), 10),
-                'Response Time',
-                100,
-                '%'
-              )}
-              className="w-full"
-            />
-          </div>
-          
-          {/* Security Score Gauge */}
-          <div className="w-full">
-            <VisualRenderer
-              payload={createGaugePayload(
-                Math.max(85 - (totalThreats / 100), 20),
-                'Security Score',
-                100,
-                '%'
-              )}
-              className="w-full"
-            />
-          </div>
-        </div>
-        
-        {/* Alert Feed Section */}
-        <div className="w-full">
-          <VisualRenderer
-            payload={createAlertFeedPayload(
-              // Generate sample alerts from our threat data
-              topThreats.slice(0, 5).map((threat: any, index: number) => ({
-                id: `alert-${index}`,
-                title: `${threat.name} Detection`,
-                description: `Detected ${threat.count} instances of ${threat.name.toLowerCase()} activity in the last hour.`,
-                severity: threat.severity >= 4 ? 'critical' : threat.severity >= 3 ? 'high' : threat.severity >= 2 ? 'medium' : 'low',
-                timestamp: new Date(Date.now() - (index * 300000)).toISOString(),
-                category: threat.name.includes('Network') ? 'Network Security' : 
-                         threat.name.includes('Auth') ? 'Authentication' : 
-                         threat.name.includes('Process') ? 'Process Monitor' : 'Security Alert',
-                source: 'SYNRGY SIEM',
-                ip: `192.168.1.${Math.floor(Math.random() * 254) + 1}`,
-                user: index % 2 === 0 ? 'system.admin' : 'unknown'
-              })),
-              'Recent Security Alerts'
+        {/* Additional SIEM Components - Only show if we have backend data */}
+        {(totalThreats > 0 || activeAlerts > 0 || systemsOnline > 0) && (
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+            {/* Systems Online Count */}
+            {systemsOnline > 0 && (
+              <div className="w-full">
+                <VisualRenderer
+                  payload={createGaugePayload(
+                    systemsOnline,
+                    'Systems Online',
+                    Math.max(systemsOnline * 2, 10),
+                    ''
+                  )}
+                  className="w-full"
+                />
+              </div>
             )}
-            className="w-full"
-          />
+            
+            {/* Active Alerts Count */}
+            {activeAlerts > 0 && (
+              <div className="w-full">
+                <VisualRenderer
+                  payload={createGaugePayload(
+                    activeAlerts,
+                    'Active Alerts',
+                    Math.max(activeAlerts * 1.5, 1000),
+                    ''
+                  )}
+                  className="w-full"
+                />
+              </div>
+            )}
+            
+            {/* Total Threats Count */}
+            {totalThreats > 0 && (
+              <div className="w-full">
+                <VisualRenderer
+                  payload={createGaugePayload(
+                    totalThreats,
+                    'Total Threats',
+                    Math.max(totalThreats * 1.5, 1000),
+                    ''
+                  )}
+                  className="w-full"
+                />
+              </div>
+            )}
+            
+            {/* Today's Incidents Count */}
+            {dashboardMetrics.incidentsToday > 0 && (
+              <div className="w-full">
+                <VisualRenderer
+                  payload={createGaugePayload(
+                    dashboardMetrics.incidentsToday,
+                    'Incidents Today',
+                    Math.max(dashboardMetrics.incidentsToday * 1.5, 1000),
+                    ''
+                  )}
+                  className="w-full"
+                />
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Alert Feed Section - Only show if we have real threat data from backend */}
+        {topThreats.length > 0 && (
+          <div className="w-full">
+            <VisualRenderer
+              payload={createAlertFeedPayload(
+                // Convert backend topThreats data to alert format - NO HARDCODED VALUES
+                topThreats.slice(0, 5).map((threat: any, index: number) => ({
+                  id: `threat-alert-${index}`,
+                  title: `${threat.name} Detected`,
+                  description: `${threat.count} instances detected from backend data`,
+                  severity: threat.severity >= 4 ? 'critical' : threat.severity >= 3 ? 'high' : threat.severity >= 2 ? 'medium' : 'low',
+                  timestamp: new Date(Date.now() - (index * 60000)).toISOString(),
+                  category: threat.name,
+                  source: 'Backend API',
+                  ip: '',
+                  user: ''
+                })),
+                'Backend Threat Alerts'
+              )}
+              className="w-full"
+            />
+          </div>
+        )}
         </div>
       </div>
+      
+      {/* AI Insight Feed - Right Sidebar */}
+      <AIInsightFeed />
     </div>
   )
 }

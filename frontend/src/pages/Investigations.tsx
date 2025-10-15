@@ -198,14 +198,14 @@ export default function InvestigationsPage() {
   const handleCreateInvestigation = (data: Partial<Investigation>) => {
     createInvestigationMutation.mutate({
       ...data,
-      created_by: { id: user?.id || '', name: user?.full_name || '', avatar: user?.avatar },
+      created_by: { id: user?.id || '', name: user?.full_name || user?.username || '', avatar: '' },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       timeline: [{
         id: Date.now().toString(),
         type: 'created',
         description: 'Investigation created',
-        user: { id: user?.id || '', name: user?.full_name || '', avatar: user?.avatar },
+        user: { id: user?.id || '', name: user?.full_name || user?.username || '', avatar: '' },
         timestamp: new Date().toISOString(),
       }],
       collaborators: [],

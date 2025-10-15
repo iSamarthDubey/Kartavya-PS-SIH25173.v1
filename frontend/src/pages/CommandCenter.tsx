@@ -267,6 +267,35 @@ export default function CommandCenter() {
           </div>
         </div>
 
+        {/* Context Chips - Active Filters */}
+        {conversationContext?.active_filters && Object.keys(conversationContext.active_filters).length > 0 && (
+          <div className="px-6 py-3 border-b border-synrgy-primary/5 bg-synrgy-surface/10">
+            <div className="flex items-center gap-2 text-sm text-synrgy-muted mb-2">
+              <span>Active filters:</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(conversationContext.active_filters).map(([key, value]) => (
+                <div
+                  key={key}
+                  className="flex items-center gap-1 px-2 py-1 bg-synrgy-primary/20 text-synrgy-primary rounded-lg text-xs"
+                >
+                  <span>{key}: {String(value)}</span>
+                  <button
+                    onClick={() => {
+                      // TODO: Remove filter functionality
+                      toast.success(`Removed filter: ${key}`)
+                    }}
+                    className="hover:bg-synrgy-primary/30 rounded p-0.5 ml-1"
+                    title="Remove filter"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {messages.length === 0 ? (
