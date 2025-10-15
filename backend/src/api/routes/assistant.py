@@ -68,7 +68,8 @@ class ChatResponse(BaseModel):
     siem_query: Dict[str, Any]
     results: List[Dict[str, Any]]
     summary: str
-    visualizations: Optional[List[VisualPayload]] = None  # Standardized format
+    visualizations: Optional[List[VisualPayload]] = None  # Legacy array format
+    visual_payload: Optional[VisualPayload] = None  # single payload format
     suggestions: Optional[List[str]] = None
     metadata: Dict[str, Any]
     status: str
@@ -308,6 +309,18 @@ async def chat(
             }
         )
         
+        # Create single visual_payload as per SYNRGY.TXT specification
+        visual_payload = None
+        if visualizations:
+            if len(visualizations) == 1:
+                visual_payload = visualizations[0]
+            elif len(visualizations) > 1:
+                # Create composite payload as specified in SYNRGY.TXT
+                visual_payload = {
+                    "type": "composite",
+                    "cards": visualizations
+                }
+        
         # Create response object
         response_data = {
             "conversation_id": conversation_id,
@@ -318,7 +331,8 @@ async def chat(
             "siem_query": siem_query,
             "results": formatted_results[:request.limit],
             "summary": summary,
-            "visualizations": visualizations,
+            "visualizations": visualizations,  # Keep for backward compatibility
+            "visual_payload": visual_payload,  # SYNRGY.TXT single payload format
             "suggestions": suggestions,
             "metadata": {
                 "timestamp": datetime.now().isoformat(),
@@ -499,6 +513,115 @@ async def get_query_suggestions():
     ]
     
     return {"suggestions": suggestions}
+
+@router.post("/suggest")
+async def suggest_completions(request: dict = None):
+    """
+    POST /api/suggest endpoint for autocomplete functionality
+    As specified in SYNRGY.TXT: given partial text returns suggested completions/intents
+    """
+    try:
+        # Parse request data
+        partial_text = ""
+        context = {}
+        
+        if request:
+            partial_text = request.get("text", "").lower()
+            context = request.get("context", {})
+        
+        logger.info(f"Getting suggestions for partial text: '{partial_text}'")
+        
+        # Generate contextual suggestions based on partial input
+        suggestions = []
+        
+        # Authentication suggestions
+        if any(keyword in partial_text for keyword in ["login", "auth", "fail", "user"]):
+            suggestions.extend([
+                "Show me failed login attempts in the last hour",
+                "Which users had authentication failures today?",
+                "Find brute force login attempts",
+                "Show successful logins from external IPs"
+            ])
+        
+        # Threat/Security suggestions
+        if any(keyword in partial_text for keyword in ["threat", "malware", "alert", "attack"]):
+            suggestions.extend([
+                "Show critical security alerts from today",
+                "Find malware detections in the last 24 hours",
+                "What are the active threat indicators?",
+                "Show potential attack patterns"
+            ])
+        
+        # Network suggestions
+        if any(keyword in partial_text for keyword in ["network", "traffic", "ip", "connection"]):
+            suggestions.extend([
+                "Show unusual network traffic patterns",
+                "Which IPs generated the most traffic?",
+                "Find connections to suspicious domains",
+                "Show network anomalies"
+            ])
+        
+        # Time-based suggestions
+        if any(keyword in partial_text for keyword in ["today", "hour", "week", "recent"]):
+            suggestions.extend([
+                "Show events from the last hour",
+                "What happened today?",
+                "Find recent security incidents",
+                "Show this week's activity summary"
+            ])
+        
+        # System suggestions
+        if any(keyword in partial_text for keyword in ["system", "process", "service", "host"]):
+            suggestions.extend([
+                "Show system health status",
+                "Find suspicious process activity",
+                "Which hosts are most active?",
+                "Show service availability"
+            ])
+        
+        # Default suggestions if no matches or empty input
+        if not suggestions or not partial_text.strip():
+            suggestions = [
+                "Show me security events from today",
+                "Find failed authentication attempts",
+                "What are the top threat indicators?",
+                "Show unusual network activity",
+                "Generate security summary report",
+                "Find malware detections",
+                "Show recent critical alerts",
+                "Analyze user behavior anomalies"
+            ]
+        
+        # Limit and filter suggestions
+        filtered_suggestions = []
+        for suggestion in suggestions[:8]:  # Limit to 8 suggestions
+            if partial_text.strip() and partial_text.strip() not in suggestion.lower():
+                # Only include suggestions that contain the partial text
+                if any(word in suggestion.lower() for word in partial_text.split()):
+                    filtered_suggestions.append(suggestion)
+            elif not partial_text.strip():
+                # Include all default suggestions if no input
+                filtered_suggestions.append(suggestion)
+        
+        # Use filtered suggestions or fall back to first few
+        final_suggestions = filtered_suggestions[:6] if filtered_suggestions else suggestions[:6]
+        
+        return {
+            "status": "success", 
+            "suggestions": final_suggestions,
+            "partial_text": request.get("text", "") if request else "",
+            "context": context,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating suggestions: {e}")
+        return {
+            "status": "error",
+            "suggestions": [],
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
 # Helper functions
 async def create_standardized_visualizations(

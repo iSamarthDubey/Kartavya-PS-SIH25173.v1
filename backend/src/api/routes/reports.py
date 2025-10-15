@@ -72,3 +72,69 @@ async def export_report(format: str):
 async def schedule_report(request: ReportRequest):
 	# TODO: Schedule recurring report
 	return ReportResponse(success=True, data={"schedule": f"Report scheduled for {request.report_type}"})
+
+# SYNRGY.TXT specified endpoints
+@router.get("/{report_id}/download")
+async def download_report(report_id: str):
+	"""
+	Download report by ID - as specified in SYNRGY.TXT
+	"""
+	try:
+		# TODO: Implement actual report download logic
+		# For now, return a success response
+		return {
+			"status": "success",
+			"report_id": report_id,
+			"download_url": f"/api/reports/{report_id}/download",
+			"message": "Report download ready"
+		}
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Failed to download report: {str(e)}")
+
+@router.get("/{report_id}")
+async def get_report(report_id: str):
+	"""
+	Get report by ID - as specified in SYNRGY.TXT
+	"""
+	try:
+		# TODO: Implement actual report retrieval logic
+		return {
+			"status": "success",
+			"report_id": report_id,
+			"title": f"Report {report_id}",
+			"status": "ready",
+			"created_at": "2025-01-08T12:00:00Z",
+			"download_url": f"/api/reports/{report_id}/download"
+		}
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Failed to retrieve report: {str(e)}")
+
+@router.get("/")
+async def list_reports():
+	"""
+	List all reports - as specified in SYNRGY.TXT
+	"""
+	try:
+		# TODO: Implement actual report listing logic
+		return {
+			"status": "success",
+			"reports": [
+				{
+					"id": "report_001",
+					"title": "Weekly Security Summary",
+					"type": "executive",
+					"status": "ready",
+					"created_at": "2025-01-08T10:00:00Z"
+				},
+				{
+					"id": "report_002",
+					"title": "Threat Intelligence Report",
+					"type": "technical", 
+					"status": "generating",
+					"created_at": "2025-01-08T11:00:00Z"
+				}
+			],
+			"total": 2
+		}
+	except Exception as e:
+		raise HTTPException(status_code=500, detail=f"Failed to list reports: {str(e)}")
